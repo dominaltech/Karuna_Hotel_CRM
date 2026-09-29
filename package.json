@@ -38,5 +38,32 @@
     "tailwindcss": "^4.3.3",
     "vite": "^6.4.3",
     "wait-on": "^8.0.2"
+  },
+  "build": {
+    "appId": "com.karunahotel.pos",
+    "productName": "Karuna Hotel POS",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "server/**/*",
+      "data/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Karuna Hotel POS"
+    }
   }
 }
