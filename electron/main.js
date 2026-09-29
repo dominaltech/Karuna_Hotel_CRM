@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+﻿import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -34,12 +34,23 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      enableRemoteModule: false
+      enableRemoteModule: false,
+      devTools: false
     }
   });
 
-  // Sleek standalone desktop software feel
+  // Sleek standalone desktop software feel without default browser menu
   mainWindow.setMenuBarVisibility(false);
+
+  // Set default zoom factor to 80% (0.8) on load
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow.webContents.setZoomFactor(0.8);
+  });
+
+  // Block opening DevTools
+  mainWindow.webContents.on('devtools-opened', () => {
+    mainWindow.webContents.closeDevTools();
+  });
 
   const indexPath = path.join(__dirname, '../dist/index.html');
 

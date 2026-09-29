@@ -15716,6 +15716,51 @@
       "status": "settled",
       "syncedAt": "2026-09-29T02:20:45.871Z",
       "wasOffline": true
+    },
+    {
+      "tableId": 1788853497642,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1790648445868,
+      "status": "settled",
+      "createdAt": "2026-09-29T03:03:40.387Z"
+    },
+    {
+      "id": 1790651020402,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1790651020401",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "status": "settled",
+      "syncedAt": "2026-09-29T03:03:40.404Z",
+      "wasOffline": true
     }
   ],
   "billLogs": [
