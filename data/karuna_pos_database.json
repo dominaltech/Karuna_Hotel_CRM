@@ -2002,6 +2002,65 @@
       "currentTokenNo": "5501"
     },
     {
+      "id": 11,
+      "name": "F3",
+      "sectionId": 2,
+      "status": "occupied",
+      "currentCart": [
+        {
+          "id": 9,
+          "srNo": 109,
+          "name": "Shabu Vada",
+          "categoryId": 1,
+          "subCategoryId": 1,
+          "price": 70,
+          "hasMultiplePrices": false,
+          "variants": [],
+          "sectionPrices": {
+            "1": 70,
+            "2": 70,
+            "3": 80,
+            "4": 70
+          },
+          "subItems": [],
+          "stockQty": 0,
+          "status": "Out of Stock",
+          "isParcel": false,
+          "cartItemId": "9_1790685051495_wq43",
+          "qty": 1,
+          "unit": null,
+          "qtyDisplay": "1"
+        },
+        {
+          "id": 11,
+          "srNo": 111,
+          "name": "Dahi Vada",
+          "categoryId": 1,
+          "subCategoryId": 1,
+          "price": 70,
+          "hasMultiplePrices": false,
+          "variants": [],
+          "sectionPrices": {
+            "1": 70,
+            "2": 70,
+            "3": 80,
+            "4": 70
+          },
+          "subItems": [],
+          "isParcel": false,
+          "cartItemId": "11_1790685052126_6nh6",
+          "qty": 2,
+          "unit": null,
+          "qtyDisplay": "2"
+        }
+      ],
+      "currentTokenNo": "1011",
+      "isSplit": false,
+      "createdAt": "2026-09-29T12:30:51.495Z",
+      "parentTable": null,
+      "customerName": ""
+    },
+    {
       "id": 5,
       "name": "D5",
       "sectionId": 1,
@@ -2020,18 +2079,6 @@
       "status": "empty",
       "currentCart": [],
       "currentTokenNo": "1008",
-      "isSplit": false,
-      "createdAt": null,
-      "parentTable": null,
-      "customerName": ""
-    },
-    {
-      "id": 11,
-      "name": "F3",
-      "sectionId": 2,
-      "status": "empty",
-      "currentCart": [],
-      "currentTokenNo": "1011",
       "isSplit": false,
       "createdAt": null,
       "parentTable": null,
