@@ -1,8 +1,14 @@
 import http from 'http';
 import { WebSocket } from 'ws';
 import assert from 'node:assert';
+import { spawn } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { parseItemWeightInKg, getCounterPrefix, generateCounterInvoiceNo } from '../src/db/db.js';
 import { parseCSVAndValidateRates } from '../src/utils/excelUtils.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const PORT = 3001;
 const HOST = 'localhost';
@@ -32,6 +38,51 @@ function apiRequest(path, method = 'GET', body = null) {
   });
 }
 
+async function ensureServerRunning() {
+  const isHealthy = await new Promise((resolve) => {
+    const req = http.get(`http://${HOST}:${PORT}/api/health`, (res) => {
+      resolve(res.statusCode === 200);
+    });
+    req.on('error', () => resolve(false));
+    req.setTimeout(1000, () => {
+      req.destroy();
+      resolve(false);
+    });
+  });
+
+  if (isHealthy) {
+    return { spawned: null };
+  }
+
+  console.log('⚡ Server not detected on port 3001. Spawning node server/server.js for tests...');
+  const serverPath = path.resolve(__dirname, '../server/server.js');
+  const serverProcess = spawn('node', [serverPath], {
+    stdio: 'ignore',
+    env: process.env
+  });
+
+  // Wait up to 6 seconds for server to be healthy
+  for (let i = 0; i < 30; i++) {
+    await new Promise((r) => setTimeout(r, 200));
+    const healthy = await new Promise((resolve) => {
+      const req = http.get(`http://${HOST}:${PORT}/api/health`, (res) => {
+        resolve(res.statusCode === 200);
+      });
+      req.on('error', () => resolve(false));
+      req.setTimeout(500, () => {
+        req.destroy();
+        resolve(false);
+      });
+    });
+    if (healthy) {
+      console.log('✅ Temporary test server started successfully.\n');
+      return { spawned: serverProcess };
+    }
+  }
+
+  throw new Error('Failed to start test server on port 3001 within timeout.');
+}
+
 async function runQATestSuite() {
   console.log('================================================================');
   console.log('🧪 KARUNA HOTEL POS - OFFICIAL QA TEST SUITE & SYSTEM AUDIT');
@@ -40,6 +91,10 @@ async function runQATestSuite() {
   let passedTests = 0;
   let failedTests = 0;
   const testResults = [];
+  let serverHandle = null;
+
+  try {
+    serverHandle = await ensureServerRunning();
 
   async function runTestCase(testId, testName, testFn) {
     try {
@@ -298,6 +353,15 @@ async function runQATestSuite() {
     assert(status.data.todayRevenue >= 0, 'Today revenue computed correctly');
     assert(Array.isArray(status.data.serverIps) && status.data.serverIps.length > 0, 'LAN IP addresses resolved for CAT6 laptops');
   });
+
+  } finally {
+    if (serverHandle?.spawned) {
+      console.log('🛑 Stopping temporary test server process...');
+      try {
+        serverHandle.spawned.kill();
+      } catch (e) {}
+    }
+  }
 
   console.log('\n================================================================');
   console.log(`🏁 QA EXECUTION SUMMARY:`);

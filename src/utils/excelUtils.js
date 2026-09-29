@@ -18,7 +18,7 @@ export function exportFoodItemsToCSV(dishes = [], categories = [], subCategories
     `"${(dish.counter || 'Breakfast').replace(/"/g, '""')}"`
   ]);
 
-  const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+  const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   
@@ -31,7 +31,8 @@ export function exportFoodItemsToCSV(dishes = [], categories = [], subCategories
 }
 
 export function parseCSVAndValidateRates(fileContent) {
-  const lines = fileContent.split(/\r?\n/).filter(line => line.trim() !== '');
+  const cleanContent = (fileContent || '').replace(/^\uFEFF/, '');
+  const lines = cleanContent.split(/\r?\n/).filter(line => line.trim() !== '');
   if (lines.length === 0) {
     return { success: false, error: 'File is empty!' };
   }

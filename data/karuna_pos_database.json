@@ -1455,15 +1455,6 @@
       "waiter": "Raju"
     },
     {
-      "name": "D9",
-      "sectionId": 1,
-      "status": "empty",
-      "currentCart": [],
-      "currentTokenNo": "",
-      "createdAt": "2026-09-07T12:16:42.911Z",
-      "id": 1788783403448
-    },
-    {
       "id": 6,
       "name": "D6-A",
       "sectionId": 1,
@@ -1596,30 +1587,6 @@
       "createdAt": "2026-09-06T11:51:34.448Z"
     },
     {
-      "name": "D9-B",
-      "sectionId": 1,
-      "status": "empty",
-      "currentCart": [],
-      "currentTokenNo": "9082",
-      "isSplit": true,
-      "parentTable": "D9",
-      "customerName": "Customer 2",
-      "createdAt": null,
-      "id": 1788846277351
-    },
-    {
-      "name": "D9-B",
-      "sectionId": 1,
-      "status": "empty",
-      "currentCart": [],
-      "currentTokenNo": "9082",
-      "isSplit": true,
-      "parentTable": "D9",
-      "customerName": "Customer 2",
-      "createdAt": null,
-      "id": 1788846277352
-    },
-    {
       "name": "P5",
       "sectionId": 1788847541506,
       "status": "occupied",
@@ -1722,91 +1689,6 @@
       "lastPrintedCart": [],
       "kotCount": 0,
       "parcelStatus": null
-    },
-    {
-      "name": "S1",
-      "sectionId": 1788848773810,
-      "status": "empty",
-      "currentCart": [],
-      "currentTokenNo": "1650",
-      "isSplit": false,
-      "createdAt": null,
-      "id": 1788851649601
-    },
-    {
-      "name": "S2",
-      "sectionId": 1788848773810,
-      "status": "empty",
-      "currentCart": [],
-      "currentTokenNo": "",
-      "isSplit": false,
-      "createdAt": null,
-      "id": 1788851681143,
-      "lastPrintedCart": [],
-      "kotCount": 0,
-      "customerName": "",
-      "pax": "1",
-      "waiter": "Raju"
-    },
-    {
-      "name": "S2",
-      "sectionId": 1788848773810,
-      "status": "empty",
-      "currentCart": [],
-      "currentTokenNo": "6738",
-      "isSplit": false,
-      "createdAt": null,
-      "id": 1788851681144
-    },
-    {
-      "name": "S3",
-      "sectionId": 1788848773810,
-      "status": "empty",
-      "currentCart": [],
-      "currentTokenNo": "",
-      "isSplit": false,
-      "createdAt": null,
-      "id": 1788851687323,
-      "lastPrintedCart": [],
-      "kotCount": 0,
-      "customerName": "",
-      "pax": "1",
-      "waiter": "Raju"
-    },
-    {
-      "name": "S3",
-      "sectionId": 1788848773810,
-      "status": "empty",
-      "currentCart": [],
-      "currentTokenNo": "9533",
-      "isSplit": false,
-      "createdAt": null,
-      "id": 1788851687324
-    },
-    {
-      "name": "S4",
-      "sectionId": 1788848773810,
-      "status": "empty",
-      "currentCart": [],
-      "currentTokenNo": "",
-      "isSplit": false,
-      "createdAt": null,
-      "id": 1788851692295,
-      "lastPrintedCart": [],
-      "kotCount": 0,
-      "customerName": "",
-      "pax": "1",
-      "waiter": "Raju"
-    },
-    {
-      "name": "S4",
-      "sectionId": 1788848773810,
-      "status": "empty",
-      "currentCart": [],
-      "currentTokenNo": "6749",
-      "isSplit": false,
-      "createdAt": null,
-      "id": 1788851692296
     },
     {
       "name": "P6",
@@ -1987,6 +1869,66 @@
       "createdAt": null,
       "parentTable": null,
       "customerName": ""
+    },
+    {
+      "name": "D9",
+      "sectionId": 1,
+      "status": "empty",
+      "currentCart": [],
+      "currentTokenNo": "1788783404448",
+      "createdAt": null,
+      "id": 1788783403448,
+      "isSplit": false,
+      "parentTable": null,
+      "customerName": ""
+    },
+    {
+      "name": "S2",
+      "sectionId": 1788848773810,
+      "status": "empty",
+      "currentCart": [],
+      "currentTokenNo": "1788851682143",
+      "isSplit": false,
+      "createdAt": null,
+      "id": 1788851681143,
+      "lastPrintedCart": [],
+      "kotCount": 0,
+      "customerName": "",
+      "pax": "1",
+      "waiter": "Raju",
+      "parentTable": null
+    },
+    {
+      "name": "S3",
+      "sectionId": 1788848773810,
+      "status": "empty",
+      "currentCart": [],
+      "currentTokenNo": "1788851688323",
+      "isSplit": false,
+      "createdAt": null,
+      "id": 1788851687323,
+      "lastPrintedCart": [],
+      "kotCount": 0,
+      "customerName": "",
+      "pax": "1",
+      "waiter": "Raju",
+      "parentTable": null
+    },
+    {
+      "name": "S4",
+      "sectionId": 1788848773810,
+      "status": "empty",
+      "currentCart": [],
+      "currentTokenNo": "1788851693295",
+      "isSplit": false,
+      "createdAt": null,
+      "id": 1788851692295,
+      "lastPrintedCart": [],
+      "kotCount": 0,
+      "customerName": "",
+      "pax": "1",
+      "waiter": "Raju",
+      "parentTable": null
     }
   ],
   "bills": [
@@ -15638,6 +15580,141 @@
       ],
       "status": "settled",
       "syncedAt": "2026-09-13T14:39:52.215Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 1788853497642,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1789310392215,
+      "status": "settled",
+      "createdAt": "2026-09-27T11:56:15.200Z"
+    },
+    {
+      "id": 1790510175213,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1790510175212",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "status": "settled",
+      "syncedAt": "2026-09-27T11:56:15.216Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 1788853497642,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1790510175214,
+      "status": "settled",
+      "createdAt": "2026-09-27T12:05:51.156Z"
+    },
+    {
+      "id": 1790510751170,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1790510751169",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "status": "settled",
+      "syncedAt": "2026-09-27T12:05:51.172Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 1788853497642,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1790510751171,
+      "status": "settled",
+      "createdAt": "2026-09-29T02:20:45.849Z"
+    },
+    {
+      "id": 1790648445867,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1790648445866",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "status": "settled",
+      "syncedAt": "2026-09-29T02:20:45.871Z",
       "wasOffline": true
     }
   ],

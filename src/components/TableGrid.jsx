@@ -163,6 +163,12 @@ export default function TableGrid({
   const [secondaryAmount, setSecondaryAmount] = useState('');
   const [isCustomAmountEdited, setIsCustomAmountEdited] = useState(false);
 
+  // Shift Table State & Handlers
+  const [isShiftMode, setIsShiftMode] = useState(false);
+  const [draggedTable, setDraggedTable] = useState(null);
+  const [dragOverTableId, setDragOverTableId] = useState(null);
+  const [shiftToast, setShiftToast] = useState(null);
+
   const handleOpenSettledBillModal = (bill) => {
     setSelectedBill(bill);
     const items = JSON.parse(JSON.stringify(bill.items || []));
@@ -399,12 +405,7 @@ export default function TableGrid({
       return getLocalDateStr(b.createdAt) === todayStr;
     })
     .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-  
-  // Shift Table State & Handlers
-  const [isShiftMode, setIsShiftMode] = useState(false);
-  const [draggedTable, setDraggedTable] = useState(null);
-  const [dragOverTableId, setDragOverTableId] = useState(null);
-  const [shiftToast, setShiftToast] = useState(null);
+
 
   const handleShiftTable = async (srcTable, targetTable) => {
     if (!srcTable || !targetTable) return;

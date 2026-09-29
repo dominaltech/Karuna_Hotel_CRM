@@ -125,9 +125,15 @@ export default function App() {
         return true;
       });
 
-      const baseNames = ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9', 'D10', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'AC1', 'AC2', 'AC3', 'AC4', 'AC5'];
+      const allBaseNames = new Set(DEFAULT_INITIAL_DATA.diningTables.map((d) => String(d.name).toUpperCase().trim()));
+      result.forEach((t) => {
+        if (!t || !t.name) return;
+        const raw = String(t.parentTable || t.name).trim();
+        const base = raw.replace(/-[A-Z]$/i, '').trim().toUpperCase();
+        if (base) allBaseNames.add(base);
+      });
 
-      baseNames.forEach((baseName) => {
+      allBaseNames.forEach((baseName) => {
         const splits = result.filter((t) => {
           if (!t || !t.name) return false;
           const u = String(t.name).toUpperCase().trim();
@@ -149,6 +155,20 @@ export default function App() {
             const defObj = DEFAULT_INITIAL_DATA.diningTables.find((d) => String(d.name).toUpperCase().trim() === baseName);
             if (defObj) {
               result.push({ ...defObj, status: 'empty', currentCart: [], isSplit: false, parentTable: null });
+            } else {
+              const sample = splits[0];
+              result.push({
+                ...sample,
+                id: sample.parentTable || sample.id,
+                name: baseName,
+                status: 'empty',
+                currentCart: [],
+                currentTokenNo: sample.currentTokenNo || (1000 + (parseInt(sample.id) || 1)).toString(),
+                isSplit: false,
+                parentTable: null,
+                customerName: '',
+                createdAt: null
+              });
             }
           } else {
             // Prune empty split child tables (e.g. empty D9-B)

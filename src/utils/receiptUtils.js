@@ -1,5 +1,4 @@
-// Thermal Receipt & KOT Printing Utilities for Karuna Hotel POS
-// Matches exact user layout specifications (Cash-Memo Bill & K.O.T. Ticket)
+import QRCode from 'qrcode';
 
 export function printKOTReceipt({ tableNo, tokenNo, kotRunNo = 1, items, orderNote, waiter }) {
   if (!items || items.length === 0) return;
@@ -182,7 +181,7 @@ export function printKOTReceipt({ tableNo, tokenNo, kotRunNo = 1, items, orderNo
   printWindow.document.close();
 }
 
-export function printThermalReceipt(billData) {
+export async function printThermalReceipt(billData) {
   const printWindow = window.open('', '_blank', 'width=440,height=650');
   if (!printWindow) {
     console.warn('Print pop-up window was blocked by the browser. Please allow pop-ups for this POS site.');
@@ -207,9 +206,21 @@ export function printThermalReceipt(billData) {
   const waiterName = billData.waiter || billData.paymentDetails?.waiter || 'Raju';
   const grandTotal = billData.total || 0;
 
-  // Generate UPI Payment QR Code string for phone scanning
-  const upiString = `upi://pay?pa=8446091809@upi&pn=KarunaHotel&am=${grandTotal}&cu=INR`;
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(upiString)}&margin=1`;
+  // Dynamically resolve UPI configurations
+  const upiId = (typeof localStorage !== 'undefined' && localStorage.getItem('karuna_upi_id')) || '8446091809@ybl';
+  const payeeName = (typeof localStorage !== 'undefined' && localStorage.getItem('karuna_payee_name')) || 'Karuna Hotel';
+  const upiString = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${grandTotal}&cu=INR`;
+  
+  let qrCodeUrl = '';
+  try {
+    qrCodeUrl = await QRCode.toDataURL(upiString, {
+      margin: 1,
+      width: 120,
+      errorCorrectionLevel: 'M'
+    });
+  } catch (e) {
+    qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(upiString)}&margin=1`;
+  }
 
   const html = `
     <!DOCTYPE html>

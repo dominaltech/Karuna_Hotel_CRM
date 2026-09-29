@@ -34,14 +34,15 @@ export default function SweetsWeightPanel({
 
   const handleQuickAdd = (weightVal) => {
     if (!currentSweet || weightVal <= 0) return;
+    const portionPrice = Math.round(weightVal * ratePerKg);
     onAddToCart({
       id: currentSweet.id,
       srNo: currentSweet.srNo,
       name: cleanName,
-      price: ratePerKg,
+      price: portionPrice,
       weightKg: weightVal,
       unit: `${weightVal} Kg`,
-      qty: weightVal,
+      qty: 1,
       qtyDisplay: `${weightVal} Kg`,
       isSweet: true,
       isSweetWeight: true,
