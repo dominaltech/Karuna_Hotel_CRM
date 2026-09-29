@@ -43,9 +43,7 @@ function createWindow() {
   mainWindow.setMenuBarVisibility(false);
 
   // Set default zoom factor to 80% (0.8) on load
-  mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow.webContents.setZoomFactor(0.8);
-  });
+  
 
   // Block opening DevTools
   mainWindow.webContents.on('devtools-opened', () => {

@@ -6,15 +6,17 @@
   color-scheme: light;
 }
 
-html {
-  zoom: 80%;
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  margin: 0;
-  padding: 0;
   background-color: #f1f5f9;
   color: #0f172a;
+  overflow-x: hidden;
 }
 
 /* Custom Scrollbars */

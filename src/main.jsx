@@ -1,12 +1,7 @@
-﻿import React from 'react';
+import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
-
-// Set default zoom level to 80%
-if (typeof document !== 'undefined') {
-  document.documentElement.style.zoom = '80%';
-}
 
 // Disable right-click context menu
 document.addEventListener('contextmenu', (e) => {
@@ -14,7 +9,7 @@ document.addEventListener('contextmenu', (e) => {
   return false;
 });
 
-// Disable inspect element & devtools shortcut keys
+// Disable inspect element & devtools shortcut keys (while preserving Ctrl +/- zoom)
 document.addEventListener('keydown', (e) => {
   // F12
   if (e.key === 'F12' || e.keyCode === 123) {
