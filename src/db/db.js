@@ -1091,7 +1091,7 @@ export const db = {
           dbCache.diningTables.splice(tIdx, 1);
           localDb.diningTables.delete(t.id).catch(() => {});
         } else {
-          dbCache.diningTables[tIdx] = {
+          const clearedTable = {
             ...t,
             status: 'empty',
             currentCart: [],
@@ -1103,6 +1103,8 @@ export const db = {
             pax: '1',
             waiter: 'Raju'
           };
+          dbCache.diningTables[tIdx] = clearedTable;
+          localDb.diningTables.put(clearedTable).catch(() => {});
         }
       }
     }

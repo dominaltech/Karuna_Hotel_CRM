@@ -330,14 +330,21 @@ export default function App() {
     try {
       sessionStorage.setItem('karuna_active_table_id', String(tableObj.id));
     } catch (e) {}
-    setActiveTable(tableObj);
     
-    if (tableObj.sectionId) {
-      const matchSec = sections.find((s) => s.id === tableObj.sectionId);
+    const latestTable = tables.find((t) => String(t.id) === String(tableObj.id)) || tableObj;
+    setActiveTable(latestTable);
+    
+    if (latestTable.sectionId) {
+      const matchSec = sections.find((s) => s.id === latestTable.sectionId);
       if (matchSec) setActiveSectionState(matchSec);
     }
 
-    setCartItems(tableObj.currentCart || []);
+    // Preserve existing cartItems if selecting the same active table and cart is not empty
+    if (activeTableRef.current && String(activeTableRef.current.id) === String(latestTable.id) && cartItems.length > 0) {
+      // Keep current cart items intact
+    } else {
+      setCartItems(latestTable.currentCart || []);
+    }
   };
 
   // Split Table Action
@@ -526,6 +533,8 @@ export default function App() {
         ? activeTable.createdAt
         : new Date().toISOString();
 
+      setActiveTable((prev) => prev ? { ...prev, currentCart: updated, status: 'occupied', createdAt: orderStartTime } : prev);
+
       await db.diningTables.update(activeTable.id, {
         currentCart: updated,
         status: 'occupied',
@@ -565,6 +574,7 @@ export default function App() {
     setCartItems(updated);
 
     if (activeTable) {
+      setActiveTable((prev) => prev ? { ...prev, currentCart: updated, status: updated.length > 0 ? 'occupied' : 'empty' } : prev);
       await db.diningTables.update(activeTable.id, {
         currentCart: updated,
         status: updated.length > 0 ? 'occupied' : 'empty'
@@ -578,6 +588,7 @@ export default function App() {
     updated[index] = { ...updated[index], ...updatedFields };
     setCartItems(updated);
     if (activeTable) {
+      setActiveTable((prev) => prev ? { ...prev, currentCart: updated } : prev);
       await db.diningTables.update(activeTable.id, { currentCart: updated });
     }
   };
@@ -595,6 +606,7 @@ export default function App() {
     setCartItems(updated);
 
     if (activeTable) {
+      setActiveTable((prev) => prev ? { ...prev, currentCart: updated, status: updated.length > 0 ? 'occupied' : 'empty' } : prev);
       await db.diningTables.update(activeTable.id, {
         currentCart: updated,
         status: updated.length > 0 ? 'occupied' : 'empty'
@@ -607,6 +619,7 @@ export default function App() {
     setCartItems(updated);
 
     if (activeTable) {
+      setActiveTable((prev) => prev ? { ...prev, currentCart: updated, status: updated.length > 0 ? 'occupied' : 'empty' } : prev);
       await db.diningTables.update(activeTable.id, {
         currentCart: updated,
         status: updated.length > 0 ? 'occupied' : 'empty'
@@ -616,29 +629,35 @@ export default function App() {
 
   // Settle Bill Action
   const handleSettleBill = async (billData) => {
+    const tableId = billData.tableId || activeTable?.id;
+    const targetTable = tables.find((t) => String(t.id) === String(tableId)) || activeTable;
+
     const payload = {
-      tableId: activeTable?.id,
-      tokenNo: billData.tokenNo,
-      tableNo: billData.tableNo || (activeTable ? activeTable.name : 'Takeaway'),
-      items: billData.items,
-      subtotal: billData.subtotal,
-      sectionName: billData.sectionName,
+      tableId: tableId || null,
+      tokenNo: billData.tokenNo || targetTable?.currentTokenNo || (1000 + (parseInt(tableId) || 1)).toString(),
+      tableNo: billData.tableNo || (targetTable ? targetTable.name : 'Takeaway'),
+      items: billData.items || cartItems,
+      subtotal: billData.subtotal !== undefined ? billData.subtotal : (billData.total || 0),
+      sectionName: billData.sectionName || activeSection?.name || 'Dine In Area',
       sectionExtraCharge: 0,
-      total: billData.total,
+      total: billData.total !== undefined ? billData.total : 0,
       counter: activeCounter,
-      paymentDetails: billData.paymentDetails,
+      paymentDetails: billData.paymentDetails || { mode: 'Cash', cash: billData.total || 0, online: 0, card: 0 },
       status: 'settled',
       createdAt: new Date().toISOString()
     };
 
     const result = await db.settleBill(payload);
 
-    if (activeTable && (activeTable.sectionId === 4 || activeTable.name?.startsWith('P') || activeTable.isParcel || activeTable.isSplit || activeTable.name?.includes('-'))) {
+    if (targetTable && (targetTable.sectionId === 4 || targetTable.name?.startsWith('P') || targetTable.isParcel || targetTable.isSplit || targetTable.name?.includes('-'))) {
       try {
-        await db.diningTables.delete(activeTable.id);
+        await db.diningTables.delete(targetTable.id);
       } catch (e) {}
     }
 
+    try {
+      sessionStorage.removeItem('karuna_active_table_id');
+    } catch (e) {}
     setActiveTable(null);
     setCartItems([]);
     setIsCartOpen(false);
@@ -843,7 +862,12 @@ export default function App() {
             onNavigateToSettled={() => setActiveTab('settle')}
             onOpenOrderPopupForTable={(tbl) => {
               if (tbl) {
-                handleSelectTable(tbl);
+                const targetTable = tables.find((t) => String(t.id) === String(tbl.id)) || tbl;
+                if (!activeTable || String(activeTable.id) !== String(targetTable.id)) {
+                  handleSelectTable(targetTable);
+                } else {
+                  setActiveTable((prev) => prev ? { ...prev, currentCart: cartItems.length > 0 ? cartItems : (targetTable.currentCart || []) } : targetTable);
+                }
               }
               setIsCartOpen(true);
             }}
