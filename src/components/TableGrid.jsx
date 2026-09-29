@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Utensils,
   Building,
@@ -147,6 +147,12 @@ export default function TableGrid({
   onOpenOrderPopupForTable
 }) {
   const [activeAreaFilter, setActiveAreaFilter] = useState(initialAreaFilter || 'all');
+
+  useEffect(() => {
+    if (initialAreaFilter !== undefined && initialAreaFilter !== null) {
+      setActiveAreaFilter(initialAreaFilter);
+    }
+  }, [initialAreaFilter]);
   const [selectedRedTable, setSelectedRedTable] = useState(null);
   const [openStatusDropdownTableId, setOpenStatusDropdownTableId] = useState(null);
   const currentZoom = propZoom || 100;
@@ -561,8 +567,8 @@ export default function TableGrid({
     : sortedSections.filter((s) => s.id === activeAreaFilter);
 
   const handleCardClick = (tbl) => {
-    if (tbl && tbl.sectionId && typeof onAreaFilterChange === 'function') {
-      onAreaFilterChange(activeAreaFilter !== 'all' ? activeAreaFilter : tbl.sectionId);
+    if (typeof onAreaFilterChange === 'function') {
+      onAreaFilterChange(activeAreaFilter);
     }
     if (tbl.status === 'bill_released') {
       setSelectedRedTable(tbl);

@@ -1861,6 +1861,147 @@
       "customerName": ""
     },
     {
+      "id": 10,
+      "name": "F2",
+      "sectionId": 2,
+      "status": "occupied",
+      "currentCart": [
+        {
+          "id": 4,
+          "srNo": 104,
+          "name": "Sheera",
+          "categoryId": 1,
+          "subCategoryId": 1,
+          "price": 45,
+          "hasMultiplePrices": false,
+          "variants": [],
+          "sectionPrices": {
+            "1": 45,
+            "2": 45,
+            "3": 55,
+            "4": 45
+          },
+          "subItems": [],
+          "stockQty": 0,
+          "status": "Out of Stock",
+          "isParcel": false,
+          "cartItemId": "4_1790684326989_s7or",
+          "qty": 1,
+          "unit": null,
+          "qtyDisplay": "1"
+        },
+        {
+          "id": 5,
+          "srNo": 105,
+          "name": "Puri Bhaji",
+          "categoryId": 1,
+          "subCategoryId": 1,
+          "price": 75,
+          "hasMultiplePrices": false,
+          "variants": [],
+          "sectionPrices": {
+            "1": 75,
+            "2": 75,
+            "3": 85,
+            "4": 75
+          },
+          "subItems": [
+            {
+              "name": "4 Puris",
+              "qty": "1 portion"
+            },
+            {
+              "name": "Potato Bhaji",
+              "qty": "1 bowl"
+            }
+          ],
+          "isParcel": false,
+          "cartItemId": "5_1790684327798_vda4",
+          "qty": 1,
+          "unit": null,
+          "qtyDisplay": "1"
+        }
+      ],
+      "currentTokenNo": "1010",
+      "isSplit": false,
+      "createdAt": "2026-09-29T12:18:47.798Z",
+      "parentTable": null,
+      "customerName": "",
+      "lastPrintedCart": [
+        {
+          "id": 4,
+          "srNo": 104,
+          "name": "Sheera",
+          "categoryId": 1,
+          "subCategoryId": 1,
+          "price": 45,
+          "hasMultiplePrices": false,
+          "variants": [],
+          "sectionPrices": {
+            "1": 45,
+            "2": 45,
+            "3": 55,
+            "4": 45
+          },
+          "subItems": [],
+          "stockQty": 0,
+          "status": "Out of Stock",
+          "isParcel": false,
+          "cartItemId": "4_1790684326989_s7or",
+          "qty": 1,
+          "unit": null,
+          "qtyDisplay": "1"
+        },
+        {
+          "id": 5,
+          "srNo": 105,
+          "name": "Puri Bhaji",
+          "categoryId": 1,
+          "subCategoryId": 1,
+          "price": 75,
+          "hasMultiplePrices": false,
+          "variants": [],
+          "sectionPrices": {
+            "1": 75,
+            "2": 75,
+            "3": 85,
+            "4": 75
+          },
+          "subItems": [
+            {
+              "name": "4 Puris",
+              "qty": "1 portion"
+            },
+            {
+              "name": "Potato Bhaji",
+              "qty": "1 bowl"
+            }
+          ],
+          "isParcel": false,
+          "cartItemId": "5_1790684327798_vda4",
+          "qty": 1,
+          "unit": null,
+          "qtyDisplay": "1"
+        }
+      ],
+      "kotCount": 1
+    },
+    {
+      "id": 1788853497642,
+      "name": "QA-D1",
+      "sectionId": 1,
+      "status": "occupied",
+      "currentCart": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "currentTokenNo": "5501"
+    },
+    {
       "id": 5,
       "name": "D5",
       "sectionId": 1,
@@ -1879,18 +2020,6 @@
       "status": "empty",
       "currentCart": [],
       "currentTokenNo": "1008",
-      "isSplit": false,
-      "createdAt": null,
-      "parentTable": null,
-      "customerName": ""
-    },
-    {
-      "id": 10,
-      "name": "F2",
-      "sectionId": 2,
-      "status": "empty",
-      "currentCart": [],
-      "currentTokenNo": "1010",
       "isSplit": false,
       "createdAt": null,
       "parentTable": null,
@@ -16019,6 +16148,76 @@
       "status": "settled",
       "syncedAt": "2026-09-29T12:29:55.714Z",
       "wasOffline": true
+    },
+    {
+      "tableId": 11,
+      "tokenNo": "1011",
+      "tableNo": "F3",
+      "items": [
+        {
+          "id": 9,
+          "srNo": 109,
+          "name": "Shabu Vada",
+          "categoryId": 1,
+          "subCategoryId": 1,
+          "price": 70,
+          "hasMultiplePrices": false,
+          "variants": [],
+          "sectionPrices": {
+            "1": 70,
+            "2": 70,
+            "3": 80,
+            "4": 70
+          },
+          "subItems": [],
+          "stockQty": 0,
+          "status": "Out of Stock",
+          "isParcel": false,
+          "cartItemId": "9_1790685051495_wq43",
+          "qty": 1,
+          "unit": null,
+          "qtyDisplay": "1"
+        },
+        {
+          "id": 11,
+          "srNo": 111,
+          "name": "Dahi Vada",
+          "categoryId": 1,
+          "subCategoryId": 1,
+          "price": 70,
+          "hasMultiplePrices": false,
+          "variants": [],
+          "sectionPrices": {
+            "1": 70,
+            "2": 70,
+            "3": 80,
+            "4": 70
+          },
+          "subItems": [],
+          "isParcel": false,
+          "cartItemId": "11_1790685052126_6nh6",
+          "qty": 2,
+          "unit": null,
+          "qtyDisplay": "2"
+        }
+      ],
+      "subtotal": 210,
+      "sectionName": "First Floor",
+      "sectionExtraCharge": 0,
+      "total": 210,
+      "counter": "Counter 1 (Breakfast & Snacks)",
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 210,
+        "online": 0,
+        "card": 0
+      },
+      "status": "settled",
+      "createdAt": "2026-09-29T12:30:55.928Z",
+      "counterId": "C1",
+      "counterName": "Counter 1 (Breakfast & Snacks)",
+      "invoiceNo": "INV-C1-260929-102",
+      "id": 1790684995713
     }
   ],
   "billLogs": [
