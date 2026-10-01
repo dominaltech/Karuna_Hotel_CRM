@@ -1749,42 +1749,11 @@
       "id": 10,
       "name": "F2",
       "sectionId": 2,
-      "status": "occupied",
-      "currentCart": [
-        {
-          "id": 3,
-          "srNo": 103,
-          "name": "Pohe",
-          "categoryId": 1,
-          "subCategoryId": 1,
-          "price": 35,
-          "hasMultiplePrices": false,
-          "variants": [],
-          "sectionPrices": {
-            "1": 35,
-            "2": 35,
-            "3": 45,
-            "4": 35
-          },
-          "subItems": [
-            {
-              "name": "Sev & Lemon",
-              "qty": "1"
-            }
-          ],
-          "pricePerKg": null,
-          "stockQty": 0,
-          "status": "Out of Stock",
-          "isParcel": false,
-          "cartItemId": "3_1790838953681_xa38",
-          "qty": 3,
-          "unit": null,
-          "qtyDisplay": "3"
-        }
-      ],
-      "currentTokenNo": "1010",
+      "status": "empty",
+      "currentCart": [],
+      "currentTokenNo": "",
       "isSplit": false,
-      "createdAt": "2026-10-01T07:15:53.681Z",
+      "createdAt": null,
       "parentTable": null,
       "customerName": "",
       "lastPrintedCart": [],
@@ -16513,6 +16482,60 @@
       "status": "settled",
       "syncedAt": "2026-10-01T08:14:27.683Z",
       "wasOffline": true
+    },
+    {
+      "tableId": 10,
+      "tokenNo": "1010",
+      "tableNo": "F2",
+      "items": [
+        {
+          "id": 3,
+          "srNo": 103,
+          "name": "Pohe",
+          "categoryId": 1,
+          "subCategoryId": 1,
+          "price": 35,
+          "hasMultiplePrices": false,
+          "variants": [],
+          "sectionPrices": {
+            "1": 35,
+            "2": 35,
+            "3": 45,
+            "4": 35
+          },
+          "subItems": [
+            {
+              "name": "Sev & Lemon",
+              "qty": "1"
+            }
+          ],
+          "pricePerKg": null,
+          "stockQty": 0,
+          "status": "Out of Stock",
+          "isParcel": false,
+          "cartItemId": "3_1790838953681_xa38",
+          "qty": 3,
+          "unit": null,
+          "qtyDisplay": "3"
+        }
+      ],
+      "subtotal": 105,
+      "sectionName": "First Floor",
+      "sectionExtraCharge": 0,
+      "total": 105,
+      "counter": "Counter 1 (Breakfast & Snacks)",
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 105,
+        "online": 0,
+        "card": 0
+      },
+      "status": "settled",
+      "createdAt": "2026-10-01T08:21:48.265Z",
+      "counterId": "C1",
+      "counterName": "Counter 1 (Breakfast & Snacks)",
+      "invoiceNo": "INV-C1-261001-105",
+      "id": 1790842467682
     }
   ],
   "billLogs": [
