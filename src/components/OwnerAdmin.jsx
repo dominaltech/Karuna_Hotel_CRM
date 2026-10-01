@@ -66,7 +66,8 @@ export default function OwnerAdmin({
   onAddTable,
   onDeleteTable,
   onBulkUpdatePrices,
-  onUpdateSettledBill
+  onUpdateSettledBill,
+  printLanguage = 'mr'
 }) {
   const sortSectionsWithParcelsLast = (secArray) => {
     if (!Array.isArray(secArray)) return [];
@@ -1041,7 +1042,7 @@ export default function OwnerAdmin({
                           <td className="py-3 px-4 text-center">
                             <div className="flex items-center justify-center space-x-1.5">
                               <button
-                                onClick={() => printThermalReceipt(bill)}
+                                onClick={() => printThermalReceipt(bill, { language: printLanguage })}
                                 className="p-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 cursor-pointer"
                                 title="Reprint Bill"
                               >

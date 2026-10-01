@@ -1,6 +1,236 @@
 import QRCode from 'qrcode';
 
-export function printKOTReceipt({ tableNo, tokenNo, kotRunNo = 1, items, orderNote, waiter }) {
+// Comprehensive dictionary for English -> Marathi dish translation
+export const MARATHI_DISH_MAP = {
+  'single idli vada': 'सिंगल इडली वडा',
+  'single shabu vada': 'सिंगल शाबूवडा',
+  'single sabudana vada': 'सिंगल शाबूवडा',
+  'shabu vada': 'शाबू वडा',
+  'sabudana vada': 'शाबू वडा',
+  'shabu khichdi': 'शाबू खिचडी',
+  'sabudana khichdi': 'शाबू खिचडी',
+  'special tea': 'स्पे. चहा',
+  'special chaha': 'स्पे. चहा',
+  'tea': 'चहा',
+  'chaha': 'चहा',
+  'chai': 'चहा',
+  'puri bhaji': 'पुरी भाजी',
+  'pohe': 'पोहे',
+  'poha': 'पोहे',
+  'kanda pohe': 'कांदा पोहे',
+  'uppit': 'उप्पीट',
+  'upma': 'उप्पीट',
+  'sheera': 'शिरा',
+  'idli': 'इडली सांबार',
+  'idli sambar': 'इडली सांबार',
+  'vada sambar': 'वडा सांबार',
+  'idli vada': 'इडली वडा मिक्स',
+  'idli vada mix': 'इडली वडा मिक्स',
+  'dahi vada': 'दही वडा',
+  'batata vada': 'बटाटा वडा',
+  'vada pav': 'वडा पाव',
+  'misal pav': 'मिसळ पाव',
+  'samosa': 'समोसा',
+  'kachori': 'कचोरी',
+  'dhokla': 'ढोकळा',
+  'bhaji': 'कांदा भजी',
+  'bhaji (pakoda)': 'कांदा भजी',
+  'kanda bhaji': 'कांदा भजी',
+  'pakoda': 'पकोडा',
+  'papdi': 'पापडी',
+  'plain dosa': 'प्लेन डोसा',
+  'masala dosa': 'मसाला डोसा',
+  'mysore masala dosa': 'म्हैसूर मसाला डोसा',
+  'cheese masala dosa': 'चीज मसाला डोसा',
+  'onion uttappa': 'कांदा उत्तप्पा',
+  'tomato onion uttappa': 'टोमॅटो कांदा उत्तप्पा',
+  'butter pav bhaji': 'बटर पाव भाजी',
+  'cheese pav bhaji': 'चीज पाव भाजी',
+  'pav bhaji': 'पाव भाजी',
+  'extra pav (pair)': 'एक्स्ट्रा पाव जोडी',
+  'extra pav': 'एक्स्ट्रा पाव',
+  'special thali meal': 'स्पेशल थाळी जेवण',
+  'thali': 'थाळी',
+  'filter coffee': 'फिल्टर कॉफी',
+  'coffee': 'कॉफी',
+  'cold drink / lassi': 'लस्सी / कोल्ड ड्रिंक',
+  'lassi': 'लस्सी',
+  'sweet lassi': 'स्वीट लस्सी',
+  'taak': 'ताक',
+  'buttermilk': 'ताक',
+  'butter milk': 'ताक',
+  'mineral water (1l)': 'मिनरल वॉटर (१L)',
+  'mineral water': 'मिनरल वॉटर',
+  'water bottle': 'पाण्याची बाटली',
+  'gulab jamun': 'गुलाब जामुन',
+  'kaju katli': 'काजू कतली',
+  'rasgulla': 'रसगुल्ला',
+  'motichoor laddu': 'मोतीचूर लाडू',
+  'special peda': 'स्पेशल पेढा',
+  'kaju peda': 'काजू पेढा',
+  'milk cake': 'मिल्क केक',
+  'malai peda': 'मलाई पेढा',
+  'kaju roll': 'काजू रोल',
+  'besan laddu': 'बेसन लाडू',
+  'soan papdi': 'सोन पापडी',
+  'cham cham': 'चम चम',
+  'kalakand': 'कलाकंद',
+  'jalebi': 'जिलेबी',
+  'mysore pak': 'म्हैसूर पाक',
+  'rasmalai': 'रसमलाई',
+  'dry fruit halwa': 'ड्रायफ्रूट हलवा',
+  'anjeer roll': 'अंजीर रोल',
+  'badam katli': 'बदाम कतली',
+  'dharwad peda': 'धारवाड पेढा'
+};
+
+// Reverse dictionary for Marathi -> English dish translation
+export const ENGLISH_DISH_MAP = {
+  'सिंगल इडली वडा': 'Single Idli Vada',
+  'सिंगल शाबूवडा': 'Single Shabu Vada',
+  'शाबू वडा': 'Shabu Vada',
+  'शाबू खिचडी': 'Shabu Khichdi',
+  'स्पे. चहा': 'Special Tea',
+  'स्पेशल चहा': 'Special Tea',
+  'चहा': 'Tea',
+  'पुरी भाजी': 'Puri Bhaji',
+  'पोहे': 'Pohe',
+  'कांदा पोहे': 'Kanda Pohe',
+  'उप्पीट': 'Uppit',
+  'शिरा': 'Sheera',
+  'इडली सांबार': 'Idli',
+  'वडा सांबार': 'Vada Sambar',
+  'इडली वडा मिक्स': 'Idli Vada',
+  'दही वडा': 'Dahi Vada',
+  'बटाटा वडा': 'Batata Vada',
+  'वडा पाव': 'Vada Pav',
+  'मिसळ पाव': 'Misal Pav',
+  'समोसा': 'Samosa',
+  'कचोरी': 'Kachori',
+  'ढोकळा': 'Dhokla',
+  'कांदा भजी': 'Bhaji (Pakoda)',
+  'पकोडा': 'Pakoda',
+  'पापडी': 'Papdi',
+  'प्लेन डोसा': 'Plain Dosa',
+  'मसाला डोसा': 'Masala Dosa',
+  'म्हैसूर मसाला डोसा': 'Mysore Masala Dosa',
+  'चीज मसाला डोसा': 'Cheese Masala Dosa',
+  'कांदा उत्तप्पा': 'Onion Uttappa',
+  'टोमॅटो कांदा उत्तप्पा': 'Tomato Onion Uttappa',
+  'बटर पाव भाजी': 'Butter Pav Bhaji',
+  'चीज पाव भाजी': 'Cheese Pav Bhaji',
+  'पाव भाजी': 'Pav Bhaji',
+  'एक्स्ट्रा पाव जोडी': 'Extra Pav (Pair)',
+  'एक्स्ट्रा पाव': 'Extra Pav',
+  'स्पेशल थाळी जेवण': 'Special Thali Meal',
+  'थाळी': 'Thali Meal',
+  'फिल्टर कॉफी': 'Filter Coffee',
+  'कॉफी': 'Coffee',
+  'लस्सी / कोल्ड ड्रिंक': 'Cold Drink / Lassi',
+  'लस्सी': 'Lassi',
+  'ताक': 'Taak (Buttermilk)',
+  'मिनरल वॉटर (१L)': 'Mineral Water (1L)',
+  'मिनरल वॉटर': 'Mineral Water',
+  'गुलाब जामुन': 'Gulab Jamun',
+  'काजू कतली': 'Kaju Katli',
+  'रसगुल्ला': 'Rasgulla',
+  'मोतीचूर लाडू': 'Motichoor Laddu',
+  'स्पेशल पेढा': 'Special Peda',
+  'काजू पेढा': 'Kaju Peda',
+  'मिल्क केक': 'Milk Cake',
+  'मलाई पेढा': 'Malai Peda',
+  'काजू रोल': 'Kaju Roll',
+  'बेसन लाडू': 'Besan Laddu',
+  'सोन पापडी': 'Soan Papdi',
+  'चम चम': 'Cham Cham',
+  'कलाकंद': 'Kalakand',
+  'जिलेबी': 'Jalebi',
+  'म्हैसूर पाक': 'Mysore Pak',
+  'रसमलाई': 'Rasmalai',
+  'ड्रायफ्रूट हलवा': 'Dry Fruit Halwa',
+  'अंजीर रोल': 'Anjeer Roll',
+  'बदाम कतली': 'Badam Katli',
+  'धारवाड पेढा': 'Dharwad Peda'
+};
+
+// Retrieve currently active print language ('mr' | 'en')
+export function getPrintLanguage() {
+  if (typeof localStorage !== 'undefined') {
+    return localStorage.getItem('karuna_print_language') || 'mr';
+  }
+  return 'mr';
+}
+
+// Translate dish name strictly according to selected language
+export function getPrintDishName(item, language) {
+  if (!item) return '';
+  const lang = language || getPrintLanguage();
+  const rawName = (item.name || item.dishName || item.title || '').trim();
+  const rawMarathi = (item.marathiName || item.dish?.marathiName || '').trim();
+  const rawEnglish = (item.englishName || '').trim();
+
+  const isDevanagari = (str) => /[\u0900-\u097F]/.test(str);
+
+  if (lang === 'en') {
+    // English requested
+    if (rawEnglish) return rawEnglish;
+    if (rawName && !isDevanagari(rawName)) return rawName;
+    if (rawName && isDevanagari(rawName) && ENGLISH_DISH_MAP[rawName]) {
+      return ENGLISH_DISH_MAP[rawName];
+    }
+    if (rawMarathi && ENGLISH_DISH_MAP[rawMarathi]) {
+      return ENGLISH_DISH_MAP[rawMarathi];
+    }
+    return rawName || rawMarathi || 'Item';
+  } else {
+    // Marathi requested ('mr')
+    if (rawMarathi) return rawMarathi;
+    if (rawName && isDevanagari(rawName)) return rawName;
+    const lower = rawName.toLowerCase();
+    if (MARATHI_DISH_MAP[lower]) return MARATHI_DISH_MAP[lower];
+    for (const [key, val] of Object.entries(MARATHI_DISH_MAP)) {
+      if (lower.includes(key)) return val;
+    }
+    return rawName || 'आयटम';
+  }
+}
+
+// 12-Hour AM/PM Time Formatter
+export function format12HourTime(dateVal = new Date()) {
+  const d = dateVal instanceof Date ? dateVal : new Date(dateVal || Date.now());
+  let hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12; // '0' becomes '12'
+  const hoursStr = String(hours).padStart(2, '0');
+  return `${hoursStr}:${minutes} ${ampm}`;
+}
+
+// DD-MM-YYYY Date Formatter
+export function formatReceiptDate(dateVal = new Date()) {
+  const d = dateVal instanceof Date ? dateVal : new Date(dateVal || Date.now());
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+/**
+ * Print Kitchen Order Ticket (KOT)
+ * Matches exact layout provided in Photo 1
+ */
+export function printKOTReceipt({
+  tableNo,
+  billNo,
+  tokenNo,
+  sectionName = 'FIRST FLOOR',
+  kotRunNo = 1,
+  items = [],
+  orderNote,
+  waiter = 'Raju',
+  language
+}) {
   if (!items || items.length === 0) return;
 
   const printWindow = window.open('', '_blank', 'width=420,height=600');
@@ -8,19 +238,34 @@ export function printKOTReceipt({ tableNo, tokenNo, kotRunNo = 1, items, orderNo
     console.warn('Print pop-up window was blocked by the browser. Please allow pop-ups for this POS site.');
     return;
   }
+
   const now = new Date();
-  const day = String(now.getDate()).padStart(2, '0');
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const year = now.getFullYear();
-  const dateFormatted = `${day}-${month}-${year}`;
+  const dateFormatted = formatReceiptDate(now);
+  const timeFormatted = format12HourTime(now);
+  const currentLang = language || getPrintLanguage();
 
-  const timeStr = now.toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  });
+  // KOT title line (e.g., 'KOT No : Checking' or token number)
+  const kotNoDisplay = tokenNo || (kotRunNo ? `${kotRunNo}` : 'Checking');
+  const tableDisplay = tableNo || 'Takeaway';
+  const billNoDisplay = billNo || tokenNo?.replace(/^#/, '') || (tableNo ? String(tableNo).replace(/\D/g, '') : '') || '1';
+  const waiterDisplay = waiter || 'Raju';
+  const sectionDisplay = (sectionName || 'FIRST FLOOR').toUpperCase();
 
-  const tokenFormatted = tokenNo ? String(tokenNo).replace(/^#/, '') : (kotRunNo ? `${kotRunNo}` : '1000');
+  const itemsHtml = items.map((item) => {
+    const dishName = getPrintDishName(item, currentLang);
+    const qty = item.unit || item.qtyDisplay || item.qty || 1;
+    const isParcel = item.isParcel || (item.customNote && item.customNote.toLowerCase().includes('parcel'));
+    const displayName = `${dishName}${isParcel ? ' [PARCEL]' : ''}`;
+    return `
+      <tr>
+        <td class="col-item">
+          ${displayName}
+          ${item.customNote && !item.customNote.toLowerCase().includes('parcel') ? `<div style="font-size: 10px; font-weight: normal; font-style: italic; color: #475569;">(${item.customNote})</div>` : ''}
+        </td>
+        <td class="col-qty">${qty}</td>
+      </tr>
+    `;
+  }).join('');
 
   const html = `
     <!DOCTYPE html>
@@ -39,166 +284,152 @@ export function printKOTReceipt({ tableNo, tokenNo, kotRunNo = 1, items, orderNo
           padding: 0;
         }
         html, body {
-          width: 72mm;
-          max-width: 72mm;
-          margin: 0 auto;
-          padding: 4px;
+          width: 100%;
+          margin: 0 auto !important;
+          padding: 0 !important;
           background: #fff;
           color: #000;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Devanagari", "Mangal", "Arial Unicode MS", "Helvetica Neue", Arial, sans-serif;
           font-size: 13px;
           line-height: 1.35;
-          overflow-x: hidden;
+          display: flex;
+          justify-content: center;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
-        .kot-card {
-          border: 2px dashed #000;
-          border-radius: 6px;
-          padding: 8px 10px;
-          background: #fff;
-          width: 100%;
+        .receipt-container {
+          width: 65mm;
+          max-width: 65mm;
+          margin: 0 auto;
+          padding: 2mm 2mm;
           box-sizing: border-box;
         }
         .kot-title {
-          font-size: 20px;
+          font-size: 19px;
           font-weight: 900;
-          letter-spacing: 2px;
-          margin: 0;
           text-align: center;
           color: #000;
+          margin-bottom: 6px;
+          letter-spacing: 0.3px;
         }
-        .kot-subtitle {
-          font-size: 10.5px;
-          font-weight: 800;
-          color: #334155;
-          letter-spacing: 0.8px;
-          margin-top: 1px;
-          text-align: center;
-          text-transform: uppercase;
+        .meta-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 2px;
         }
-        .dashed-divider {
-          border-top: 1.5px dashed #000;
-          margin: 6px 0;
-        }
-        .meta-group {
+        .meta-table td {
+          padding: 1.5px 0;
           font-size: 12.5px;
           font-weight: 800;
-          line-height: 1.4;
           color: #000;
+          white-space: nowrap;
         }
-        .meta-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 2px;
+        .meta-left {
+          text-align: left;
+          width: 55%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .meta-right {
+          text-align: right;
+          width: 45%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .dashed-line {
+          border-top: 1.5px dashed #000;
+          margin: 4px 0;
+          width: 100%;
         }
         .items-table {
           width: 100%;
-          table-layout: fixed;
           border-collapse: collapse;
+          table-layout: fixed;
         }
-        .items-header {
-          display: flex;
-          justify-content: space-between;
-          font-size: 12.5px;
+        .items-table th {
+          font-size: 13px;
           font-weight: 900;
           color: #000;
           padding: 2px 0;
         }
-        .item-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: baseline;
-          padding: 3.5px 0;
-          font-size: 13.5px;
-          font-weight: 900;
+        .items-table td {
+          padding: 3px 0;
+          font-size: 13px;
+          font-weight: 800;
           color: #000;
+          vertical-align: top;
         }
-        .item-name {
-          flex: 1;
-          padding-right: 6px;
+        .col-item {
+          width: 78%;
+          text-align: left;
           word-break: break-word;
-          overflow-wrap: break-word;
+          padding-right: 4px;
         }
-        .item-qty {
-          font-size: 14.5px;
-          font-weight: 900;
+        .col-qty {
+          width: 22%;
           text-align: right;
+          font-weight: 900;
+          font-size: 14px;
           white-space: nowrap;
-          shrink-0;
-        }
-        .footer-text {
-          font-size: 10.5px;
-          font-weight: 700;
-          color: #475569;
-          text-align: center;
-          margin-top: 4px;
         }
         @media print {
           html, body {
             width: 72mm !important;
             max-width: 72mm !important;
             margin: 0 auto !important;
-            padding: 2px !important;
-            overflow-x: hidden !important;
+            padding: 0 !important;
+            display: flex !important;
+            justify-content: center !important;
           }
-          .kot-card {
-            border: 2px dashed #000 !important;
-            width: 100% !important;
-            max-width: 72mm !important;
+          .receipt-container {
+            width: 65mm !important;
+            max-width: 65mm !important;
+            margin: 0 auto !important;
+            padding: 2mm 2mm !important;
           }
         }
       </style>
     </head>
     <body>
-      <div class="kot-card">
-        <h1 class="kot-title">K. O. T.</h1>
-        <div class="kot-subtitle">KITCHEN ORDER TICKET</div>
-        
-        <div class="dashed-divider"></div>
-        
-        <div class="meta-group">
-          <div class="meta-row">
-            <span>Table: ${tableNo || 'Takeaway'}</span>
-            <span>Token: #${tokenFormatted}</span>
-          </div>
-          <div class="meta-row">
-            <span>Date: ${dateFormatted}</span>
-            <span>Time: ${timeStr}</span>
-          </div>
-          ${orderNote ? `<div style="margin-top: 3px; font-size: 11px; color: #b91c1c;">Note: ${orderNote}</div>` : ''}
-        </div>
-        
-        <div class="dashed-divider"></div>
-        
-        <div class="items-header">
-          <span>Item</span>
-          <span>Qty</span>
-        </div>
-        
-        <div class="dashed-divider" style="margin: 3px 0;"></div>
-        
-        <div>
-          ${items.map(item => {
-            const qtyStr = item.unit || item.qtyDisplay || item.qty;
-            const isParcel = item.isParcel || (item.customNote && item.customNote.toLowerCase().includes('parcel'));
-            const displayName = `${item.name}${isParcel ? ' <span style="color:#b91c1c; font-weight:900;">[PARCEL]</span>' : ''}`;
-            return `
-              <div class="item-row">
-                <div class="item-name">
-                  ${displayName}
-                  ${item.customNote && !item.customNote.toLowerCase().includes('parcel') ? `<div style="font-size: 10px; font-weight: normal; font-style: italic; color: #475569;">(${item.customNote})</div>` : ''}
-                </div>
-                <div class="item-qty">${qtyStr}</div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-        
-        <div class="dashed-divider"></div>
-        
-        <div class="footer-text">
-          Karuna Hotel Kitchen System
-        </div>
+      <div class="receipt-container">
+        <div class="kot-title">KOT No : ${kotNoDisplay}</div>
+
+        <table class="meta-table">
+          <tr>
+            <td class="meta-left">Table No : ${tableDisplay}</td>
+            <td class="meta-right">Bill No : ${billNoDisplay}</td>
+          </tr>
+          <tr>
+            <td class="meta-left">Section : ${sectionDisplay}</td>
+            <td class="meta-right">Date : ${dateFormatted}</td>
+          </tr>
+          <tr>
+            <td class="meta-left">Waiter :${waiterDisplay}</td>
+            <td class="meta-right">Time : ${timeFormatted}</td>
+          </tr>
+        </table>
+
+        <div class="dashed-line"></div>
+
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th class="col-item">Item</th>
+              <th class="col-qty">Qty</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="2" style="padding: 0;">
+                <div class="dashed-line" style="margin: 2px 0 3px 0;"></div>
+              </td>
+            </tr>
+            ${itemsHtml}
+          </tbody>
+        </table>
+
+        <div class="dashed-line"></div>
+        ${orderNote ? `<div style="font-size: 11px; font-weight: 700; margin-top: 3px; color: #000;">Note: ${orderNote}</div>` : ''}
       </div>
 
       <script>
@@ -214,47 +445,63 @@ export function printKOTReceipt({ tableNo, tokenNo, kotRunNo = 1, items, orderNo
   printWindow.document.close();
 }
 
-export async function printThermalReceipt(billData) {
+/**
+ * Print Cash-Memo Thermal Receipt (Customer Bill)
+ * Matches exact layout provided in Photo 2
+ */
+export async function printThermalReceipt(billData, options = {}) {
   const printWindow = window.open('', '_blank', 'width=440,height=650');
   if (!printWindow) {
     console.warn('Print pop-up window was blocked by the browser. Please allow pop-ups for this POS site.');
     return;
   }
+
   const billDate = new Date(billData.createdAt || Date.now());
-  
-  const day = String(billDate.getDate()).padStart(2, '0');
-  const month = String(billDate.getMonth() + 1).padStart(2, '0');
-  const year = billDate.getFullYear();
-  const dateFormatted = `${day}-${month}-${year}`;
+  const dateFormatted = formatReceiptDate(billDate);
+  const timeFormatted = format12HourTime(billDate);
+  const currentLang = options.language || getPrintLanguage();
 
-  const timeFormatted = billDate.toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  });
-
-  const billNumber = billData.invoiceNo || billData.id || billData.tokenNo || '1';
-  const tokenFormatted = billData.tokenNo ? String(billData.tokenNo).replace(/^#/, '') : (billData.id || '1000');
-  const tableName = billData.tableNo || '14A';
-  const sectionName = (billData.sectionName || 'Dine In Area').toUpperCase();
-  const waiterName = billData.waiter || billData.paymentDetails?.waiter || 'Staff';
-  const grandTotal = billData.total || 0;
+  const billNumber = billData.invoiceNo || billData.id || billData.tokenNo || '6';
+  const tableName = billData.tableNo || '16A';
+  const sectionName = (billData.sectionName || 'FIRST FLOOR').toUpperCase();
+  const waiterName = billData.waiter || billData.paymentDetails?.waiter || 'Raju';
+  const grandTotal = billData.total || billData.grandTotal || 0;
 
   // Dynamically resolve UPI configurations
   const upiId = (typeof localStorage !== 'undefined' && localStorage.getItem('karuna_upi_id')) || '8446091809@ybl';
   const payeeName = (typeof localStorage !== 'undefined' && localStorage.getItem('karuna_payee_name')) || 'Karuna Hotel';
   const upiString = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${grandTotal}&cu=INR`;
-  
+
   let qrCodeUrl = '';
   try {
     qrCodeUrl = await QRCode.toDataURL(upiString, {
       margin: 1,
-      width: 110,
+      width: 100,
       errorCorrectionLevel: 'M'
     });
   } catch (e) {
     qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(upiString)}&margin=1`;
   }
+
+  const itemsHtml = (billData.items || []).map((item) => {
+    const dishName = getPrintDishName(item, currentLang);
+    const itemQty = parseFloat(item.qty) || 1;
+    const itemPrice = parseFloat(item.price) || 0;
+    const lineAmount = Math.round((itemPrice * itemQty) * 100) / 100;
+    const isKgItem = item.weightKg !== undefined || (item.unit && (item.unit.includes('g') || item.unit.toLowerCase().includes('kg')));
+    const qtyDisplay = isKgItem ? (item.unit || `${itemQty}`) : `${itemQty}`;
+    const isParcel = item.isParcel || (item.customNote && item.customNote.toLowerCase().includes('parcel'));
+    const displayName = `${dishName}${isParcel ? ' (Parcel)' : ''}`;
+
+    return `
+      <tr>
+        <td class="col-item">${displayName}</td>
+        <td class="col-price">${itemPrice}</td>
+        <td class="col-qty">${qtyDisplay}</td>
+        <td class="col-amount">${lineAmount}</td>
+      </tr>
+    `;
+  }).join('');
 
   const html = `
     <!DOCTYPE html>
@@ -273,93 +520,121 @@ export async function printThermalReceipt(billData) {
           padding: 0;
         }
         html, body {
-          width: 72mm;
-          max-width: 72mm;
-          margin: 0 auto;
-          padding: 4px 6px;
-          color: #000;
+          width: 100%;
+          margin: 0 auto !important;
+          padding: 0 !important;
           background: #fff;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+          color: #000;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Devanagari", "Mangal", "Arial Unicode MS", "Helvetica Neue", Arial, sans-serif;
           font-size: 12.5px;
           line-height: 1.3;
-          overflow-x: hidden;
+          display: flex;
+          justify-content: center;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
-        .bill-container {
-          width: 100%;
-          max-width: 72mm;
+        .receipt-container {
+          width: 65mm;
+          max-width: 65mm;
           margin: 0 auto;
+          padding: 2mm 2mm;
           box-sizing: border-box;
         }
         .header {
           text-align: center;
-          margin-bottom: 5px;
+          margin-bottom: 3px;
         }
         .hotel-name {
-          font-size: 20px;
+          font-size: 19px;
           font-weight: 900;
-          margin: 0 0 2px 0;
           letter-spacing: -0.2px;
           color: #000;
+          margin-bottom: 1px;
         }
         .location, .phone {
-          font-size: 12px;
+          font-size: 12.5px;
           font-weight: 700;
-          margin: 1px 0;
           color: #000;
+          margin-bottom: 1px;
         }
         .cash-memo-title {
-          font-size: 16px;
+          font-size: 17px;
           font-weight: 900;
-          margin: 5px 0;
           letter-spacing: 0.5px;
           text-transform: uppercase;
           color: #000;
+          margin-top: 3px;
+          margin-bottom: 4px;
         }
-        .info-row {
-          display: flex;
-          justify-content: space-between;
+        .meta-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 2px;
+        }
+        .meta-table td {
+          padding: 1.5px 0;
           font-size: 12px;
           font-weight: 800;
-          margin-bottom: 2px;
           color: #000;
+          white-space: nowrap;
+        }
+        .meta-left {
+          text-align: left;
+          width: 55%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .meta-right {
+          text-align: right;
+          width: 45%;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
         .dashed-line {
           border-top: 1.5px dashed #000;
-          margin: 5px 0;
+          margin: 4px 0;
+          width: 100%;
         }
         .items-table {
           width: 100%;
-          table-layout: fixed;
           border-collapse: collapse;
-          font-size: 12.5px;
+          table-layout: fixed;
         }
         .items-table th {
-          padding: 2.5px 0;
+          font-size: 12px;
           font-weight: 900;
           color: #000;
-          font-size: 12px;
+          padding: 2px 0;
         }
         .items-table td {
-          padding: 3px 0;
+          padding: 2.5px 0;
+          font-size: 12.5px;
           font-weight: 800;
           color: #000;
           vertical-align: top;
         }
         .col-item {
-          width: 48%;
+          width: 44%;
           text-align: left;
-          padding-right: 4px;
           word-break: break-word;
-          overflow-wrap: break-word;
+          padding-right: 3px;
+        }
+        .col-price {
+          width: 18%;
+          text-align: right;
+          font-weight: 800;
+          padding-right: 3px;
+          white-space: nowrap;
         }
         .col-qty {
-          width: 24%;
+          width: 14%;
           text-align: center;
-          font-weight: 900;
-          word-break: break-word;
+          font-weight: 800;
+          padding-right: 2px;
+          white-space: nowrap;
         }
         .col-amount {
-          width: 28%;
+          width: 24%;
           text-align: right;
           font-weight: 900;
           white-space: nowrap;
@@ -367,81 +642,94 @@ export async function printThermalReceipt(billData) {
         .bottom-section {
           display: flex;
           justify-content: space-between;
-          align-items: center;
+          align-items: flex-start;
           width: 100%;
           box-sizing: border-box;
-          margin-top: 6px;
+          margin-top: 5px;
         }
-        .qr-block {
-          width: 44%;
+        .qr-col {
+          width: 48%;
           display: flex;
           flex-direction: column;
-          align-items: center;
+          align-items: flex-start;
         }
         .scan-title {
-          font-size: 9.5px;
+          font-size: 10px;
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: 0.2px;
-          margin-bottom: 2px;
           color: #000;
-          text-align: center;
+          margin-bottom: 2px;
+          white-space: nowrap;
         }
-        .qr-wrapper {
+        .phone-qr-wrapper {
           display: flex;
           align-items: center;
-          gap: 2px;
+          gap: 3px;
+        }
+        .phone-icon-svg {
+          width: 32px;
+          height: 48px;
+          flex-shrink: 0;
         }
         .qr-img {
-          width: 68px;
-          height: 68px;
+          width: 58px;
+          height: 58px;
           display: block;
         }
-        .total-block {
-          width: 54%;
-          text-align: right;
+        .total-col {
+          width: 50%;
           display: flex;
           flex-direction: column;
-          justify-content: space-between;
+          align-items: flex-end;
+          text-align: right;
           padding-left: 2px;
         }
-        .total-row {
+        .total-line {
           display: flex;
           justify-content: space-between;
           align-items: baseline;
-          font-size: 15px;
+          width: 100%;
+        }
+        .total-label {
+          font-size: 16px;
           font-weight: 900;
           color: #000;
         }
-        .total-amount {
-          font-size: 19px;
+        .total-val {
+          font-size: 21px;
           font-weight: 900;
           color: #000;
         }
-        .thank-you {
+        .thank-you-text {
           font-size: 11px;
           font-weight: 800;
-          text-align: center;
-          margin-top: 6px;
           color: #000;
+          text-align: center;
+          width: 100%;
+          margin-top: 3px;
+          white-space: nowrap;
         }
         @media print {
           html, body {
             width: 72mm !important;
             max-width: 72mm !important;
             margin: 0 auto !important;
-            padding: 2px 2px !important;
-            overflow-x: hidden !important;
+            padding: 0 !important;
+            display: flex !important;
+            justify-content: center !important;
           }
-          .bill-container {
-            width: 100% !important;
-            max-width: 72mm !important;
+          .receipt-container {
+            width: 65mm !important;
+            max-width: 65mm !important;
+            margin: 0 auto !important;
+            padding: 2mm 2mm !important;
           }
         }
       </style>
     </head>
     <body>
-      <div class="bill-container">
+      <div class="receipt-container">
         <div class="header">
           <h1 class="hotel-name">Karuna Hotel</h1>
           <div class="location">Solapur</div>
@@ -449,18 +737,20 @@ export async function printThermalReceipt(billData) {
           <h2 class="cash-memo-title">CASH-MEMO</h2>
         </div>
 
-        <div class="info-row">
-          <div>Table No : ${tableName}</div>
-          <div>Bill No : ${billNumber}</div>
-        </div>
-        <div class="info-row">
-          <div>Section : ${sectionName}</div>
-          <div>Token : #${tokenFormatted}</div>
-        </div>
-        <div class="info-row">
-          <div>Date : ${dateFormatted}</div>
-          <div>Time : ${timeFormatted}</div>
-        </div>
+        <table class="meta-table">
+          <tr>
+            <td class="meta-left">Table No : ${tableName}</td>
+            <td class="meta-right">Bill No : ${billNumber}</td>
+          </tr>
+          <tr>
+            <td class="meta-left">Section : ${sectionName}</td>
+            <td class="meta-right">Date : ${dateFormatted}</td>
+          </tr>
+          <tr>
+            <td class="meta-left">Waiter : ${waiterName}</td>
+            <td class="meta-right">Time : ${timeFormatted}</td>
+          </tr>
+        </table>
 
         <div class="dashed-line"></div>
 
@@ -468,64 +758,47 @@ export async function printThermalReceipt(billData) {
           <thead>
             <tr>
               <th class="col-item">Item</th>
-              <th class="col-qty">Qty/Unit</th>
+              <th class="col-price">Price</th>
+              <th class="col-qty">Qty</th>
               <th class="col-amount">Amount</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td colspan="3" style="padding: 0;">
-                <div class="dashed-line" style="margin: 2px 0 4px 0;"></div>
+              <td colspan="4" style="padding: 0;">
+                <div class="dashed-line" style="margin: 2px 0 3px 0;"></div>
               </td>
             </tr>
-            ${(billData.items || []).map(item => {
-              const itemQty = parseFloat(item.qty) || 1;
-              const isKgItem = item.weightKg !== undefined || (item.unit && (item.unit.includes('g') || item.unit.toLowerCase().includes('kg'))) || item.hasMultiplePrices;
-              let qtyDisplay;
-              if (isKgItem) {
-                if (itemQty > 1 && item.unit && !item.unit.startsWith(`${itemQty} `) && !item.unit.startsWith(`${itemQty}×`)) {
-                  qtyDisplay = `${itemQty} × ${item.unit}`;
-                } else {
-                  qtyDisplay = item.unit || `${itemQty} Kg`;
-                }
-              } else {
-                qtyDisplay = `${itemQty}`;
-              }
-              const lineAmount = Math.round(((item.price || 0) * itemQty) * 100) / 100;
-              const isParcel = item.isParcel || (item.customNote && item.customNote.toLowerCase().includes('parcel'));
-              const displayName = `${item.name}${isParcel ? ' (Parcel)' : ''}`;
-              return `
-                <tr>
-                  <td class="col-item">${displayName}</td>
-                  <td class="col-qty">${qtyDisplay}</td>
-                  <td class="col-amount">₹${lineAmount.toFixed(2)}</td>
-                </tr>
-              `;
-            }).join('')}
+            ${itemsHtml}
           </tbody>
         </table>
 
         <div class="dashed-line"></div>
 
         <div class="bottom-section">
-          <div class="qr-block">
+          <div class="qr-col">
             <div class="scan-title">SCAN ME TO PAY!</div>
-            <div class="qr-wrapper">
+            <div class="phone-qr-wrapper">
+              <svg class="phone-icon-svg" viewBox="0 0 48 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="2" y="2" width="44" height="68" rx="6" stroke="#000" stroke-width="2.5" fill="#fff"/>
+                <rect x="6" y="8" width="36" height="50" rx="3" stroke="#000" stroke-width="1.5" fill="#f8fafc"/>
+                <circle cx="24" cy="63" r="2.5" fill="#000"/>
+                <rect x="18" y="4.5" width="12" height="1.5" rx="0.75" fill="#000"/>
+                <path d="M12 24 L24 24 L24 36 L12 36 Z" stroke="#000" stroke-width="1.5"/>
+                <path d="M28 24 L36 24 L36 32 L28 32 Z" stroke="#000" stroke-width="1.5"/>
+                <path d="M14 42 L22 42 L22 50 L14 50 Z" stroke="#000" stroke-width="1.5"/>
+              </svg>
               <img class="qr-img" src="${qrCodeUrl}" alt="UPI QR" />
             </div>
           </div>
 
-          <div class="total-block">
-            <div>
-              <div class="total-row">
-                <span>Total:</span>
-                <span class="total-amount">₹${grandTotal}</span>
-              </div>
-              <div class="dashed-line" style="margin: 4px 0;"></div>
+          <div class="total-col">
+            <div class="total-line">
+              <span class="total-label">Total:</span>
+              <span class="total-val">₹${grandTotal}</span>
             </div>
-            <div class="thank-you">
-              Thank You! Visit Again!
-            </div>
+            <div class="dashed-line" style="margin: 4px 0;"></div>
+            <div class="thank-you-text">Thank You! Visit Again!</div>
           </div>
         </div>
       </div>

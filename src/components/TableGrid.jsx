@@ -95,7 +95,8 @@ export default function TableGrid({
   onNavigateToSettled,
   onSplitTable,
   onDeleteTable,
-  onOpenOrderPopupForTable
+  onOpenOrderPopupForTable,
+  printLanguage = 'mr'
 }) {
   const [activeAreaFilter, setActiveAreaFilter] = useState(initialAreaFilter || 'all');
 
@@ -229,7 +230,7 @@ export default function TableGrid({
     const effectivePayMode = getEffectivePayModeStr();
     const billObj = { ...billToPrint, paymentMode: effectivePayMode };
     try {
-      printThermalReceipt(billObj);
+      printThermalReceipt(billObj, { language: printLanguage });
     } catch (e) {
       console.warn('Thermal print error:', e);
     }

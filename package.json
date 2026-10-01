@@ -54,7 +54,7 @@
     ],
     "win": {
       "target": "dir",
-      "sign": "./scripts/customSign.cjs",
+      "signAndEditExecutable": false,
       "forceCodeSigning": false
     },
     "nsis": {

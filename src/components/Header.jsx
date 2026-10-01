@@ -43,7 +43,9 @@ export default function Header({
   canZoomIn = true,
   canZoomOut = false,
   onZoomIn,
-  onZoomOut
+  onZoomOut,
+  printLanguage = 'mr',
+  onLanguageChange
 }) {
   const [isCounterDropdownOpen, setIsCounterDropdownOpen] = useState(false);
   const [isLanModalOpen, setIsLanModalOpen] = useState(false);
@@ -147,6 +149,32 @@ export default function Header({
 
         {/* Right Section: Connection Status Badge & Counter Selector */}
         <div className="flex items-center space-x-2 shrink-0">
+
+          {/* Print Language Toggle: English / Marathi */}
+          <div className="flex items-center bg-slate-100 border border-slate-300 rounded-xl p-0.5 shadow-2xs space-x-0.5" title="Print Dish Language (KOT & Cash Memo)">
+            <button
+              type="button"
+              onClick={() => onLanguageChange && onLanguageChange('en')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                printLanguage === 'en'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
+              }`}
+            >
+              English
+            </button>
+            <button
+              type="button"
+              onClick={() => onLanguageChange && onLanguageChange('mr')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                printLanguage === 'mr'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
+              }`}
+            >
+              मराठी
+            </button>
+          </div>
 
           {/* Zoom In / Zoom Out Controls */}
           {onZoomIn && onZoomOut && (

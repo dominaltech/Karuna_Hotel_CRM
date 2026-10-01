@@ -59,7 +59,8 @@ export default function POSBilling({
   onUpdateCartQty,
   onRemoveCartItem,
   onClearCart,
-  onSettleBill
+  onSettleBill,
+  printLanguage = 'mr'
 }) {
   const sortedCategories = [...categories].sort((a, b) => (a.srNo || 0) - (b.srNo || 0));
 
@@ -202,11 +203,14 @@ export default function POSBilling({
 
     printKOTReceipt({
       tableNo: activeTable ? activeTable.name : 'Takeaway',
+      billNo: activeTable?.currentBillNo || activeTable?.currentTokenNo?.replace(/^#/, '') || (activeTable?.name ? String(activeTable.name).replace(/\D/g, '') : '') || '1',
       tokenNo: activeTable?.currentTokenNo || Math.floor(1000 + Math.random() * 9000).toString(),
+      sectionName: activeSection?.name || 'FIRST FLOOR',
       kotRunNo: currentKotCount || 1,
       items: itemsToDispatch,
       orderNote,
-      waiter: waiterName
+      waiter: waiterName,
+      language: printLanguage
     });
 
     if (activeTable) {
@@ -451,6 +455,7 @@ export default function POSBilling({
         onNavigateToSettled={onNavigateToSettled}
         onSplitTable={onSplitTable}
         onDeleteTable={onDeleteTable}
+        printLanguage={printLanguage}
         onOpenOrderPopupForTable={(tbl) => {
           if (tbl) {
             onSelectTable(tbl);

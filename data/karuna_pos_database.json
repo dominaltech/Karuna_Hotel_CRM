@@ -1746,18 +1746,6 @@
       "customerName": ""
     },
     {
-      "id": 9,
-      "name": "F1",
-      "sectionId": 2,
-      "status": "empty",
-      "currentCart": [],
-      "currentTokenNo": "1009",
-      "isSplit": false,
-      "createdAt": null,
-      "parentTable": null,
-      "customerName": ""
-    },
-    {
       "id": 10,
       "name": "F2",
       "sectionId": 2,
@@ -16003,6 +15991,51 @@
       ],
       "status": "settled",
       "syncedAt": "2026-10-01T06:25:34.406Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 1788853497644,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1790835934406,
+      "status": "settled",
+      "createdAt": "2026-10-01T07:01:17.478Z"
+    },
+    {
+      "id": 1790838077489,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1790838077488",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "status": "settled",
+      "syncedAt": "2026-10-01T07:01:17.492Z",
       "wasOffline": true
     }
   ],

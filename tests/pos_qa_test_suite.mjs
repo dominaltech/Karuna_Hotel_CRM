@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { parseItemWeightInKg, getCounterPrefix, generateCounterInvoiceNo } from '../src/db/db.js';
 import { parseCSVAndValidateRates } from '../src/utils/excelUtils.js';
+import { getPrintDishName, format12HourTime, formatReceiptDate } from '../src/utils/receiptUtils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -380,6 +381,44 @@ async function runQATestSuite() {
     const listRes2 = await apiRequest('/api/diningTables', 'GET');
     const found2 = listRes2.data.data.find((t) => String(t.id) === String(createdId) || t.name === 'TEST-F99');
     assert(!found2, 'Deleted card TEST-F99 is permanently removed and not restored');
+  });
+
+  // --- TEST CASE 12: Dual-Language KOT/Bill Printing & 12-Hour AM/PM Time Formatting ---
+  await runTestCase('TC-12', 'Dual Language Print (English/Marathi) & 12-Hour AM/PM Time Format', async () => {
+    // 1. Test 12-Hour AM/PM Formatter
+    const morningDate = new Date('2026-09-30T10:53:00');
+    const afternoonDate = new Date('2026-09-30T14:30:00');
+    const midnightDate = new Date('2026-09-30T00:15:00');
+    const noonDate = new Date('2026-09-30T12:00:00');
+
+    assert.strictEqual(format12HourTime(morningDate), '10:53 AM', 'Morning 10:53 correctly formatted as 10:53 AM');
+    assert.strictEqual(format12HourTime(afternoonDate), '02:30 PM', 'Afternoon 14:30 correctly formatted as 02:30 PM');
+    assert.strictEqual(format12HourTime(midnightDate), '12:15 AM', 'Midnight 00:15 correctly formatted as 12:15 AM');
+    assert.strictEqual(format12HourTime(noonDate), '12:00 PM', 'Noon 12:00 correctly formatted as 12:00 PM');
+    assert.strictEqual(formatReceiptDate(morningDate), '30-09-2026', 'Date formatted as DD-MM-YYYY');
+
+    // 2. Test Marathi dish translation for KOT and Bill (matching user photos)
+    const itemShabu = { name: 'Single Shabu Vada', marathiName: 'सिंगल शाबूवडा' };
+    const itemTea = { name: 'Special Tea', marathiName: 'स्पे. चहा' };
+    const itemPuri = { name: 'Puri Bhaji', marathiName: 'पुरी भाजी' };
+    const itemNoMarathi = { name: 'Pohe' };
+
+    // Marathi mode ('mr')
+    assert.strictEqual(getPrintDishName(itemShabu, 'mr'), 'सिंगल शाबूवडा', 'Single Shabu Vada prints in Marathi');
+    assert.strictEqual(getPrintDishName(itemTea, 'mr'), 'स्पे. चहा', 'Special Tea prints in Marathi');
+    assert.strictEqual(getPrintDishName(itemPuri, 'mr'), 'पुरी भाजी', 'Puri Bhaji prints in Marathi');
+    assert.strictEqual(getPrintDishName(itemNoMarathi, 'mr'), 'पोहे', 'Pohe translates to Marathi via dictionary');
+
+    // English mode ('en')
+    assert.strictEqual(getPrintDishName(itemShabu, 'en'), 'Single Shabu Vada', 'Single Shabu Vada prints in English');
+    assert.strictEqual(getPrintDishName(itemTea, 'en'), 'Special Tea', 'Special Tea prints in English');
+    assert.strictEqual(getPrintDishName(itemPuri, 'en'), 'Puri Bhaji', 'Puri Bhaji prints in English');
+    assert.strictEqual(getPrintDishName(itemNoMarathi, 'en'), 'Pohe', 'Pohe prints in English');
+
+    // Reverse lookup from pure Devanagari dish name
+    const itemDevanagariOnly = { name: 'पुरी भाजी' };
+    assert.strictEqual(getPrintDishName(itemDevanagariOnly, 'en'), 'Puri Bhaji', 'Devanagari dish reverse translates to English');
+    assert.strictEqual(getPrintDishName(itemDevanagariOnly, 'mr'), 'पुरी भाजी', 'Devanagari dish stays Devanagari in Marathi mode');
   });
 
   } finally {

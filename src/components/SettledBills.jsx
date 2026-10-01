@@ -25,7 +25,8 @@ export default function SettledBills({
   settledBills,
   allDishes,
   billLogs,
-  onUpdateSettledBill
+  onUpdateSettledBill,
+  printLanguage = 'mr'
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [timeFilter, setTimeFilter] = useState('today'); // 'today' | 'all'
@@ -387,7 +388,7 @@ export default function SettledBills({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              printThermalReceipt(bill);
+                              printThermalReceipt(bill, { language: printLanguage });
                             }}
                             className="p-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 transition-colors cursor-pointer"
                             title="Reprint Bill Receipt"
@@ -447,7 +448,7 @@ export default function SettledBills({
 
               <div className="flex items-center space-x-2">
                 <button
-                  onClick={() => printThermalReceipt({ ...selectedBill, items: editedItems, subtotal: liveTotal, total: liveTotal })}
+                  onClick={() => printThermalReceipt({ ...selectedBill, items: editedItems, subtotal: liveTotal, total: liveTotal }, { language: printLanguage })}
                   className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-1.5 rounded-xl font-bold text-xs flex items-center space-x-1.5 cursor-pointer transition-all border border-slate-300"
                 >
                   <Printer className="w-3.5 h-3.5" />

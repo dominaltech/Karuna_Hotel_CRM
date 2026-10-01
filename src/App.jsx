@@ -30,10 +30,19 @@ export default function App() {
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
 
-  // Active Terminal / Counter State
   const [activeCounter, setActiveCounterState] = useState(() => {
     return localStorage.getItem('karuna_active_counter') || 'Counter 1 (Breakfast & Snacks)';
   });
+
+  // Print Language State ('mr' | 'en') - Persisted to LocalStorage
+  const [printLanguage, setPrintLanguage] = useState(() => {
+    return localStorage.getItem('karuna_print_language') || 'mr';
+  });
+
+  const handleLanguageChange = (lang) => {
+    setPrintLanguage(lang);
+    localStorage.setItem('karuna_print_language', lang);
+  };
 
   const handleSelectCounter = (counterName) => {
     setActiveCounterState(counterName);
@@ -812,6 +821,8 @@ export default function App() {
           canZoomOut={zoomIndex > 0}
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
+          printLanguage={printLanguage}
+          onLanguageChange={handleLanguageChange}
         />
       )}
 
@@ -878,6 +889,7 @@ export default function App() {
             onRemoveCartItem={handleRemoveCartItem}
             onClearCart={() => setCartItems([])}
             onSettleBill={handleSettleBill}
+            printLanguage={printLanguage}
           />
         )}
 
@@ -887,6 +899,7 @@ export default function App() {
             allDishes={dishes}
             billLogs={billLogs}
             onUpdateSettledBill={handleUpdateSettledBill}
+            printLanguage={printLanguage}
           />
         )}
 
@@ -934,6 +947,7 @@ export default function App() {
             onDeleteTable={handleDeleteTable}
             onBulkUpdatePrices={handleBulkUpdatePrices}
             onUpdateSettledBill={handleUpdateSettledBill}
+            printLanguage={printLanguage}
           />
         )}
 
