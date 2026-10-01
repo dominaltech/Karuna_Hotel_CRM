@@ -1,4 +1,5 @@
 import QRCode from 'qrcode';
+import { QR_SCAN_PHONE_ICON_DATA_URL } from './qrScanPhoneIcon.js';
 
 // Comprehensive dictionary for English -> Marathi dish translation
 export const MARATHI_DISH_MAP = {
@@ -670,7 +671,7 @@ export async function printThermalReceipt(billData, options = {}) {
           margin-top: 5px;
         }
         .qr-col {
-          width: 48%;
+          width: 52%;
           display: flex;
           flex-direction: column;
           align-items: flex-start;
@@ -682,28 +683,29 @@ export async function printThermalReceipt(billData, options = {}) {
           text-transform: uppercase;
           letter-spacing: 0.3px;
           color: #000;
-          margin-bottom: 2px;
+          margin-bottom: 3px;
           white-space: nowrap;
         }
         .phone-qr-wrapper {
           display: flex;
           align-items: center;
-          gap: 4px;
+          gap: 3px;
         }
         .phone-scanner-icon {
-          width: 44px;
-          height: 56px;
+          width: 46px;
+          height: 52px;
+          object-fit: contain;
           flex-shrink: 0;
           display: block;
         }
         .qr-img {
-          width: 56px;
-          height: 56px;
+          width: 54px;
+          height: 54px;
           display: block;
           flex-shrink: 0;
         }
         .total-col {
-          width: 50%;
+          width: 48%;
           display: flex;
           flex-direction: column;
           align-items: flex-end;
@@ -807,40 +809,7 @@ export async function printThermalReceipt(billData, options = {}) {
           <div class="qr-col">
             <div class="scan-title">SCAN ME TO PAY!</div>
             <div class="phone-qr-wrapper">
-              <!-- High-Fidelity Smartphone QR Scanner Icon Vector matching Reference -->
-              <svg class="phone-scanner-icon" viewBox="0 0 100 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <!-- Left QR Target Blocks -->
-                <path d="M14 18 L5 18 L5 29" stroke="#000" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <rect x="10" y="22" width="13" height="13" rx="1.5" stroke="#000" stroke-width="3.5" fill="#fff"/>
-                <rect x="14.5" y="26.5" width="4" height="4" fill="#000"/>
-                
-                <line x1="28" y1="24" x2="28" y2="26" stroke="#000" stroke-width="3.5" stroke-linecap="round"/>
-                <line x1="28" y1="33" x2="28" y2="35" stroke="#000" stroke-width="3.5" stroke-linecap="round"/>
-                <line x1="28" y1="42" x2="28" y2="44" stroke="#000" stroke-width="3.5" stroke-linecap="round"/>
-                
-                <path d="M5 50 L5 61 L14 61" stroke="#000" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <rect x="10" y="45" width="13" height="13" rx="1.5" stroke="#000" stroke-width="3.5" fill="#fff"/>
-
-                <!-- Smartphone Body Outline -->
-                <rect x="33" y="6" width="46" height="80" rx="8" stroke="#000" stroke-width="4" fill="#fff"/>
-                
-                <!-- Speaker Slit -->
-                <line x1="50" y1="12" x2="62" y2="12" stroke="#000" stroke-width="3" stroke-linecap="round"/>
-
-                <!-- Screen Viewfinder Target Brackets -->
-                <path d="M43 35 L43 28 L51 28" stroke="#000" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M69 35 L69 28 L61 28" stroke="#000" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M43 47 L43 54 L51 54" stroke="#000" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M69 47 L69 54 L61 54" stroke="#000" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-                
-                <!-- Horizontal Scan Laser Beam -->
-                <line x1="42" y1="41" x2="70" y2="41" stroke="#000" stroke-width="4" stroke-linecap="round"/>
-
-                <!-- Hand Gripping Phone -->
-                <path d="M56 79 C52 70 59 56 67 56 C74 56 77 65 78 76" stroke="#000" stroke-width="4" stroke-linecap="round" fill="#fff"/>
-                <path d="M78 57 C85 64 93 78 93 91 C93 104 82 112 70 114" stroke="#000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-                <path d="M62 113 C62 107 60 95 60 87" stroke="#000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-              </svg>
+              <img class="phone-scanner-icon" src="${QR_SCAN_PHONE_ICON_DATA_URL}" alt="Scan QR" />
               <img class="qr-img" src="${qrCodeUrl}" alt="UPI QR" />
             </div>
           </div>
