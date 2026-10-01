@@ -655,10 +655,26 @@ export default function App() {
 
     const result = await db.settleBill(payload);
 
-    if (targetTable && (targetTable.sectionId === 4 || targetTable.name?.startsWith('P') || targetTable.isParcel || targetTable.isSplit || targetTable.name?.includes('-'))) {
-      try {
-        await db.diningTables.delete(targetTable.id);
-      } catch (e) {}
+    if (targetTable) {
+      if (targetTable.sectionId === 4 || targetTable.name?.startsWith('P') || targetTable.isParcel || targetTable.isSplit || targetTable.name?.includes('-')) {
+        try {
+          await db.diningTables.delete(targetTable.id);
+        } catch (e) {}
+      } else {
+        try {
+          await db.diningTables.update(targetTable.id, {
+            status: 'empty',
+            currentCart: [],
+            currentTokenNo: '',
+            lastPrintedCart: [],
+            kotCount: 0,
+            createdAt: null,
+            customerName: '',
+            pax: '1',
+            waiter: 'Raju'
+          });
+        } catch (e) {}
+      }
     }
 
     try {

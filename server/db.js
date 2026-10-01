@@ -509,32 +509,42 @@ export function settleBillTransaction(billData) {
   // 3. Reset / Delete Dining Table
   let updatedTable = null;
   let deletedTableId = null;
+  let table = null;
+
   if (billData.tableId) {
-    const table = getById('diningTables', billData.tableId);
-    if (table) {
-      if (table.isSplit || (table.name && table.name.includes('-')) || table.sectionId === 4 || (table.name && String(table.name).toUpperCase().startsWith('P')) || table.isParcel) {
-        deleteItem('diningTables', table.id);
-        deletedTableId = table.id;
-      } else {
-        updatedTable = updateItem('diningTables', table.id, {
-          status: 'empty',
-          currentCart: [],
-          currentTokenNo: '',
-          lastPrintedCart: [],
-          kotCount: 0,
-          createdAt: null,
-          customerName: '',
-          pax: '1',
-          waiter: 'Raju'
-        });
-      }
+    table = getById('diningTables', billData.tableId);
+  }
+  if (!table && billData.tableNo) {
+    const allTables = getCollection('diningTables');
+    table = allTables.find((t) => t && (
+      String(t.name).toUpperCase().trim() === String(billData.tableNo).toUpperCase().trim() ||
+      String(t.id) === String(billData.tableNo)
+    )) || null;
+  }
+
+  if (table) {
+    if (table.isSplit || (table.name && table.name.includes('-')) || table.sectionId === 4 || (table.name && String(table.name).toUpperCase().startsWith('P')) || table.isParcel) {
+      deleteItem('diningTables', table.id);
+      deletedTableId = table.id;
+    } else {
+      updatedTable = updateItem('diningTables', table.id, {
+        status: 'empty',
+        currentCart: [],
+        currentTokenNo: '',
+        lastPrintedCart: [],
+        kotCount: 0,
+        createdAt: null,
+        customerName: '',
+        pax: '1',
+        waiter: 'Raju'
+      });
     }
   }
 
   // Auto-collapse split tables if all portions are now empty!
   dbState.diningTables = ensureDefaultDiningTables(dbState.diningTables);
 
-  scheduleSaveDatabase();
+  saveDatabaseSync();
 
   return {
     bill: newBill,

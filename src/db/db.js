@@ -587,10 +587,14 @@ function handleServerBroadcast(msg) {
       }
       if (updatedTable && dbCache.diningTables) {
         const tIdx = dbCache.diningTables.findIndex((t) => t && String(t.id) === String(updatedTable.id));
-        if (tIdx !== -1) dbCache.diningTables[tIdx] = updatedTable;
+        if (tIdx !== -1) {
+          dbCache.diningTables[tIdx] = updatedTable;
+          localDb.diningTables.put(updatedTable).catch(() => {});
+        }
       }
       if (deletedTableId && dbCache.diningTables) {
         dbCache.diningTables = dbCache.diningTables.filter((t) => t && String(t.id) !== String(deletedTableId));
+        localDb.diningTables.delete(deletedTableId).catch(() => {});
       }
       notifyListeners('BILL_SETTLED', { bill, rawMaterials, dishes, updatedTable, deletedTableId });
       break;
@@ -695,23 +699,22 @@ async function loadLocalDexieFallback() {
 export async function flushOfflineQueue() {
   try {
     const pending = await localDb.offline_queue.toArray();
-    const occupiedTables = (dbCache.diningTables || []).filter((t) => t && t.status === 'occupied');
 
-    if ((!pending || pending.length === 0) && occupiedTables.length === 0) {
+    if (!pending || pending.length === 0) {
       setOfflineQueueCount(0);
       return { success: true, count: 0 };
     }
 
-    console.log(`📤 [Sync] Sending ${pending.length} offline bills & ${occupiedTables.length} active tables to Master Server...`);
+    console.log(`📤 [Sync] Sending ${pending.length} offline bills to Master Server...`);
     const res = await fetch(`${getApiBase()}/bills/sync-offline`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bills: pending, occupiedTables })
+      body: JSON.stringify({ bills: pending })
     });
 
     const json = await res.json();
     if (json.success) {
-      console.log(`✅ [Sync] Successfully merged offline bills & active tables into Master Server!`);
+      console.log(`✅ [Sync] Successfully merged offline bills into Master Server!`);
       await localDb.offline_queue.clear();
       setOfflineQueueCount(0);
 
@@ -1026,8 +1029,51 @@ export const db = {
       if (json.success) {
         if (json.rawMaterials) dbCache.rawMaterials = json.rawMaterials;
         if (json.dishes) dbCache.dishes = json.dishes;
+        
+        if (json.updatedTable && dbCache.diningTables) {
+          const tIdx = dbCache.diningTables.findIndex((t) => t && String(t.id) === String(json.updatedTable.id));
+          if (tIdx !== -1) {
+            dbCache.diningTables[tIdx] = json.updatedTable;
+            localDb.diningTables.put(json.updatedTable).catch(() => {});
+          }
+        }
+        if (json.deletedTableId && dbCache.diningTables) {
+          dbCache.diningTables = dbCache.diningTables.filter((t) => t && String(t.id) !== String(json.deletedTableId));
+          localDb.diningTables.delete(json.deletedTableId).catch(() => {});
+        }
+        
+        // Also ensure local table is cleared if target was a regular table and updatedTable wasn't returned
+        if (finalBillData.tableId || finalBillData.tableNo) {
+          const tIdx = dbCache.diningTables.findIndex((t) => 
+            t && (String(t.id) === String(finalBillData.tableId) || (finalBillData.tableNo && String(t.name).toUpperCase() === String(finalBillData.tableNo).toUpperCase()))
+          );
+          if (tIdx !== -1 && !json.updatedTable && !json.deletedTableId) {
+            const t = dbCache.diningTables[tIdx];
+            const clearedTable = {
+              ...t,
+              status: 'empty',
+              currentCart: [],
+              currentTokenNo: '',
+              lastPrintedCart: [],
+              kotCount: 0,
+              createdAt: null,
+              customerName: '',
+              pax: '1',
+              waiter: 'Raju'
+            };
+            dbCache.diningTables[tIdx] = clearedTable;
+            localDb.diningTables.put(clearedTable).catch(() => {});
+          }
+        }
+
         localDb.bills.put(json.bill).catch(() => {});
-        notifyListeners('BILL_SETTLED', { bill: json.bill, rawMaterials: json.rawMaterials, dishes: json.dishes });
+        notifyListeners('BILL_SETTLED', {
+          bill: json.bill,
+          rawMaterials: json.rawMaterials,
+          dishes: json.dishes,
+          updatedTable: json.updatedTable,
+          deletedTableId: json.deletedTableId
+        });
         return json;
       }
     } catch (err) {
