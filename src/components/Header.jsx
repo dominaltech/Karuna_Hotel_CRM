@@ -17,7 +17,8 @@ import {
   RefreshCw,
   Edit2,
   ZoomIn,
-  ZoomOut
+  ZoomOut,
+  Languages
 } from 'lucide-react';
 import { getServerIp, setServerIp } from '../db/db';
 
@@ -151,14 +152,17 @@ export default function Header({
         <div className="flex items-center space-x-2 shrink-0">
 
           {/* Print Language Toggle: English / Marathi */}
-          <div className="flex items-center bg-slate-100 border border-slate-300 rounded-xl p-0.5 shadow-2xs space-x-0.5" title="Print Dish Language (KOT & Cash Memo)">
+          <div className="flex items-center bg-slate-900 border border-slate-700 rounded-xl p-0.5 shadow-sm space-x-1" title="Print Dish Language for KOT & Bill (English / मराठी)">
+            <div className="flex items-center pl-1.5 pr-0.5 text-slate-300">
+              <Languages className="w-3.5 h-3.5 text-amber-400" />
+            </div>
             <button
               type="button"
               onClick={() => onLanguageChange && onLanguageChange('en')}
               className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
                 printLanguage === 'en'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
+                  ? 'bg-indigo-600 text-white shadow-xs font-black'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
               }`}
             >
               English
@@ -168,8 +172,8 @@ export default function Header({
               onClick={() => onLanguageChange && onLanguageChange('mr')}
               className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
                 printLanguage === 'mr'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
+                  ? 'bg-amber-500 text-slate-950 shadow-xs font-black'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
               }`}
             >
               मराठी
