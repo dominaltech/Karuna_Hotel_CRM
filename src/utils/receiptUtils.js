@@ -320,18 +320,19 @@ export function printKOTReceipt({
         .meta-table {
           width: 100%;
           border-collapse: collapse;
+          table-layout: fixed;
           margin-bottom: 2px;
         }
         .meta-table td {
           padding: 1.5px 0;
           font-family: 'Nunito Sans', sans-serif;
-          font-size: 12px;
+          font-size: 11.5px;
           font-weight: 700;
           color: #000;
         }
         .meta-left {
           text-align: left;
-          width: 50%;
+          width: 53%;
           padding-right: 4px;
           white-space: nowrap;
           overflow: hidden;
@@ -339,8 +340,8 @@ export function printKOTReceipt({
         }
         .meta-right {
           text-align: right;
-          width: 50%;
-          padding-left: 4px;
+          width: 47%;
+          padding-left: 2px;
           white-space: nowrap;
         }
         .dashed-line {
@@ -410,7 +411,7 @@ export function printKOTReceipt({
             <td class="meta-right">Bill No : ${billNoDisplay}</td>
           </tr>
           <tr>
-            <td class="meta-left">Section : ${sectionDisplay}</td>
+            <td class="meta-left">Section : <span style="font-size: 10px; font-weight: 700;">${sectionDisplay}</span></td>
             <td class="meta-right">Date : ${dateFormatted}</td>
           </tr>
           <tr>
@@ -585,18 +586,19 @@ export async function printThermalReceipt(billData, options = {}) {
         .meta-table {
           width: 100%;
           border-collapse: collapse;
+          table-layout: fixed;
           margin-bottom: 2px;
         }
         .meta-table td {
           padding: 1.5px 0;
           font-family: 'Nunito Sans', sans-serif;
-          font-size: 12px;
+          font-size: 11.5px;
           font-weight: 700;
           color: #000;
         }
         .meta-left {
           text-align: left;
-          width: 50%;
+          width: 53%;
           padding-right: 4px;
           white-space: nowrap;
           overflow: hidden;
@@ -604,8 +606,8 @@ export async function printThermalReceipt(billData, options = {}) {
         }
         .meta-right {
           text-align: right;
-          width: 50%;
-          padding-left: 4px;
+          width: 47%;
+          padding-left: 2px;
           white-space: nowrap;
         }
         .dashed-line {
@@ -671,14 +673,14 @@ export async function printThermalReceipt(billData, options = {}) {
           margin-top: 5px;
         }
         .qr-col {
-          width: 52%;
+          width: 48%;
           display: flex;
           flex-direction: column;
           align-items: flex-start;
         }
         .scan-title {
           font-family: 'Montserrat', sans-serif;
-          font-size: 9.5px;
+          font-size: 9px;
           font-weight: 800;
           text-transform: uppercase;
           letter-spacing: 0.3px;
@@ -692,20 +694,20 @@ export async function printThermalReceipt(billData, options = {}) {
           gap: 3px;
         }
         .phone-scanner-icon {
-          width: 46px;
-          height: 52px;
+          width: 44px;
+          height: 50px;
           object-fit: contain;
           flex-shrink: 0;
           display: block;
         }
         .qr-img {
-          width: 54px;
-          height: 54px;
+          width: 50px;
+          height: 50px;
           display: block;
           flex-shrink: 0;
         }
         .total-col {
-          width: 48%;
+          width: 50%;
           display: flex;
           flex-direction: column;
           align-items: flex-end;
@@ -720,24 +722,25 @@ export async function printThermalReceipt(billData, options = {}) {
         }
         .total-label {
           font-family: 'Montserrat', sans-serif;
-          font-size: 15px;
+          font-size: 14px;
           font-weight: 700;
           color: #000;
         }
         .total-val {
           font-family: 'Montserrat', sans-serif;
-          font-size: 20px;
+          font-size: 19px;
           font-weight: 800;
           color: #000;
         }
         .thank-you-text {
-          font-family: 'Montserrat', 'Nunito Sans', sans-serif;
-          font-size: 11px;
-          font-weight: 700;
+          font-family: 'Nunito Sans', 'Montserrat', sans-serif;
+          font-size: 9.5px;
+          font-weight: 800;
           color: #000;
-          text-align: center;
+          text-align: right;
           width: 100%;
           margin-top: 3px;
+          letter-spacing: -0.2px;
           white-space: nowrap;
         }
         @media print {
@@ -773,7 +776,7 @@ export async function printThermalReceipt(billData, options = {}) {
             <td class="meta-right">Bill No : ${billNumber}</td>
           </tr>
           <tr>
-            <td class="meta-left">Section : ${sectionName}</td>
+            <td class="meta-left">Section : <span style="font-size: 10px; font-weight: 700;">${sectionName}</span></td>
             <td class="meta-right">Date : ${dateFormatted}</td>
           </tr>
           <tr>
