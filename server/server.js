@@ -283,7 +283,8 @@ app.delete('/api/:collection/:id', (req, res) => {
     broadcast({
       type: 'DELETE',
       collection,
-      id
+      id,
+      data: { id }
     });
 
     res.json({ success });

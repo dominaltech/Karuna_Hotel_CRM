@@ -337,24 +337,27 @@ export async function refreshOfflineQueueCount() {
   }
 }
 
-export function ensureDefaultDiningTables(tables = []) {
-  if (!Array.isArray(tables)) {
-    tables = JSON.parse(JSON.stringify(DEFAULT_INITIAL_DATA.diningTables || []));
+// Auto-collapse empty split tables (e.g. D1-A and D1-B back to D1 when cleared)
+export function cleanAndPruneSplitTables(tables = []) {
+  if (!Array.isArray(tables) || tables.length === 0) {
+    return [];
   }
 
-  const defaultList = DEFAULT_INITIAL_DATA.diningTables || [];
-  const defaultBaseNames = new Set(defaultList.map((d) => String(d.name).toUpperCase().trim()));
-  const allBaseNames = new Set(defaultBaseNames);
+  let result = [...tables];
 
-  tables.forEach((t) => {
+  // Find all split base names present in the CURRENT tables array
+  const activeBaseNames = new Set();
+  result.forEach((t) => {
     if (!t || !t.name) return;
     const raw = String(t.parentTable || t.name).trim();
-    const base = raw.replace(/-[A-Z]$/i, '').trim().toUpperCase();
-    if (base) allBaseNames.add(base);
+    if (raw.includes('-')) {
+      const base = raw.replace(/-[A-Z]$/i, '').trim().toUpperCase();
+      if (base) activeBaseNames.add(base);
+    }
   });
 
-  allBaseNames.forEach((baseName) => {
-    const splitMatches = tables.filter((t) => {
+  activeBaseNames.forEach((baseName) => {
+    const splitMatches = result.filter((t) => {
       if (!t || !t.name) return false;
       const upper = String(t.name).toUpperCase().trim();
       const parentUpper = t.parentTable ? String(t.parentTable).toUpperCase().trim() : '';
@@ -368,40 +371,26 @@ export function ensureDefaultDiningTables(tables = []) {
 
       // If NO split portion is occupied, collapse all back to a single base table!
       if (occupiedMatches.length === 0) {
-        tables = tables.filter((t) => {
+        result = result.filter((t) => {
           if (!t || !t.name) return false;
           const upper = String(t.name).toUpperCase().trim();
           const parentUpper = t.parentTable ? String(t.parentTable).toUpperCase().trim() : '';
           return !(upper === baseName || upper.startsWith(`${baseName}-`) || parentUpper === baseName);
         });
 
-        const defObj = defaultList.find((d) => String(d.name).toUpperCase().trim() === baseName);
-        if (defObj) {
-          tables.push({
-            ...defObj,
-            status: 'empty',
-            currentCart: [],
-            currentTokenNo: defObj.currentTokenNo || (1000 + defObj.id).toString(),
-            isSplit: false,
-            parentTable: null,
-            customerName: '',
-            createdAt: null
-          });
-        } else {
-          const sample = splitMatches[0];
-          tables.push({
-            ...sample,
-            id: sample.parentTable || sample.id,
-            name: baseName,
-            status: 'empty',
-            currentCart: [],
-            currentTokenNo: sample.currentTokenNo || (1000 + (parseInt(sample.id) || 1)).toString(),
-            isSplit: false,
-            parentTable: null,
-            customerName: '',
-            createdAt: null
-          });
-        }
+        const sample = splitMatches[0];
+        result.push({
+          ...sample,
+          id: sample.parentTable || sample.id,
+          name: baseName,
+          status: 'empty',
+          currentCart: [],
+          currentTokenNo: sample.currentTokenNo || (1000 + (parseInt(sample.id) || 1)).toString(),
+          isSplit: false,
+          parentTable: null,
+          customerName: '',
+          createdAt: null
+        });
       } else {
         // Remove empty split portions so empty D2-B cards don't linger next to active D2-A!
         const emptySplits = splitMatches.filter(
@@ -409,11 +398,11 @@ export function ensureDefaultDiningTables(tables = []) {
         );
         if (emptySplits.length > 0) {
           const emptyIds = new Set(emptySplits.map((e) => e.id));
-          tables = tables.filter((t) => !emptyIds.has(t.id));
+          result = result.filter((t) => !emptyIds.has(t.id));
         }
 
         // If only 1 portion remains (e.g. D9-A), rename D9-A back to D9
-        const remainingSplits = tables.filter((t) => {
+        const remainingSplits = result.filter((t) => {
           if (!t || !t.name) return false;
           const u = String(t.name).toUpperCase().trim();
           const p = t.parentTable ? String(t.parentTable).toUpperCase().trim() : '';
@@ -425,15 +414,17 @@ export function ensureDefaultDiningTables(tables = []) {
           remainingSplits[0].parentTable = null;
         }
       }
-    } else if (defaultBaseNames.has(baseName)) {
-      const defObj = defaultList.find((d) => String(d.name).toUpperCase().trim() === baseName);
-      if (defObj) {
-        tables.push({ ...defObj });
-      }
     }
   });
 
-  return tables;
+  return result;
+}
+
+export function ensureDefaultDiningTables(tables = []) {
+  if (!Array.isArray(tables) || tables.length === 0) {
+    return JSON.parse(JSON.stringify(DEFAULT_INITIAL_DATA.diningTables || []));
+  }
+  return cleanAndPruneSplitTables(tables);
 }
 
 // High-speed LAN table sync loop (guarantees instant table state refresh across all devices)

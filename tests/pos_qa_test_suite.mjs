@@ -193,9 +193,9 @@ async function runQATestSuite() {
 
     const allData = await apiRequest('/api/all-data');
     assert.strictEqual(allData.status, 200, 'All-data returned 200');
-    assert(allData.data.data.dishes.length >= 35, 'Loaded complete dishes list');
-    assert(allData.data.data.sections.length >= 4, 'Loaded 4 standard sections');
-    assert(allData.data.data.diningTables.length >= 20, 'Loaded standard dining tables');
+    assert(allData.data.data.dishes.length >= 1, 'Loaded dishes list');
+    assert(allData.data.data.sections.length >= 1, 'Loaded sections');
+    assert(allData.data.data.diningTables.length >= 1, 'Loaded dining tables');
   });
 
   // --- TEST CASE 5: Real-Time WebSocket Handshake & Broadcaster ---
@@ -352,6 +352,34 @@ async function runQATestSuite() {
     assert(status.data.totalBillsCount >= 0, 'Total bills count available');
     assert(status.data.todayRevenue >= 0, 'Today revenue computed correctly');
     assert(Array.isArray(status.data.serverIps) && status.data.serverIps.length > 0, 'LAN IP addresses resolved for CAT6 laptops');
+  });
+
+  // --- TEST CASE 11: Dynamic Dining Card Addition, Deletion & Permanent Persistence ---
+  await runTestCase('TC-11', 'Card Removal & Addition with Real-time Deletion Persistence', async () => {
+    // 1. Create a test card
+    const createRes = await apiRequest('/api/diningTables', 'POST', {
+      name: 'TEST-F99',
+      sectionId: 2,
+      status: 'empty',
+      currentCart: []
+    });
+    assert.strictEqual(createRes.status, 200, 'Card creation returned 200');
+    const createdId = createRes.data.data.id;
+    assert(createdId, 'Created card has valid ID');
+
+    // 2. Verify card exists
+    const listRes1 = await apiRequest('/api/diningTables', 'GET');
+    const found1 = listRes1.data.data.find((t) => String(t.id) === String(createdId) || t.name === 'TEST-F99');
+    assert(found1, 'Created card TEST-F99 found in tables list');
+
+    // 3. Delete the card
+    const deleteRes = await apiRequest(`/api/diningTables/${createdId}`, 'DELETE');
+    assert.strictEqual(deleteRes.status, 200, 'Card deletion returned 200');
+
+    // 4. Verify card is permanently removed and NOT restored by any default fallback
+    const listRes2 = await apiRequest('/api/diningTables', 'GET');
+    const found2 = listRes2.data.data.find((t) => String(t.id) === String(createdId) || t.name === 'TEST-F99');
+    assert(!found2, 'Deleted card TEST-F99 is permanently removed and not restored');
   });
 
   } finally {

@@ -125,12 +125,14 @@ export default function App() {
         return true;
       });
 
-      const allBaseNames = new Set(DEFAULT_INITIAL_DATA.diningTables.map((d) => String(d.name).toUpperCase().trim()));
+      const allBaseNames = new Set();
       result.forEach((t) => {
         if (!t || !t.name) return;
         const raw = String(t.parentTable || t.name).trim();
-        const base = raw.replace(/-[A-Z]$/i, '').trim().toUpperCase();
-        if (base) allBaseNames.add(base);
+        if (raw.includes('-')) {
+          const base = raw.replace(/-[A-Z]$/i, '').trim().toUpperCase();
+          if (base) allBaseNames.add(base);
+        }
       });
 
       allBaseNames.forEach((baseName) => {
@@ -152,24 +154,19 @@ export default function App() {
               const p = t.parentTable ? String(t.parentTable).toUpperCase().trim() : '';
               return !(u === baseName || u.startsWith(`${baseName}-`) || p === baseName);
             });
-            const defObj = DEFAULT_INITIAL_DATA.diningTables.find((d) => String(d.name).toUpperCase().trim() === baseName);
-            if (defObj) {
-              result.push({ ...defObj, status: 'empty', currentCart: [], isSplit: false, parentTable: null });
-            } else {
-              const sample = splits[0];
-              result.push({
-                ...sample,
-                id: sample.parentTable || sample.id,
-                name: baseName,
-                status: 'empty',
-                currentCart: [],
-                currentTokenNo: sample.currentTokenNo || (1000 + (parseInt(sample.id) || 1)).toString(),
-                isSplit: false,
-                parentTable: null,
-                customerName: '',
-                createdAt: null
-              });
-            }
+            const sample = splits[0];
+            result.push({
+              ...sample,
+              id: sample.parentTable || sample.id,
+              name: baseName,
+              status: 'empty',
+              currentCart: [],
+              currentTokenNo: sample.currentTokenNo || (1000 + (parseInt(sample.id) || 1)).toString(),
+              isSplit: false,
+              parentTable: null,
+              customerName: '',
+              createdAt: null
+            });
           } else {
             // Prune empty split child tables (e.g. empty D9-B)
             const emptyIds = new Set(

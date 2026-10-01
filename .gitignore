@@ -35,5 +35,6 @@ Thumbs.db
 # Temp files
 scratch/
 tmp/
+release/
 
 data/backups/

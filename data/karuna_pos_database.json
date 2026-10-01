@@ -86,24 +86,6 @@
       "id": 2,
       "name": "First Floor",
       "extraCharge": 0
-    },
-    {
-      "name": "Parcels",
-      "extraCharge": 0,
-      "color": "blue",
-      "id": 1788847541506
-    },
-    {
-      "name": "Parcels",
-      "extraCharge": 0,
-      "color": "blue",
-      "id": 1788847541507
-    },
-    {
-      "name": "2nd floor",
-      "extraCharge": 0,
-      "color": "blue",
-      "id": 1788848773810
     }
   ],
   "dishes": [
@@ -1620,77 +1602,6 @@
       "id": 1788850779856
     },
     {
-      "name": "S1",
-      "sectionId": 1788848773810,
-      "status": "occupied",
-      "currentCart": [
-        {
-          "id": 3,
-          "srNo": 103,
-          "name": "Pohe",
-          "categoryId": 1,
-          "subCategoryId": 1,
-          "price": 35,
-          "hasMultiplePrices": false,
-          "variants": [],
-          "sectionPrices": {
-            "1": 35,
-            "2": 35,
-            "3": 45,
-            "4": 35
-          },
-          "subItems": [
-            {
-              "name": "Sev & Lemon",
-              "qty": "1"
-            }
-          ],
-          "pricePerKg": null,
-          "stockQty": 0,
-          "status": "Out of Stock",
-          "isParcel": false,
-          "cartItemId": "3_1788929149426_88fp",
-          "qty": 1,
-          "unit": null,
-          "qtyDisplay": "1"
-        },
-        {
-          "id": 4,
-          "srNo": 104,
-          "name": "Sheera",
-          "categoryId": 1,
-          "subCategoryId": 1,
-          "price": 45,
-          "hasMultiplePrices": false,
-          "variants": [],
-          "sectionPrices": {
-            "1": 45,
-            "2": 45,
-            "3": 55,
-            "4": 45
-          },
-          "subItems": [],
-          "stockQty": 0,
-          "status": "Out of Stock",
-          "isParcel": false,
-          "cartItemId": "4_1788929150207_z282",
-          "qty": 1,
-          "unit": null,
-          "qtyDisplay": "1"
-        }
-      ],
-      "currentTokenNo": "1010",
-      "isSplit": false,
-      "createdAt": "2026-09-09T04:45:54.097Z",
-      "id": 1788851649600,
-      "customerName": "",
-      "pax": "1",
-      "waiter": "Raju",
-      "lastPrintedCart": [],
-      "kotCount": 0,
-      "parcelStatus": null
-    },
-    {
       "name": "P6",
       "sectionId": 1788847541506,
       "status": "occupied",
@@ -1796,198 +1707,7 @@
       "waiter": "Raju"
     },
     {
-      "id": 9,
-      "name": "F1",
-      "sectionId": 2,
-      "status": "occupied",
-      "currentCart": [
-        {
-          "id": 3,
-          "srNo": 103,
-          "name": "Pohe",
-          "categoryId": 1,
-          "subCategoryId": 1,
-          "price": 35,
-          "hasMultiplePrices": false,
-          "variants": [],
-          "sectionPrices": {
-            "1": 35,
-            "2": 35,
-            "3": 45,
-            "4": 35
-          },
-          "subItems": [
-            {
-              "name": "Sev & Lemon",
-              "qty": "1"
-            }
-          ],
-          "pricePerKg": null,
-          "stockQty": 0,
-          "status": "Out of Stock",
-          "cartItemId": "3_1788858544463_q3ph",
-          "qty": 1,
-          "unit": null,
-          "qtyDisplay": "1"
-        },
-        {
-          "id": 4,
-          "srNo": 104,
-          "name": "Sheera",
-          "categoryId": 1,
-          "subCategoryId": 1,
-          "price": 45,
-          "hasMultiplePrices": false,
-          "variants": [],
-          "sectionPrices": {
-            "1": 45,
-            "2": 45,
-            "3": 55,
-            "4": 45
-          },
-          "subItems": [],
-          "stockQty": 0,
-          "status": "Out of Stock",
-          "cartItemId": "4_1788858544838_oatb",
-          "qty": 1,
-          "unit": null,
-          "qtyDisplay": "1"
-        }
-      ],
-      "currentTokenNo": "1009",
-      "isSplit": false,
-      "createdAt": "2026-09-08T09:09:16.862Z",
-      "parentTable": null,
-      "customerName": ""
-    },
-    {
-      "id": 10,
-      "name": "F2",
-      "sectionId": 2,
-      "status": "occupied",
-      "currentCart": [
-        {
-          "id": 4,
-          "srNo": 104,
-          "name": "Sheera",
-          "categoryId": 1,
-          "subCategoryId": 1,
-          "price": 45,
-          "hasMultiplePrices": false,
-          "variants": [],
-          "sectionPrices": {
-            "1": 45,
-            "2": 45,
-            "3": 55,
-            "4": 45
-          },
-          "subItems": [],
-          "stockQty": 0,
-          "status": "Out of Stock",
-          "isParcel": false,
-          "cartItemId": "4_1790684326989_s7or",
-          "qty": 1,
-          "unit": null,
-          "qtyDisplay": "1"
-        },
-        {
-          "id": 5,
-          "srNo": 105,
-          "name": "Puri Bhaji",
-          "categoryId": 1,
-          "subCategoryId": 1,
-          "price": 75,
-          "hasMultiplePrices": false,
-          "variants": [],
-          "sectionPrices": {
-            "1": 75,
-            "2": 75,
-            "3": 85,
-            "4": 75
-          },
-          "subItems": [
-            {
-              "name": "4 Puris",
-              "qty": "1 portion"
-            },
-            {
-              "name": "Potato Bhaji",
-              "qty": "1 bowl"
-            }
-          ],
-          "isParcel": false,
-          "cartItemId": "5_1790684327798_vda4",
-          "qty": 1,
-          "unit": null,
-          "qtyDisplay": "1"
-        }
-      ],
-      "currentTokenNo": "1010",
-      "isSplit": false,
-      "createdAt": "2026-09-29T12:18:47.798Z",
-      "parentTable": null,
-      "customerName": "",
-      "lastPrintedCart": [
-        {
-          "id": 4,
-          "srNo": 104,
-          "name": "Sheera",
-          "categoryId": 1,
-          "subCategoryId": 1,
-          "price": 45,
-          "hasMultiplePrices": false,
-          "variants": [],
-          "sectionPrices": {
-            "1": 45,
-            "2": 45,
-            "3": 55,
-            "4": 45
-          },
-          "subItems": [],
-          "stockQty": 0,
-          "status": "Out of Stock",
-          "isParcel": false,
-          "cartItemId": "4_1790684326989_s7or",
-          "qty": 1,
-          "unit": null,
-          "qtyDisplay": "1"
-        },
-        {
-          "id": 5,
-          "srNo": 105,
-          "name": "Puri Bhaji",
-          "categoryId": 1,
-          "subCategoryId": 1,
-          "price": 75,
-          "hasMultiplePrices": false,
-          "variants": [],
-          "sectionPrices": {
-            "1": 75,
-            "2": 75,
-            "3": 85,
-            "4": 75
-          },
-          "subItems": [
-            {
-              "name": "4 Puris",
-              "qty": "1 portion"
-            },
-            {
-              "name": "Potato Bhaji",
-              "qty": "1 bowl"
-            }
-          ],
-          "isParcel": false,
-          "cartItemId": "5_1790684327798_vda4",
-          "qty": 1,
-          "unit": null,
-          "qtyDisplay": "1"
-        }
-      ],
-      "kotCount": 1
-    },
-    {
-      "id": 1788853497642,
+      "id": 1788853497643,
       "name": "QA-D1",
       "sectionId": 1,
       "status": "occupied",
@@ -2000,65 +1720,6 @@
         }
       ],
       "currentTokenNo": "5501"
-    },
-    {
-      "id": 11,
-      "name": "F3",
-      "sectionId": 2,
-      "status": "occupied",
-      "currentCart": [
-        {
-          "id": 9,
-          "srNo": 109,
-          "name": "Shabu Vada",
-          "categoryId": 1,
-          "subCategoryId": 1,
-          "price": 70,
-          "hasMultiplePrices": false,
-          "variants": [],
-          "sectionPrices": {
-            "1": 70,
-            "2": 70,
-            "3": 80,
-            "4": 70
-          },
-          "subItems": [],
-          "stockQty": 0,
-          "status": "Out of Stock",
-          "isParcel": false,
-          "cartItemId": "9_1790685051495_wq43",
-          "qty": 1,
-          "unit": null,
-          "qtyDisplay": "1"
-        },
-        {
-          "id": 11,
-          "srNo": 111,
-          "name": "Dahi Vada",
-          "categoryId": 1,
-          "subCategoryId": 1,
-          "price": 70,
-          "hasMultiplePrices": false,
-          "variants": [],
-          "sectionPrices": {
-            "1": 70,
-            "2": 70,
-            "3": 80,
-            "4": 70
-          },
-          "subItems": [],
-          "isParcel": false,
-          "cartItemId": "11_1790685052126_6nh6",
-          "qty": 2,
-          "unit": null,
-          "qtyDisplay": "2"
-        }
-      ],
-      "currentTokenNo": "1011",
-      "isSplit": false,
-      "createdAt": "2026-09-29T12:30:51.495Z",
-      "parentTable": null,
-      "customerName": ""
     },
     {
       "id": 5,
@@ -2079,6 +1740,42 @@
       "status": "empty",
       "currentCart": [],
       "currentTokenNo": "1008",
+      "isSplit": false,
+      "createdAt": null,
+      "parentTable": null,
+      "customerName": ""
+    },
+    {
+      "id": 9,
+      "name": "F1",
+      "sectionId": 2,
+      "status": "empty",
+      "currentCart": [],
+      "currentTokenNo": "1009",
+      "isSplit": false,
+      "createdAt": null,
+      "parentTable": null,
+      "customerName": ""
+    },
+    {
+      "id": 10,
+      "name": "F2",
+      "sectionId": 2,
+      "status": "empty",
+      "currentCart": [],
+      "currentTokenNo": "1010",
+      "isSplit": false,
+      "createdAt": null,
+      "parentTable": null,
+      "customerName": ""
+    },
+    {
+      "id": 11,
+      "name": "F3",
+      "sectionId": 2,
+      "status": "empty",
+      "currentCart": [],
+      "currentTokenNo": "1011",
       "isSplit": false,
       "createdAt": null,
       "parentTable": null,
@@ -2191,54 +1888,6 @@
       "isSplit": false,
       "parentTable": null,
       "customerName": ""
-    },
-    {
-      "name": "S2",
-      "sectionId": 1788848773810,
-      "status": "empty",
-      "currentCart": [],
-      "currentTokenNo": "1788851682143",
-      "isSplit": false,
-      "createdAt": null,
-      "id": 1788851681143,
-      "lastPrintedCart": [],
-      "kotCount": 0,
-      "customerName": "",
-      "pax": "1",
-      "waiter": "Raju",
-      "parentTable": null
-    },
-    {
-      "name": "S3",
-      "sectionId": 1788848773810,
-      "status": "empty",
-      "currentCart": [],
-      "currentTokenNo": "1788851688323",
-      "isSplit": false,
-      "createdAt": null,
-      "id": 1788851687323,
-      "lastPrintedCart": [],
-      "kotCount": 0,
-      "customerName": "",
-      "pax": "1",
-      "waiter": "Raju",
-      "parentTable": null
-    },
-    {
-      "name": "S4",
-      "sectionId": 1788848773810,
-      "status": "empty",
-      "currentCart": [],
-      "currentTokenNo": "1788851693295",
-      "isSplit": false,
-      "createdAt": null,
-      "id": 1788851692295,
-      "lastPrintedCart": [],
-      "kotCount": 0,
-      "customerName": "",
-      "pax": "1",
-      "waiter": "Raju",
-      "parentTable": null
     }
   ],
   "bills": [
@@ -16265,6 +15914,96 @@
       "counterName": "Counter 1 (Breakfast & Snacks)",
       "invoiceNo": "INV-C1-260929-102",
       "id": 1790684995713
+    },
+    {
+      "tableId": 1788853497643,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1790684995714,
+      "status": "settled",
+      "createdAt": "2026-10-01T06:24:26.889Z"
+    },
+    {
+      "id": 1790835866902,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1790835866901",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "status": "settled",
+      "syncedAt": "2026-10-01T06:24:26.905Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 1788853497644,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1790835866903,
+      "status": "settled",
+      "createdAt": "2026-10-01T06:25:34.393Z"
+    },
+    {
+      "id": 1790835934405,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1790835934404",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "status": "settled",
+      "syncedAt": "2026-10-01T06:25:34.406Z",
+      "wasOffline": true
     }
   ],
   "billLogs": [

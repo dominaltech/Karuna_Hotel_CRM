@@ -15,7 +15,7 @@
     "preview": "vite preview",
     "test": "node tests/pos_qa_test_suite.mjs",
     "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://localhost:5173 && electron electron/main.js\"",
-    "electron:build": "vite build && electron-builder"
+    "electron:build": "vite build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --dir"
   },
   "dependencies": {
     "cors": "^2.8.6",
@@ -53,10 +53,9 @@
       "package.json"
     ],
     "win": {
-      "target": [
-        "nsis",
-        "portable"
-      ]
+      "target": "dir",
+      "sign": "./scripts/customSign.cjs",
+      "forceCodeSigning": false
     },
     "nsis": {
       "oneClick": false,

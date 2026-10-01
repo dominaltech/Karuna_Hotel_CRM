@@ -1,7 +1,8 @@
-﻿import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import http from 'http';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,6 +20,36 @@ if (!gotTheLock) {
       mainWindow.focus();
     }
   });
+}
+
+// Start internal backend database & websocket server if running standalone
+async function ensureBackendServer() {
+  try {
+    const isRunning = await new Promise((resolve) => {
+      const req = http.get('http://127.0.0.1:3001/api/health', (res) => {
+        resolve(res.statusCode === 200);
+      });
+      req.on('error', () => resolve(false));
+      req.setTimeout(800, () => {
+        req.destroy();
+        resolve(false);
+      });
+    });
+
+    if (!isRunning) {
+      console.log('🚀 Starting embedded Karuna POS Server on port 3001...');
+      try {
+        await import('../server/server.js');
+        console.log('✅ Embedded POS Server active on port 3001.');
+      } catch (serverErr) {
+        console.warn('⚠️ Server auto-start notice:', serverErr.message);
+      }
+    } else {
+      console.log('🔗 External POS Server already active on port 3001.');
+    }
+  } catch (err) {
+    console.error('Server check error:', err);
+  }
 }
 
 function createWindow() {
@@ -42,9 +73,6 @@ function createWindow() {
   // Sleek standalone desktop software feel without default browser menu
   mainWindow.setMenuBarVisibility(false);
 
-  // Set default zoom factor to 80% (0.8) on load
-  
-
   // Block opening DevTools
   mainWindow.webContents.on('devtools-opened', () => {
     mainWindow.webContents.closeDevTools();
@@ -67,7 +95,8 @@ function createWindow() {
 }
 
 // App lifecycle
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await ensureBackendServer();
   createWindow();
 
   app.on('activate', () => {

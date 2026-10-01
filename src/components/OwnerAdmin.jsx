@@ -1099,7 +1099,7 @@ export default function OwnerAdmin({
             {/* List of Dining Areas */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {sortSectionsWithParcelsLast(sections).map((sec) => {
-                const secTables = tables.filter((t) => t && t.sectionId === sec.id);
+                const secTables = tables.filter((t) => t && (t.sectionId === sec.id || String(t.sectionId) === String(sec.id)));
 
                 return (
                   <div key={`admin-sec-card-${sec.id}`} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3 shadow-2xs">
