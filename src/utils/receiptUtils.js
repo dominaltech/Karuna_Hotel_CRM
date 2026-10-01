@@ -273,6 +273,9 @@ export function printKOTReceipt({
     <head>
       <title>KOT - Karuna Hotel</title>
       <meta charset="utf-8">
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Zen+Dots&display=swap" rel="stylesheet">
       <style>
         @page {
           size: 72mm auto;
@@ -289,8 +292,8 @@ export function printKOTReceipt({
           padding: 0 !important;
           background: #fff;
           color: #000;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Devanagari", "Mangal", "Arial Unicode MS", "Helvetica Neue", Arial, sans-serif;
-          font-size: 13px;
+          font-family: 'Nunito Sans', 'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Devanagari", sans-serif;
+          font-size: 12px;
           line-height: 1.35;
           display: flex;
           justify-content: center;
@@ -305,12 +308,13 @@ export function printKOTReceipt({
           box-sizing: border-box;
         }
         .kot-title {
-          font-size: 19px;
-          font-weight: 900;
+          font-family: 'Montserrat', sans-serif;
+          font-size: 17px;
+          font-weight: 800;
           text-align: center;
           color: #000;
           margin-bottom: 6px;
-          letter-spacing: 0.3px;
+          letter-spacing: 0.5px;
         }
         .meta-table {
           width: 100%;
@@ -319,8 +323,9 @@ export function printKOTReceipt({
         }
         .meta-table td {
           padding: 1.5px 0;
-          font-size: 12.5px;
-          font-weight: 800;
+          font-family: 'Nunito Sans', sans-serif;
+          font-size: 12px;
+          font-weight: 700;
           color: #000;
           white-space: nowrap;
         }
@@ -347,15 +352,17 @@ export function printKOTReceipt({
           table-layout: fixed;
         }
         .items-table th {
-          font-size: 13px;
-          font-weight: 900;
+          font-family: 'Montserrat', sans-serif;
+          font-size: 12px;
+          font-weight: 700;
           color: #000;
           padding: 2px 0;
         }
         .items-table td {
           padding: 3px 0;
-          font-size: 13px;
-          font-weight: 800;
+          font-family: 'Nunito Sans', 'Noto Sans Devanagari', sans-serif;
+          font-size: 12.5px;
+          font-weight: 600;
           color: #000;
           vertical-align: top;
         }
@@ -368,8 +375,9 @@ export function printKOTReceipt({
         .col-qty {
           width: 22%;
           text-align: right;
-          font-weight: 900;
-          font-size: 14px;
+          font-family: 'Montserrat', sans-serif;
+          font-weight: 700;
+          font-size: 13.5px;
           white-space: nowrap;
         }
         @media print {
@@ -429,7 +437,7 @@ export function printKOTReceipt({
         </table>
 
         <div class="dashed-line"></div>
-        ${orderNote ? `<div style="font-size: 11px; font-weight: 700; margin-top: 3px; color: #000;">Note: ${orderNote}</div>` : ''}
+        ${orderNote ? `<div style="font-size: 11px; font-weight: 600; margin-top: 3px; color: #000;">Note: ${orderNote}</div>` : ''}
       </div>
 
       <script>
@@ -447,7 +455,7 @@ export function printKOTReceipt({
 
 /**
  * Print Cash-Memo Thermal Receipt (Customer Bill)
- * Matches exact layout provided in Photo 2
+ * Matches exact layout provided in Photo 2 with Smartphone Scanner Icon & Google Fonts
  */
 export async function printThermalReceipt(billData, options = {}) {
   const printWindow = window.open('', '_blank', 'width=440,height=650');
@@ -476,11 +484,11 @@ export async function printThermalReceipt(billData, options = {}) {
   try {
     qrCodeUrl = await QRCode.toDataURL(upiString, {
       margin: 1,
-      width: 100,
+      width: 95,
       errorCorrectionLevel: 'M'
     });
   } catch (e) {
-    qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(upiString)}&margin=1`;
+    qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=95x95&data=${encodeURIComponent(upiString)}&margin=1`;
   }
 
   const itemsHtml = (billData.items || []).map((item) => {
@@ -509,6 +517,9 @@ export async function printThermalReceipt(billData, options = {}) {
     <head>
       <title>Cash Memo - Karuna Hotel</title>
       <meta charset="utf-8">
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Zen+Dots&display=swap" rel="stylesheet">
       <style>
         @page {
           size: 72mm auto;
@@ -525,8 +536,8 @@ export async function printThermalReceipt(billData, options = {}) {
           padding: 0 !important;
           background: #fff;
           color: #000;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Devanagari", "Mangal", "Arial Unicode MS", "Helvetica Neue", Arial, sans-serif;
-          font-size: 12.5px;
+          font-family: 'Nunito Sans', 'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Devanagari", sans-serif;
+          font-size: 12px;
           line-height: 1.3;
           display: flex;
           justify-content: center;
@@ -545,22 +556,25 @@ export async function printThermalReceipt(billData, options = {}) {
           margin-bottom: 3px;
         }
         .hotel-name {
+          font-family: 'Montserrat', 'Playfair Display', sans-serif;
           font-size: 19px;
-          font-weight: 900;
-          letter-spacing: -0.2px;
+          font-weight: 800;
+          letter-spacing: 0.5px;
           color: #000;
           margin-bottom: 1px;
         }
         .location, .phone {
-          font-size: 12.5px;
+          font-family: 'Nunito Sans', 'Montserrat', sans-serif;
+          font-size: 12px;
           font-weight: 700;
           color: #000;
           margin-bottom: 1px;
         }
         .cash-memo-title {
-          font-size: 17px;
-          font-weight: 900;
-          letter-spacing: 0.5px;
+          font-family: 'Montserrat', sans-serif;
+          font-size: 16px;
+          font-weight: 800;
+          letter-spacing: 0.8px;
           text-transform: uppercase;
           color: #000;
           margin-top: 3px;
@@ -573,8 +587,9 @@ export async function printThermalReceipt(billData, options = {}) {
         }
         .meta-table td {
           padding: 1.5px 0;
+          font-family: 'Nunito Sans', sans-serif;
           font-size: 12px;
-          font-weight: 800;
+          font-weight: 700;
           color: #000;
           white-space: nowrap;
         }
@@ -601,15 +616,17 @@ export async function printThermalReceipt(billData, options = {}) {
           table-layout: fixed;
         }
         .items-table th {
+          font-family: 'Montserrat', sans-serif;
           font-size: 12px;
-          font-weight: 900;
+          font-weight: 700;
           color: #000;
           padding: 2px 0;
         }
         .items-table td {
           padding: 2.5px 0;
-          font-size: 12.5px;
-          font-weight: 800;
+          font-family: 'Nunito Sans', 'Noto Sans Devanagari', sans-serif;
+          font-size: 12px;
+          font-weight: 600;
           color: #000;
           vertical-align: top;
         }
@@ -622,21 +639,24 @@ export async function printThermalReceipt(billData, options = {}) {
         .col-price {
           width: 18%;
           text-align: right;
-          font-weight: 800;
+          font-family: 'Montserrat', sans-serif;
+          font-weight: 700;
           padding-right: 3px;
           white-space: nowrap;
         }
         .col-qty {
           width: 14%;
           text-align: center;
-          font-weight: 800;
+          font-family: 'Montserrat', sans-serif;
+          font-weight: 700;
           padding-right: 2px;
           white-space: nowrap;
         }
         .col-amount {
           width: 24%;
           text-align: right;
-          font-weight: 900;
+          font-family: 'Montserrat', sans-serif;
+          font-weight: 800;
           white-space: nowrap;
         }
         .bottom-section {
@@ -654,10 +674,11 @@ export async function printThermalReceipt(billData, options = {}) {
           align-items: flex-start;
         }
         .scan-title {
-          font-size: 10px;
-          font-weight: 900;
+          font-family: 'Montserrat', sans-serif;
+          font-size: 9.5px;
+          font-weight: 800;
           text-transform: uppercase;
-          letter-spacing: 0.2px;
+          letter-spacing: 0.3px;
           color: #000;
           margin-bottom: 2px;
           white-space: nowrap;
@@ -665,17 +686,19 @@ export async function printThermalReceipt(billData, options = {}) {
         .phone-qr-wrapper {
           display: flex;
           align-items: center;
-          gap: 3px;
+          gap: 2px;
         }
-        .phone-icon-svg {
-          width: 32px;
-          height: 48px;
+        .phone-scanner-icon {
+          width: 38px;
+          height: 52px;
           flex-shrink: 0;
+          display: block;
         }
         .qr-img {
-          width: 58px;
-          height: 58px;
+          width: 52px;
+          height: 52px;
           display: block;
+          flex-shrink: 0;
         }
         .total-col {
           width: 50%;
@@ -692,18 +715,21 @@ export async function printThermalReceipt(billData, options = {}) {
           width: 100%;
         }
         .total-label {
-          font-size: 16px;
-          font-weight: 900;
+          font-family: 'Montserrat', sans-serif;
+          font-size: 15px;
+          font-weight: 700;
           color: #000;
         }
         .total-val {
-          font-size: 21px;
-          font-weight: 900;
+          font-family: 'Montserrat', sans-serif;
+          font-size: 20px;
+          font-weight: 800;
           color: #000;
         }
         .thank-you-text {
+          font-family: 'Montserrat', 'Nunito Sans', sans-serif;
           font-size: 11px;
-          font-weight: 800;
+          font-weight: 700;
           color: #000;
           text-align: center;
           width: 100%;
@@ -779,14 +805,33 @@ export async function printThermalReceipt(billData, options = {}) {
           <div class="qr-col">
             <div class="scan-title">SCAN ME TO PAY!</div>
             <div class="phone-qr-wrapper">
-              <svg class="phone-icon-svg" viewBox="0 0 48 72" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="2" y="2" width="44" height="68" rx="6" stroke="#000" stroke-width="2.5" fill="#fff"/>
-                <rect x="6" y="8" width="36" height="50" rx="3" stroke="#000" stroke-width="1.5" fill="#f8fafc"/>
-                <circle cx="24" cy="63" r="2.5" fill="#000"/>
-                <rect x="18" y="4.5" width="12" height="1.5" rx="0.75" fill="#000"/>
-                <path d="M12 24 L24 24 L24 36 L12 36 Z" stroke="#000" stroke-width="1.5"/>
-                <path d="M28 24 L36 24 L36 32 L28 32 Z" stroke="#000" stroke-width="1.5"/>
-                <path d="M14 42 L22 42 L22 50 L14 50 Z" stroke="#000" stroke-width="1.5"/>
+              <!-- Smartphone QR Scanner Vector Graphic matching user uploaded icon -->
+              <svg class="phone-scanner-icon" viewBox="0 0 90 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- QR Code Blocks on Left -->
+                <path d="M14 18 L6 18 L6 28" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <rect x="11" y="22" width="11" height="11" stroke="#000" stroke-width="2.5" fill="#fff"/>
+                <rect x="14.5" y="25.5" width="4" height="4" fill="#000"/>
+                <line x1="26" y1="23" x2="26" y2="25" stroke="#000" stroke-width="2.5" stroke-linecap="round"/>
+                <line x1="26" y1="29" x2="26" y2="31" stroke="#000" stroke-width="2.5" stroke-linecap="round"/>
+                <line x1="26" y1="35" x2="26" y2="37" stroke="#000" stroke-width="2.5" stroke-linecap="round"/>
+                <path d="M6 46 L6 56 L14 56" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <rect x="11" y="42" width="11" height="11" stroke="#000" stroke-width="2.5" fill="#fff"/>
+
+                <!-- Phone Body -->
+                <rect x="30" y="6" width="40" height="70" rx="7" stroke="#000" stroke-width="3" fill="#fff"/>
+                <line x1="45" y1="10.5" x2="55" y2="10.5" stroke="#000" stroke-width="2" stroke-linecap="round"/>
+
+                <!-- Scanner Target on Screen -->
+                <path d="M38 33 L38 27 L44 27" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M62 33 L62 27 L56 27" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M38 43 L38 49 L44 49" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M62 43 L62 49 L56 49" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <line x1="38" y1="38" x2="62" y2="38" stroke="#000" stroke-width="3" stroke-linecap="round"/>
+
+                <!-- Hand Holding Phone -->
+                <path d="M51 72 C48 64 54 53 60 53 C65 53 68 60 69 70" stroke="#000" stroke-width="3" stroke-linecap="round" fill="#fff"/>
+                <path d="M70 52 C76 58 84 70 84 81 C84 92 73 97 64 99" stroke="#000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <path d="M57 98 C57 93 55 83 55 76" stroke="#000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
               </svg>
               <img class="qr-img" src="${qrCodeUrl}" alt="UPI QR" />
             </div>

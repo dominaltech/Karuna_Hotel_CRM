@@ -1751,11 +1751,15 @@
       "sectionId": 2,
       "status": "empty",
       "currentCart": [],
-      "currentTokenNo": "1010",
+      "currentTokenNo": "",
       "isSplit": false,
       "createdAt": null,
       "parentTable": null,
-      "customerName": ""
+      "customerName": "",
+      "lastPrintedCart": [],
+      "kotCount": 0,
+      "pax": "1",
+      "waiter": "Raju"
     },
     {
       "id": 11,
@@ -16036,6 +16040,105 @@
       ],
       "status": "settled",
       "syncedAt": "2026-10-01T07:01:17.492Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 10,
+      "tokenNo": "1010",
+      "tableNo": "F2",
+      "items": [
+        {
+          "id": 3,
+          "srNo": 103,
+          "name": "Pohe",
+          "categoryId": 1,
+          "subCategoryId": 1,
+          "price": 35,
+          "hasMultiplePrices": false,
+          "variants": [],
+          "sectionPrices": {
+            "1": 35,
+            "2": 35,
+            "3": 45,
+            "4": 35
+          },
+          "subItems": [
+            {
+              "name": "Sev & Lemon",
+              "qty": "1"
+            }
+          ],
+          "pricePerKg": null,
+          "stockQty": 0,
+          "status": "Out of Stock",
+          "isParcel": false,
+          "cartItemId": "3_1790838953681_xa38",
+          "qty": 3,
+          "unit": null,
+          "qtyDisplay": "3"
+        }
+      ],
+      "subtotal": 105,
+      "sectionName": "First Floor",
+      "sectionExtraCharge": 0,
+      "total": 105,
+      "counter": "Counter 1 (Breakfast & Snacks)",
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 105,
+        "online": 0,
+        "card": 0
+      },
+      "status": "settled",
+      "createdAt": "2026-10-01T07:15:57.533Z",
+      "counterId": "C1",
+      "counterName": "Counter 1 (Breakfast & Snacks)",
+      "invoiceNo": "INV-C1-261001-101",
+      "id": 1790838077490
+    },
+    {
+      "tableId": 1788853497644,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1790838077491,
+      "status": "settled",
+      "createdAt": "2026-10-01T07:31:40.364Z"
+    },
+    {
+      "id": 1790839900382,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1790839900381",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "status": "settled",
+      "syncedAt": "2026-10-01T07:31:40.384Z",
       "wasOffline": true
     }
   ],
