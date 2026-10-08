@@ -154,7 +154,7 @@ app.get('/api/server/status', (req, res) => {
     const allBills = getCollection('bills') || [];
     const todayStr = new Date().toISOString().split('T')[0];
     const todayBills = allBills.filter((b) => b && b.createdAt && b.createdAt.startsWith(todayStr));
-    const todayRevenue = todayBills.reduce((acc, b) => acc + (parseFloat(b.finalTotal || b.grandTotal || 0) || 0), 0);
+    const todayRevenue = todayBills.reduce((acc, b) => acc + (parseFloat(b.finalTotal || b.grandTotal || b.total || b.totalAmount || 0) || 0), 0);
 
     const ips = getLocalIpAddresses();
     res.json({
@@ -298,18 +298,22 @@ app.post('/api/bills/settle', (req, res) => {
   try {
     const billData = req.body;
     const result = settleBillTransaction(billData);
+    const diningTables = getCollection('diningTables');
 
     // Broadcast real-time updates to all LAN devices
     broadcast({
       type: 'BILL_SETTLED',
       bill: result.bill,
       rawMaterials: result.rawMaterials,
+      recipes: result.recipes,
       dishes: result.dishes,
       updatedTable: result.updatedTable,
-      deletedTableId: result.deletedTableId
+      deletedTableId: result.deletedTableId,
+      deletedTableIds: result.deletedTableIds,
+      diningTables
     });
 
-    res.json({ success: true, ...result });
+    res.json({ success: true, ...result, diningTables });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -334,6 +338,7 @@ app.post('/api/bills/sync-offline', (req, res) => {
         syncedCount: result.syncedCount,
         syncedBills: result.syncedBills,
         rawMaterials: result.rawMaterials,
+        recipes: result.recipes,
         dishes: result.dishes
       });
     }

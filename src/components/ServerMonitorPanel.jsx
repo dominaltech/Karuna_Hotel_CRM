@@ -96,7 +96,7 @@ export default function ServerMonitorPanel({
 
   const todayStr = new Date().toISOString().split('T')[0];
   const todayBills = bills.filter((b) => b && b.createdAt && b.createdAt.startsWith(todayStr));
-  const todayTotalRevenue = todayBills.reduce((sum, b) => sum + (parseFloat(b.finalTotal || b.grandTotal || 0) || 0), 0);
+  const todayTotalRevenue = todayBills.reduce((sum, b) => sum + (parseFloat(b.finalTotal || b.grandTotal || b.total || b.totalAmount || 0) || 0), 0);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-6 space-y-6">

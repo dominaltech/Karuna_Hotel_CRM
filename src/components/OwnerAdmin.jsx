@@ -132,6 +132,31 @@ export default function OwnerAdmin({
   const [editingSectionName, setEditingSectionName] = useState('');
   const [addTableAreaId, setAddTableAreaId] = useState(null);
   const [newTableName, setNewTableName] = useState('');
+  const [isNewCardParcel, setIsNewCardParcel] = useState(false);
+
+  const getSuggestedPrefix = (secName, isParcel) => {
+    if (isParcel) return 'P';
+    const s = (secName || '').toLowerCase().trim();
+    if (s.includes('dine') || s.includes('dining') || s.includes('ground')) return 'D';
+    if (s.includes('first') || s.includes('floor')) return 'F';
+    if (s.includes('ac')) return 'AC';
+    if (s.includes('parcel') || s.includes('takeaway')) return 'P';
+    if (s.includes('roof') || s.includes('top')) return 'R';
+    if (s.includes('garden')) return 'G';
+    const firstChar = (secName || '').trim().charAt(0).toUpperCase();
+    return /[A-Z]/.test(firstChar) ? firstChar : 'T';
+  };
+
+  const getNextAvailableCardName = (secName, isParcel) => {
+    const prefix = getSuggestedPrefix(secName, isParcel);
+    let num = 1;
+    let candidate = `${prefix}${num}`;
+    while (tables.some((t) => t && String(t.name).toUpperCase().trim() === candidate.toUpperCase())) {
+      num++;
+      candidate = `${prefix}${num}`;
+    }
+    return candidate;
+  };
 
   // History Tab Filters & Modal State (Requirement 11)
   const [historyTimeFilter, setHistoryTimeFilter] = useState('today'); // 'today' | 'all'
@@ -273,7 +298,7 @@ export default function OwnerAdmin({
   };
 
   // Bulk Import Excel / CSV Menu Rates
-  const handleImportExcelFile = (e) => {
+  const handleImportExcelFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -292,9 +317,10 @@ export default function OwnerAdmin({
         }
 
         const updated = await onBulkUpdatePrices(validation.items);
+        const count = Array.isArray(updated) && updated.length > 0 ? updated.length : validation.items.length;
         setBulkRatesMessage({
           success: true,
-          text: `✓ Successfully updated prices for ${validation.items.length} dishes in menu!`
+          text: `✓ Successfully updated prices for ${count} dishes in menu!`
         });
       } catch (err) {
         setBulkRatesMessage({ success: false, text: `Error importing file: ${err.message}` });
@@ -319,17 +345,25 @@ export default function OwnerAdmin({
           return;
         }
 
+        const countCategories = parsed.categories?.length || parsed.data?.categories?.length || 0;
+        const countDishes = parsed.dishes?.length || parsed.data?.dishes?.length || 0;
+        const countBills = parsed.bills?.length || parsed.data?.bills?.length || 0;
+
         setConfirmDialog({
           title: 'Restore Database Backup?',
-          message: 'Are you sure you want to restore this JSON backup? This will update and overwrite the entire database.',
+          message: `Are you sure you want to restore this JSON backup? This will restore and update ${countDishes} dishes, ${countCategories} categories, and ${countBills} bills into the system.`,
           confirmText: 'Yes, Restore Database',
           confirmColor: 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/30',
           onConfirm: async () => {
-            await db.restoreBackup(parsed);
-            setJsonRestoreMessage({
-              success: true,
-              text: '✓ Database restored successfully! All data updated.'
-            });
+            const res = await db.restoreBackup(parsed);
+            if (res && res.error) {
+              setJsonRestoreMessage({ success: false, text: `Restore error: ${res.error}` });
+            } else {
+              setJsonRestoreMessage({
+                success: true,
+                text: `✓ Database restored successfully! Loaded ${countDishes} dishes, ${countCategories} categories, and ${countBills} bills.`
+              });
+            }
           }
         });
       } catch (err) {
@@ -1196,9 +1230,18 @@ export default function OwnerAdmin({
                         {secTables.map((tbl) => (
                           <div
                             key={`admin-tbl-${tbl.id}`}
-                            className="bg-white border border-stone-300 rounded-xl px-2.5 py-1 text-xs font-extrabold text-neutral-800 flex items-center space-x-1.5 shadow-2xs group"
+                            className={`border rounded-xl px-2.5 py-1 text-xs font-extrabold flex items-center space-x-1.5 shadow-2xs group ${
+                              tbl.isParcel
+                                ? 'bg-amber-50 border-amber-300 text-amber-950'
+                                : 'bg-white border-stone-300 text-neutral-800'
+                            }`}
                           >
                             <span>{tbl.name}</span>
+                            {tbl.isParcel && (
+                              <span className="text-[9px] font-black bg-amber-200 text-amber-900 px-1 py-0.2 rounded">
+                                Parcel
+                              </span>
+                            )}
                             <button
                               type="button"
                               onClick={() => {
@@ -1236,6 +1279,7 @@ export default function OwnerAdmin({
                               status: 'empty',
                               currentCart: [],
                               currentTokenNo: Math.floor(1000 + Math.random() * 9000).toString(),
+                              isParcel: Boolean(isNewCardParcel),
                               createdAt: null
                             };
                             if (typeof onAddTable === 'function') {
@@ -1245,53 +1289,84 @@ export default function OwnerAdmin({
                             }
                             setNewTableName('');
                             setAddTableAreaId(null);
+                            setIsNewCardParcel(false);
                           }
                         }}
-                        className="flex items-center space-x-2 pt-1"
+                        className="flex flex-wrap items-center gap-2 pt-1"
                       >
                         {addTableAreaId === sec.id ? (
-                          <>
+                          <div className="flex flex-wrap items-center gap-2 w-full">
                             <input
                               type="text"
-                              placeholder="Card name (e.g. F7)"
+                              placeholder={isNewCardParcel ? "Parcel box (e.g. P5)" : "Table card (e.g. D9, AC6, T1)"}
                               autoFocus
                               value={newTableName}
                               onChange={(e) => setNewTableName(e.target.value)}
-                              className="bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs font-bold text-neutral-900 outline-none flex-1"
+                              className="bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs font-bold text-neutral-900 outline-none flex-1 min-w-[120px]"
                             />
+                            
+                            {/* Card Type Toggle */}
+                            <label className="flex items-center space-x-1.5 text-xs font-black cursor-pointer px-2 py-1 bg-white border border-stone-200 rounded-lg select-none">
+                              <input
+                                type="checkbox"
+                                checked={isNewCardParcel}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setIsNewCardParcel(checked);
+                                  setNewTableName(getNextAvailableCardName(sec.name, checked));
+                                }}
+                                className="w-3.5 h-3.5 rounded text-amber-600 cursor-pointer"
+                              />
+                              <span className={isNewCardParcel ? 'text-amber-800' : 'text-stone-600'}>
+                                {isNewCardParcel ? '📦 Parcel / Takeaway' : '🍽️ Dining Table'}
+                              </span>
+                            </label>
+
                             <button
                               type="submit"
-                              className="bg-neutral-900 hover:bg-black text-white font-bold text-xs px-3 py-1.5 rounded-xl cursor-pointer"
+                              className="bg-neutral-900 hover:bg-black text-white font-bold text-xs px-3.5 py-1.5 rounded-xl cursor-pointer shadow-xs"
                             >
                               Add
                             </button>
                             <button
                               type="button"
-                              onClick={() => setAddTableAreaId(null)}
+                              onClick={() => {
+                                setAddTableAreaId(null);
+                                setIsNewCardParcel(false);
+                              }}
                               className="bg-stone-200 text-stone-700 font-bold text-xs px-2.5 py-1.5 rounded-xl cursor-pointer"
                             >
                               Cancel
                             </button>
-                          </>
+                          </div>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAddTableAreaId(sec.id);
-                              const existingNums = secTables.map((t) => {
-                                const match = t.name.match(/\d+/);
-                                return match ? parseInt(match[0], 10) : 0;
-                              });
-                              const maxNum = existingNums.length > 0 ? Math.max(...existingNums) : 0;
-                              const sName = (sec.name || '').toLowerCase();
-                              const prefix = sName.includes('first') ? 'F' : sName.includes('ac') ? 'AC' : sName.includes('parcel') ? 'P' : 'C';
-                              setNewTableName(`${prefix}${maxNum + 1}`);
-                            }}
-                            className="text-xs font-black text-amber-800 hover:text-amber-900 flex items-center space-x-1 py-1 cursor-pointer"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>+ Add Card to {sec.name}</span>
-                          </button>
+                          <div className="flex items-center space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAddTableAreaId(sec.id);
+                                setIsNewCardParcel(false);
+                                setNewTableName(getNextAvailableCardName(sec.name, false));
+                              }}
+                              className="text-xs font-black text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-1 rounded-lg flex items-center space-x-1 cursor-pointer transition-colors"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>+ Add Table Card</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAddTableAreaId(sec.id);
+                                setIsNewCardParcel(true);
+                                setNewTableName(getNextAvailableCardName(sec.name, true));
+                              }}
+                              className="text-xs font-black text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-lg flex items-center space-x-1 cursor-pointer transition-colors"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>+ Add Parcel Card</span>
+                            </button>
+                          </div>
                         )}
                       </form>
                     </div>

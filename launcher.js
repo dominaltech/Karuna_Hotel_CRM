@@ -60,6 +60,7 @@ async function startDesktopApp() {
     shell: false,
     env: {
       ...process.env,
+      MASTER_SERVER_IP: '127.0.0.1',
       POS_APP_URL: 'http://127.0.0.1:5173'
     }
   });

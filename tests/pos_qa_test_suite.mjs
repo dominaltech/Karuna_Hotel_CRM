@@ -57,7 +57,7 @@ async function ensureServerRunning() {
 
   console.log('⚡ Server not detected on port 3001. Spawning node server/server.js for tests...');
   const serverPath = path.resolve(__dirname, '../server/server.js');
-  const serverProcess = spawn('node', [serverPath], {
+  const serverProcess = spawn(process.execPath, [serverPath], {
     stdio: 'ignore',
     env: process.env
   });
@@ -419,6 +419,652 @@ async function runQATestSuite() {
     const itemDevanagariOnly = { name: 'पुरी भाजी' };
     assert.strictEqual(getPrintDishName(itemDevanagariOnly, 'en'), 'Puri Bhaji', 'Devanagari dish reverse translates to English');
     assert.strictEqual(getPrintDishName(itemDevanagariOnly, 'mr'), 'पुरी भाजी', 'Devanagari dish stays Devanagari in Marathi mode');
+  });
+
+  // --- TEST CASE 13: Bulk Price Update with Section Prices & Multi-Price Propagation ---
+  await runTestCase('TC-13', 'Bulk Dish Price Update Propagates to Base, Section Rates & Variants', async () => {
+    // 1. Fetch target dishes (Uppit & Gulab Jamun) and reset initial state for idempotency
+    const dishesRes = await apiRequest('/api/dishes');
+    const uppit = dishesRes.data.data.find(d => d.name === 'Uppit' || d.srNo === 102);
+    const gulabJamun = dishesRes.data.data.find(d => d.name === 'Gulab Jamun' || d.srNo === 201);
+    assert(uppit, 'Uppit dish found');
+    assert(gulabJamun, 'Gulab Jamun dish found');
+
+    await apiRequest(`/api/dishes/${uppit.id}`, 'PUT', { price: 50, sectionPrices: { 1: 50, 2: 50, 3: 60, 4: 50 } });
+    await apiRequest(`/api/dishes/${gulabJamun.id}`, 'PUT', { price: 80, pricePerKg: 320 });
+
+    // 2. Perform bulk update with modified prices
+    const newUppitPrice = 65;
+    const newJamunPrice = 110;
+    const updateRes = await apiRequest('/api/dishes/bulk-prices', 'POST', {
+      items: [
+        { srNo: uppit.srNo, name: uppit.name, price: newUppitPrice },
+        { srNo: gulabJamun.srNo, name: gulabJamun.name, price: newJamunPrice }
+      ]
+    });
+
+    assert.strictEqual(updateRes.status, 200, 'Bulk update returned 200');
+    assert.strictEqual(updateRes.data.success, true, 'Bulk update marked success');
+
+    // 3. Verify in database
+    const refreshedRes = await apiRequest('/api/dishes');
+    const updatedUppit = refreshedRes.data.data.find(d => d.id === uppit.id);
+    const updatedJamun = refreshedRes.data.data.find(d => d.id === gulabJamun.id);
+
+    assert.strictEqual(updatedUppit.price, newUppitPrice, 'Uppit dish price updated to 65');
+    assert.strictEqual(updatedUppit.sectionPrices['1'], newUppitPrice, 'Uppit Dine In section price updated to 65');
+    assert.strictEqual(updatedUppit.sectionPrices['4'], newUppitPrice, 'Uppit Parcels section price updated to 65');
+    assert(updatedUppit.sectionPrices['3'] >= newUppitPrice, 'Uppit AC Hall section price reflects higher rate');
+
+    assert.strictEqual(updatedJamun.price, newJamunPrice, 'Gulab Jamun price updated to 110');
+    assert.strictEqual(updatedJamun.pricePerKg, newJamunPrice * 4, 'Gulab Jamun pricePerKg recalculated to 440');
+    assert.strictEqual(updatedJamun.variants[0].price, newJamunPrice, 'Gulab Jamun 250g variant updated to 110');
+    assert.strictEqual(updatedJamun.variants[2].price, newJamunPrice * 4, 'Gulab Jamun 1 Kg variant updated to 440');
+  });
+
+  // --- TEST CASE 14: Full Database Backup Export & Restore on New Device ---
+  await runTestCase('TC-14', 'Full Database Backup Export & Complete Restore Integrity', async () => {
+    // 1. Export Backup
+    const backupRes = await apiRequest('/api/database/backup', 'GET');
+    assert.strictEqual(backupRes.status, 200, 'Backup export returned 200');
+    const backupData = backupRes.data;
+    assert(Array.isArray(backupData.dishes), 'Dishes collection exists in backup');
+    assert(Array.isArray(backupData.categories), 'Categories collection exists in backup');
+
+    // 2. Modify backup data (simulate taking from old device with unique test dish)
+    const testDish = {
+      id: 9999,
+      srNo: 999,
+      name: 'QA Device Transfer Dish',
+      marathiName: 'QA नवीन डिव्हाइस पदार्थ',
+      price: 155,
+      categoryId: 1,
+      subCategoryId: 1,
+      counter: 'Breakfast',
+      status: 'In Stock',
+      sectionPrices: { 1: 155 }
+    };
+    const modifiedBackup = {
+      ...backupData,
+      dishes: [...backupData.dishes, testDish]
+    };
+
+    // 3. Restore to system (simulate importing backup on new device)
+    const restoreRes = await apiRequest('/api/database/restore', 'POST', modifiedBackup);
+    assert.strictEqual(restoreRes.status, 200, 'Database restore returned 200');
+    assert.strictEqual(restoreRes.data.success, true, 'Restore marked success');
+
+    // 4. Verify new device database now contains restored data
+    const allDataRes = await apiRequest('/api/all-data', 'GET');
+    const restoredDish = allDataRes.data.data.dishes.find(d => d.id === 9999 || d.srNo === 999);
+    assert(restoredDish, 'Restored dish successfully found in new device database');
+    assert.strictEqual(restoredDish.price, 155, 'Restored dish price accurately maintained at 155');
+
+    // Clean up test dish
+    await apiRequest('/api/dishes/9999', 'DELETE');
+  });
+
+  // --- TEST CASE 15: Excel/CSV Menu Import Adds New Items with Sections & Sweets Variants ---
+  await runTestCase('TC-15', 'Excel/CSV Import Adds Brand New Dishes with Full Rates & Categories', async () => {
+    // 1. Simulate Excel/CSV content with an existing dish, a new breakfast dish, and a new sweet dish
+    const csvContent = `Sr. No.,Dish Name,Marathi Name,Category,Sub Category,Price (₹),Base Rate Per Kg (₹),Counter
+102,"Uppit","उप्पीट","Breakfast & Snacks","Single Items",50,,"Breakfast"
+850,"Crispy Corn Tikki","क्रिस्पी कॉर्न टिक्की","Breakfast & Snacks","Single Items",95,,"Breakfast"
+860,"Anjeer Dryfruit Barfi","अंजीर ड्रायफ्रूट बर्फी","Sweets","Barfi Specials",200,800,"Sweets"`;
+
+    const parsed = parseCSVAndValidateRates(csvContent);
+    assert.strictEqual(parsed.success, true, 'CSV parsed successfully');
+    assert.strictEqual(parsed.items.length, 3, 'All 3 items parsed including new items');
+
+    // 2. Import into system via bulk-prices API
+    const importRes = await apiRequest('/api/dishes/bulk-prices', 'POST', { items: parsed.items });
+    assert.strictEqual(importRes.status, 200, 'Import API returned 200');
+    assert.strictEqual(importRes.data.success, true, 'Import succeeded');
+
+    // 3. Verify new breakfast dish in database
+    const refreshed = await apiRequest('/api/dishes', 'GET');
+    const newBreakfast = refreshed.data.data.find(d => d.srNo === 850 || d.name === 'Crispy Corn Tikki');
+    assert(newBreakfast, 'New breakfast dish Crispy Corn Tikki successfully added');
+    assert.strictEqual(newBreakfast.price, 95, 'New dish price set correctly to 95');
+    assert.strictEqual(newBreakfast.marathiName, 'क्रिस्पी कॉर्न टिक्की', 'Marathi name populated');
+    assert.strictEqual(newBreakfast.counter, 'Breakfast', 'Counter assigned correctly to Breakfast');
+    assert.strictEqual(newBreakfast.sectionPrices['1'], 95, 'Dine In section rate set to 95');
+    assert.strictEqual(newBreakfast.sectionPrices['4'], 95, 'Parcels section rate set to 95');
+
+    // 4. Verify new sweet dish in database
+    const newSweet = refreshed.data.data.find(d => d.srNo === 860 || d.name === 'Anjeer Dryfruit Barfi');
+    assert(newSweet, 'New sweet dish Anjeer Dryfruit Barfi successfully added');
+    assert.strictEqual(newSweet.pricePerKg, 800, 'Price per kg set to 800');
+    assert.strictEqual(newSweet.hasMultiplePrices, true, 'Sweet marked as multi-price');
+    assert.strictEqual(newSweet.variants.length, 3, '3 weight variants generated (250g, 500g, 1 Kg)');
+    assert.strictEqual(newSweet.variants[0].price, 200, '250g variant priced at 200');
+    assert.strictEqual(newSweet.variants[2].price, 800, '1 Kg variant priced at 800');
+    assert.strictEqual(newSweet.counter, 'Sweets', 'Counter assigned correctly to Sweets');
+
+    // Clean up test dishes
+    await apiRequest(`/api/dishes/${newBreakfast.id}`, 'DELETE');
+    await apiRequest(`/api/dishes/${newSweet.id}`, 'DELETE');
+    await new Promise(r => setTimeout(r, 600));
+  });
+
+  // --- TEST CASE 16: Split Dining Table Cart Settle Never Disappears Base Table (e.g. F1, C1) ---
+  await runTestCase('TC-16', 'Split Dining Table Cart Settle Restores Base Table to Normal (Never Disappears)', async () => {
+    // 1. Verify standard table F1 exists
+    const tablesRes1 = await apiRequest('/api/diningTables');
+    const tableList1 = Array.isArray(tablesRes1.data) ? tablesRes1.data : (tablesRes1.data?.data || []);
+    let f1 = tableList1.find(t => t.name === 'F1' || t.name === 'f1');
+    assert(f1, 'Dining table F1 exists in initial database');
+    const f1Id = f1.id;
+    const f1SectionId = f1.sectionId;
+
+    // 2. Simulate splitting F1 into F1-A and F1-B with items
+    const f1BId = Date.now() + 1001;
+    const splitA = {
+      ...f1,
+      name: 'F1-A',
+      status: 'occupied',
+      isSplit: true,
+      parentTable: 'F1',
+      baseName: 'F1',
+      baseTableId: f1Id,
+      currentCart: [{ id: 1, name: 'Single Idli Vada', price: 50, qty: 1 }]
+    };
+    const splitB = {
+      id: f1BId,
+      name: 'F1-B',
+      sectionId: f1SectionId,
+      status: 'occupied',
+      isSplit: true,
+      parentTable: 'F1',
+      baseName: 'F1',
+      baseTableId: f1Id,
+      currentTokenNo: '9902',
+      currentCart: [{ id: 2, name: 'Uppit', price: 50, qty: 1 }]
+    };
+
+    await apiRequest(`/api/diningTables/${f1Id}`, 'PUT', splitA);
+    await apiRequest('/api/diningTables', 'POST', splitB);
+
+    // Verify both split tables exist
+    const splitCheck = await apiRequest('/api/diningTables');
+    const splitList = Array.isArray(splitCheck.data) ? splitCheck.data : (splitCheck.data?.data || []);
+    assert(splitList.some(t => t.name === 'F1-A'), 'Split F1-A exists');
+    assert(splitList.some(t => t.name === 'F1-B'), 'Split F1-B exists');
+
+    // 3. Settle Portion F1-A first
+    const settleARes = await apiRequest('/api/bills/settle', 'POST', {
+      tableId: f1Id,
+      tokenNo: '9901',
+      tableNo: 'F1-A',
+      sectionName: 'First Floor',
+      items: [{ id: 1, name: 'Single Idli Vada', price: 50, qty: 1 }],
+      subtotal: 50,
+      total: 50,
+      paymentDetails: { mode: 'Cash', cash: 50, online: 0 }
+    });
+    assert.strictEqual(settleARes.status, 200, 'F1-A settlement succeeded');
+
+    // Verify F1-B is still active and F1 has not disappeared
+    const midCheck = await apiRequest('/api/diningTables');
+    const midList = Array.isArray(midCheck.data) ? midCheck.data : (midCheck.data?.data || []);
+    const activeB = midList.find(t => t.name === 'F1-B');
+    assert(activeB, 'F1-B is still present and occupied while F1-A is settled');
+    assert.strictEqual(activeB.status, 'occupied', 'F1-B remains occupied');
+
+    // 4. Settle Portion F1-B (now both A and B are settled)
+    const settleBRes = await apiRequest('/api/bills/settle', 'POST', {
+      tableId: f1BId,
+      tokenNo: '9902',
+      tableNo: 'F1-B',
+      sectionName: 'First Floor',
+      items: [{ id: 2, name: 'Uppit', price: 50, qty: 1 }],
+      subtotal: 50,
+      total: 50,
+      paymentDetails: { mode: 'Cash', cash: 50, online: 0 }
+    });
+    assert.strictEqual(settleBRes.status, 200, 'F1-B settlement succeeded');
+
+    // 5. CRITICAL ASSERTION: F1 MUST COME BACK NORMAL (e.g. F1) AND NEVER DISAPPEAR
+    const finalCheck = await apiRequest('/api/diningTables');
+    const finalList = Array.isArray(finalCheck.data) ? finalCheck.data : (finalCheck.data?.data || []);
+    const restoredF1 = finalList.find(t => t.id === f1Id || t.name === 'F1');
+    assert(restoredF1, 'Table F1 did NOT disappear! It returned to the database');
+    assert.strictEqual(restoredF1.name, 'F1', 'Table name restored to base name F1 (not F1-A or F1-B)');
+    assert.strictEqual(restoredF1.status, 'empty', 'Table status is empty and ready for new guests');
+    assert.strictEqual(restoredF1.isSplit, false, 'Table isSplit flag reset to false');
+    assert.strictEqual(restoredF1.currentCart.length, 0, 'Current cart is cleared');
+    assert(!finalList.some(t => t.name === 'F1-A'), 'Split variant F1-A removed');
+    assert(!finalList.some(t => t.name === 'F1-B'), 'Split variant F1-B removed');
+
+    // 6. Test with Custom Table C1 as requested by user
+    const customId = Date.now() + 2001;
+    const customBId = Date.now() + 2002;
+    await apiRequest('/api/diningTables', 'POST', {
+      id: customId,
+      name: 'C1',
+      sectionId: 1,
+      status: 'empty',
+      currentCart: []
+    });
+
+    // Split custom table C1
+    await apiRequest(`/api/diningTables/${customId}`, 'PUT', {
+      id: customId,
+      name: 'C1-A',
+      sectionId: 1,
+      status: 'occupied',
+      isSplit: true,
+      parentTable: 'C1',
+      baseName: 'C1',
+      baseTableId: customId,
+      currentCart: [{ id: 1, name: 'Single Idli Vada', price: 50, qty: 1 }]
+    });
+    await apiRequest('/api/diningTables', 'POST', {
+      id: customBId,
+      name: 'C1-B',
+      sectionId: 1,
+      status: 'occupied',
+      isSplit: true,
+      parentTable: 'C1',
+      baseName: 'C1',
+      baseTableId: customId,
+      currentCart: [{ id: 2, name: 'Uppit', price: 50, qty: 1 }]
+    });
+
+    // Settle C1-A
+    await apiRequest('/api/bills/settle', 'POST', {
+      tableId: customId,
+      tokenNo: '8801',
+      tableNo: 'C1-A',
+      sectionName: 'Ground Floor',
+      items: [{ id: 1, name: 'Single Idli Vada', price: 50, qty: 1 }],
+      subtotal: 50,
+      total: 50,
+      paymentDetails: { mode: 'Cash', cash: 50, online: 0 }
+    });
+
+    // Settle C1-B
+    await apiRequest('/api/bills/settle', 'POST', {
+      tableId: customBId,
+      tokenNo: '8802',
+      tableNo: 'C1-B',
+      sectionName: 'Ground Floor',
+      items: [{ id: 2, name: 'Uppit', price: 50, qty: 1 }],
+      subtotal: 50,
+      total: 50,
+      paymentDetails: { mode: 'Cash', cash: 50, online: 0 }
+    });
+
+    // Verify custom table C1 collapses back to normal C1 and never disappears
+    const customCheck = await apiRequest('/api/diningTables');
+    const customList = Array.isArray(customCheck.data) ? customCheck.data : (customCheck.data?.data || []);
+    const restoredC1 = customList.find(t => t.id === customId || t.name === 'C1');
+    assert(restoredC1, 'Custom table C1 did NOT disappear! It returned to the database');
+    assert.strictEqual(restoredC1.name, 'C1', 'Custom table name restored to base name C1');
+    assert.strictEqual(restoredC1.status, 'empty', 'Custom table status is empty');
+    assert.strictEqual(restoredC1.isSplit, false, 'Custom table isSplit reset to false');
+
+    // Clean up custom table C1
+    await apiRequest(`/api/diningTables/${customId}`, 'DELETE');
+    await new Promise(r => setTimeout(r, 400));
+  });
+
+  // --- TEST CASE 17: Stock Master Recipe Deduplication & Multi-Ingredient Retention ---
+  await runTestCase('TC-17', 'Stock Master: No Duplicate Raw Materials After Sale & Adding 2nd Material Never Deletes 1st', async () => {
+    // 1. TEST PROBLEM 1: Settle a dish with a raw material -> verify NO duplicate recipes created
+    const testDishRes = await apiRequest('/api/dishes');
+    const dishList = testDishRes.data?.data || testDishRes.data || [];
+    const dish2 = dishList.find(d => d.id === 2 || d.name === 'Uppit');
+    assert(dish2, 'Dish 2 exists');
+
+    // Settle a bill with Dish 2
+    const settleRes = await apiRequest('/api/bills/settle', 'POST', {
+      tableId: 5,
+      tokenNo: '7701',
+      tableNo: 'D5',
+      sectionName: 'Dine In Area',
+      items: [{ id: dish2.id, srNo: dish2.srNo, name: dish2.name, price: dish2.price || 50, qty: 1 }],
+      subtotal: dish2.price || 50,
+      total: dish2.price || 50,
+      paymentDetails: { mode: 'Cash', cash: dish2.price || 50, online: 0 }
+    });
+    assert.strictEqual(settleRes.status, 200, 'Settlement for dish 2 succeeded');
+
+    // Query recipes: Dish 2 must NOT have duplicate raw materials
+    const recipesRes1 = await apiRequest('/api/recipes');
+    const allRecipes1 = recipesRes1.data?.data || recipesRes1.data || [];
+    const dish2Recipes = allRecipes1.filter(r => r && String(r.dishId) === String(dish2.id));
+    
+    // Check that each raw material in dish 2 appears at most once
+    const rmNameCounts = {};
+    for (const r of dish2Recipes) {
+      const name = (r.rawMaterialName || '').toLowerCase().trim();
+      rmNameCounts[name] = (rmNameCounts[name] || 0) + 1;
+    }
+    for (const [name, count] of Object.entries(rmNameCounts)) {
+      assert.strictEqual(count, 1, `Raw material "${name}" appears exactly once in dish 2 (found ${count})`);
+    }
+
+    // 2. TEST PROBLEM 2: Adding 1st raw material, then adding 2nd raw material -> 1st MUST NOT disappear
+    const testDishId = 88881;
+    // Create temporary test dish
+    await apiRequest('/api/dishes', 'POST', {
+      id: testDishId,
+      srNo: 8881,
+      name: 'QA Special Halwa',
+      price: 120,
+      stockQty: 10,
+      recipeBaseQty: 1,
+      stockUnit: 'kg'
+    });
+
+    // Step A: Add 1st raw material ("Sooji")
+    const rm1 = {
+      dishId: testDishId,
+      rawMaterialId: 99911,
+      rawMaterialName: 'Sooji',
+      qtyRequired: 0.5,
+      baseQty: 1,
+      unit: 'Kg',
+      currentStock: 10
+    };
+    const add1Res = await apiRequest('/api/recipes', 'POST', rm1);
+    assert.strictEqual(add1Res.status, 200, 'Added 1st raw material');
+
+    // Verify 1st raw material exists
+    let curRecipesRes = await apiRequest('/api/recipes');
+    let curRecipes = (curRecipesRes.data?.data || curRecipesRes.data || []).filter(r => String(r.dishId) === String(testDishId));
+    assert.strictEqual(curRecipes.length, 1, 'Exactly 1 recipe configured for QA Special Halwa');
+    assert.strictEqual(curRecipes[0].rawMaterialName, 'Sooji', '1st ingredient is Sooji');
+
+    // Step B: Now add 2nd raw material ("Ghee") to the same dish
+    const rm2 = {
+      dishId: testDishId,
+      rawMaterialId: 99912,
+      rawMaterialName: 'Ghee',
+      qtyRequired: 0.25,
+      baseQty: 1,
+      unit: 'Kg',
+      currentStock: 5
+    };
+    const add2Res = await apiRequest('/api/recipes', 'POST', rm2);
+    assert.strictEqual(add2Res.status, 200, 'Added 2nd raw material');
+
+    // Step C: CRITICAL VERIFICATION: 1st raw material must NOT disappear, both must be present!
+    const finalRecipesRes = await apiRequest('/api/recipes');
+    const finalRecipes = (finalRecipesRes.data?.data || finalRecipesRes.data || []).filter(r => String(r.dishId) === String(testDishId));
+    
+    assert.strictEqual(finalRecipes.length, 2, 'Both raw materials are present (count is 2, 1st did NOT disappear!)');
+    const hasSooji = finalRecipes.some(r => r.rawMaterialName === 'Sooji');
+    const hasGhee = finalRecipes.some(r => r.rawMaterialName === 'Ghee');
+    assert(hasSooji, '1st raw material "Sooji" is still present and did NOT disappear!');
+    assert(hasGhee, '2nd raw material "Ghee" is also successfully present!');
+
+    // Clean up QA test items
+    for (const r of finalRecipes) {
+      await apiRequest(`/api/recipes/${r.id}`, 'DELETE');
+    }
+    await apiRequest(`/api/dishes/${testDishId}`, 'DELETE');
+    await new Promise(r => setTimeout(r, 400));
+  });
+
+  // --- TEST CASE 18: Table Cards and Parcel Cards Can Be Added in Every Area (Dining, AC, Custom) ---
+  await runTestCase('TC-18', 'Table Cards and Parcel Cards Can Be Added in Every Area (Dining, AC, Custom)', async () => {
+    // 1. Fetch current sections
+    const secsRes = await apiRequest('/api/sections');
+    const sections = Array.isArray(secsRes.data) ? secsRes.data : (secsRes.data?.data || []);
+    assert(sections.length > 0, 'Sections list is populated');
+
+    // Identify dining and ac sections
+    const diningSec = sections.find(s => s.name.toLowerCase().includes('dining') || s.name.toLowerCase().includes('dine'));
+    const acSec = sections.find(s => s.name.toLowerCase().includes('ac'));
+    assert(diningSec, 'Dining section is present');
+    assert(acSec, 'AC section is present');
+
+    // 2. Add Table Card & Parcel Card to Dining Area
+    const dTableRes = await apiRequest('/api/diningTables', 'POST', {
+      name: 'QA-DINE-TBL',
+      sectionId: diningSec.id,
+      status: 'empty',
+      currentCart: [],
+      currentTokenNo: '7701',
+      isParcel: false
+    });
+    assert.strictEqual(dTableRes.status, 200, 'Successfully added table card to Dining section');
+    const dTableId = (dTableRes.data?.data || dTableRes.data)?.id;
+
+    const dParcelRes = await apiRequest('/api/diningTables', 'POST', {
+      name: 'QA-DINE-PARCEL',
+      sectionId: diningSec.id,
+      status: 'empty',
+      currentCart: [],
+      currentTokenNo: '7702',
+      isParcel: true
+    });
+    assert.strictEqual(dParcelRes.status, 200, 'Successfully added parcel card to Dining section');
+    const dParcelId = (dParcelRes.data?.data || dParcelRes.data)?.id;
+
+    // 3. Add Table Card & Parcel Card to AC Area
+    const acTableRes = await apiRequest('/api/diningTables', 'POST', {
+      name: 'QA-AC-TBL',
+      sectionId: acSec.id,
+      status: 'empty',
+      currentCart: [],
+      currentTokenNo: '7703',
+      isParcel: false
+    });
+    assert.strictEqual(acTableRes.status, 200, 'Successfully added table card to AC section');
+    const acTableId = (acTableRes.data?.data || acTableRes.data)?.id;
+
+    const acParcelRes = await apiRequest('/api/diningTables', 'POST', {
+      name: 'QA-AC-PARCEL',
+      sectionId: acSec.id,
+      status: 'empty',
+      currentCart: [],
+      currentTokenNo: '7704',
+      isParcel: true
+    });
+    assert.strictEqual(acParcelRes.status, 200, 'Successfully added parcel card to AC section');
+    const acParcelId = (acParcelRes.data?.data || acParcelRes.data)?.id;
+
+    // 4. Create a Brand New Custom Area ("Garden Terrace")
+    const newAreaRes = await apiRequest('/api/sections', 'POST', {
+      name: 'Garden Terrace',
+      extraCharge: 0,
+      color: 'emerald'
+    });
+    assert.strictEqual(newAreaRes.status, 200, 'Successfully created new area Garden Terrace');
+    const newArea = newAreaRes.data?.data || newAreaRes.data;
+    const newAreaId = newArea.id;
+
+    // 5. Add Table Card & Parcel Card into the Brand New Custom Area
+    const customTableRes = await apiRequest('/api/diningTables', 'POST', {
+      name: 'QA-GT-1',
+      sectionId: newAreaId,
+      status: 'empty',
+      currentCart: [],
+      currentTokenNo: '7705',
+      isParcel: false
+    });
+    assert.strictEqual(customTableRes.status, 200, 'Successfully added table card to new custom area');
+    const customTableId = (customTableRes.data?.data || customTableRes.data)?.id;
+
+    const customParcelRes = await apiRequest('/api/diningTables', 'POST', {
+      name: 'QA-GT-PARCEL',
+      sectionId: newAreaId,
+      status: 'empty',
+      currentCart: [],
+      currentTokenNo: '7706',
+      isParcel: true
+    });
+    assert.strictEqual(customParcelRes.status, 200, 'Successfully added parcel card to new custom area');
+    const customParcelId = (customParcelRes.data?.data || customParcelRes.data)?.id;
+
+    // 6. Verify all 6 cards exist and are mapped correctly
+    const allTablesRes = await apiRequest('/api/diningTables');
+    const allTables = Array.isArray(allTablesRes.data) ? allTablesRes.data : (allTablesRes.data?.data || []);
+
+    const verifyCard = (id, expectedName, expectedSecId, expectedIsParcel) => {
+      const card = allTables.find(t => String(t.id) === String(id));
+      assert(card, `Card "${expectedName}" (ID: ${id}) exists in database`);
+      assert.strictEqual(card.name, expectedName, `Card name matches "${expectedName}"`);
+      assert.strictEqual(String(card.sectionId), String(expectedSecId), `Card sectionId matches "${expectedSecId}"`);
+      assert.strictEqual(Boolean(card.isParcel), expectedIsParcel, `Card isParcel flag is ${expectedIsParcel}`);
+    };
+
+    verifyCard(dTableId, 'QA-DINE-TBL', diningSec.id, false);
+    verifyCard(dParcelId, 'QA-DINE-PARCEL', diningSec.id, true);
+    verifyCard(acTableId, 'QA-AC-TBL', acSec.id, false);
+    verifyCard(acParcelId, 'QA-AC-PARCEL', acSec.id, true);
+    verifyCard(customTableId, 'QA-GT-1', newAreaId, false);
+    verifyCard(customParcelId, 'QA-GT-PARCEL', newAreaId, true);
+
+    // 7. Clean up all QA test cards & custom area
+    await apiRequest(`/api/diningTables/${dTableId}`, 'DELETE');
+    await apiRequest(`/api/diningTables/${dParcelId}`, 'DELETE');
+    await apiRequest(`/api/diningTables/${acTableId}`, 'DELETE');
+    await apiRequest(`/api/diningTables/${acParcelId}`, 'DELETE');
+    await apiRequest(`/api/diningTables/${customTableId}`, 'DELETE');
+    await apiRequest(`/api/diningTables/${customParcelId}`, 'DELETE');
+    await apiRequest(`/api/sections/${newAreaId}`, 'DELETE');
+    await new Promise(r => setTimeout(r, 400));
+  });
+
+  // --------------------------------------------------------------------------
+  // TEST CASE 19: Permanent Deletion of Dining Area & First Floor Tables & Setting Tab Retention
+  // --------------------------------------------------------------------------
+  await runTestCase('TC-19', 'Permanent Deletion of Dining Area & First Floor Tables & Setting Tab Retention', async () => {
+    // 1. Verify dining area table deletion (e.g. D8) and first floor table deletion (e.g. F6)
+    // First create specific test dining and first floor tables to delete
+    const dTestRes = await apiRequest('/api/diningTables', 'POST', {
+      name: 'D-PERM-TEST',
+      sectionId: 1,
+      status: 'empty',
+      currentCart: []
+    });
+    const dTestId = (dTestRes.data?.data || dTestRes.data)?.id;
+    assert(dTestId, 'Created test dining table D-PERM-TEST');
+
+    const fTestRes = await apiRequest('/api/diningTables', 'POST', {
+      name: 'F-PERM-TEST',
+      sectionId: 2,
+      status: 'empty',
+      currentCart: []
+    });
+    const fTestId = (fTestRes.data?.data || fTestRes.data)?.id;
+    assert(fTestId, 'Created test first floor table F-PERM-TEST');
+
+    // Delete both tables
+    const delDRes = await apiRequest(`/api/diningTables/${dTestId}`, 'DELETE');
+    assert.strictEqual(delDRes.status, 200, 'DELETE request for dining table returned 200');
+
+    const delFRes = await apiRequest(`/api/diningTables/${fTestId}`, 'DELETE');
+    assert.strictEqual(delFRes.status, 200, 'DELETE request for first floor table returned 200');
+
+    // Wait and verify neither was resurrected
+    await new Promise(r => setTimeout(r, 600));
+    const postDelTablesRes = await apiRequest('/api/diningTables');
+    const postDelTables = Array.isArray(postDelTablesRes.data) ? postDelTablesRes.data : (postDelTablesRes.data?.data || []);
+
+    const dFound = postDelTables.find(t => String(t.id) === String(dTestId) || t.name === 'D-PERM-TEST');
+    assert(!dFound, 'Deleted dining table D-PERM-TEST is permanently deleted and not resurrected');
+
+    const fFound = postDelTables.find(t => String(t.id) === String(fTestId) || t.name === 'F-PERM-TEST');
+    assert(!fFound, 'Deleted first floor table F-PERM-TEST is permanently deleted and not resurrected');
+
+    // 2. Setting Tab: Adding raw materials sequentially never vanishes previous raw materials
+    // Create a new dish for setting test
+    const newDishRes = await apiRequest('/api/dishes', 'POST', {
+      name: 'QA Setting Test Sweet',
+      categoryId: 2,
+      subCategoryId: 8,
+      price: 150,
+      stockQty: 50,
+      stockUnit: 'kg',
+      recipeBaseQty: 1
+    });
+    const dishId = (newDishRes.data?.data || newDishRes.data)?.id;
+    assert(dishId, 'Created dish for recipe setting test');
+
+    // Step A: Add Raw Material 1 (Pista)
+    const rm1Res = await apiRequest('/api/rawMaterials', 'POST', {
+      name: 'QA-Pista',
+      quantity: 20,
+      unit: 'Kg',
+      minThreshold: 2
+    });
+    const rm1Id = (rm1Res.data?.data || rm1Res.data)?.id;
+
+    const recipe1Res = await apiRequest('/api/recipes', 'POST', {
+      dishId: dishId,
+      rawMaterialId: rm1Id,
+      rawMaterialName: 'QA-Pista',
+      qtyRequired: 0.25,
+      baseQty: 1,
+      unit: 'Kg'
+    });
+    assert.strictEqual(recipe1Res.status, 200, 'Added 1st raw material to dish');
+
+    // Step B: Add Raw Material 2 (Badam)
+    const rm2Res = await apiRequest('/api/rawMaterials', 'POST', {
+      name: 'QA-Badam',
+      quantity: 15,
+      unit: 'Kg',
+      minThreshold: 2
+    });
+    const rm2Id = (rm2Res.data?.data || rm2Res.data)?.id;
+
+    const recipe2Res = await apiRequest('/api/recipes', 'POST', {
+      dishId: dishId,
+      rawMaterialId: rm2Id,
+      rawMaterialName: 'QA-Badam',
+      qtyRequired: 0.35,
+      baseQty: 1,
+      unit: 'Kg'
+    });
+    assert.strictEqual(recipe2Res.status, 200, 'Added 2nd raw material to dish');
+
+    // Step C: Add Raw Material 3 (Cardamom)
+    const rm3Res = await apiRequest('/api/rawMaterials', 'POST', {
+      name: 'QA-Cardamom',
+      quantity: 5,
+      unit: 'Kg',
+      minThreshold: 1
+    });
+    const rm3Id = (rm3Res.data?.data || rm3Res.data)?.id;
+
+    const recipe3Res = await apiRequest('/api/recipes', 'POST', {
+      dishId: dishId,
+      rawMaterialId: rm3Id,
+      rawMaterialName: 'QA-Cardamom',
+      qtyRequired: 0.05,
+      baseQty: 1,
+      unit: 'Kg'
+    });
+    assert.strictEqual(recipe3Res.status, 200, 'Added 3rd raw material to dish');
+
+    // Verify all 3 raw materials for this dish are intact and none have vanished
+    const allRecipesRes = await apiRequest('/api/recipes');
+    const allRecipes = Array.isArray(allRecipesRes.data) ? allRecipesRes.data : (allRecipesRes.data?.data || []);
+    const dishRecipes = allRecipes.filter(r => r && String(r.dishId) === String(dishId));
+
+    assert.strictEqual(dishRecipes.length, 3, `Expected 3 recipes for dish, got ${dishRecipes.length}`);
+    const r1 = dishRecipes.find(r => r.rawMaterialName === 'QA-Pista' || String(r.rawMaterialId) === String(rm1Id));
+    const r2 = dishRecipes.find(r => r.rawMaterialName === 'QA-Badam' || String(r.rawMaterialId) === String(rm2Id));
+    const r3 = dishRecipes.find(r => r.rawMaterialName === 'QA-Cardamom' || String(r.rawMaterialId) === String(rm3Id));
+
+    assert(r1, 'Previous raw material 1 (QA-Pista) is still present and did NOT vanish');
+    assert(r2, 'Previous raw material 2 (QA-Badam) is still present and did NOT vanish');
+    assert(r3, 'Newly added raw material 3 (QA-Cardamom) is present');
+
+    // Clean up
+    for (const r of dishRecipes) {
+      await apiRequest(`/api/recipes/${r.id}`, 'DELETE');
+    }
+    await apiRequest(`/api/rawMaterials/${rm1Id}`, 'DELETE');
+    await apiRequest(`/api/rawMaterials/${rm2Id}`, 'DELETE');
+    await apiRequest(`/api/rawMaterials/${rm3Id}`, 'DELETE');
+    await apiRequest(`/api/dishes/${dishId}`, 'DELETE');
   });
 
   } finally {

@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   db, 
   ensureDatabaseDefaults, 
+  cleanAndPruneSplitTables,
+  cleanAndDeduplicateRecipes,
   subscribeToDatabase, 
   subscribeToConnectionStatus, 
   subscribeToOfflineQueue, 
@@ -75,7 +77,7 @@ export default function App() {
       if (!item) return;
       let key;
       if (isTableCollection && item.name) {
-        key = String(item.name).toUpperCase().trim();
+        key = `${item.sectionId || ''}_${String(item.name).toUpperCase().trim()}`;
       } else if (isSectionCollection && item.name) {
         let cleanName = String(item.name).trim();
         if (cleanName.toLowerCase().includes('parcel')) cleanName = 'Parcels';
@@ -92,7 +94,7 @@ export default function App() {
           if (item.id < existing.id) {
             map.set(key, item.name && item.name.toLowerCase().includes('parcel') ? { ...item, name: 'Parcels' } : item);
           }
-        } else {
+        } else if (isTableCollection) {
           const itemHasCart = item.status === 'occupied' || item.status === 'bill_released' || (item.currentCart && item.currentCart.length > 0);
           const existingHasCart = existing.status === 'occupied' || existing.status === 'bill_released' || (existing.currentCart && existing.currentCart.length > 0);
 
@@ -101,10 +103,10 @@ export default function App() {
           } else if (itemHasCart && existingHasCart) {
             map.set(key, { ...existing, ...item, currentCart: item.currentCart?.length ? item.currentCart : existing.currentCart });
           } else {
-            if (typeof item.id === 'number' && item.id < 100000) {
-              map.set(key, item);
-            }
+            map.set(key, { ...existing, ...item });
           }
+        } else {
+          map.set(key, item);
         }
       }
     });
@@ -123,85 +125,8 @@ export default function App() {
     }
 
     if (isTableCollection) {
-      // Filter out empty parcel tables (Parcels section tables that have no active orders)
-      result = result.filter((t) => {
-        if (!t) return false;
-        const isParcelTable = t.sectionId === 4 || (t.name && String(t.name).toUpperCase().startsWith('P')) || t.isParcel;
-        if (isParcelTable) {
-          const hasActiveOrder = (t.status === 'occupied' || t.status === 'bill_released') && t.currentCart && t.currentCart.length > 0;
-          return hasActiveOrder;
-        }
-        return true;
-      });
-
-      const allBaseNames = new Set();
-      result.forEach((t) => {
-        if (!t || !t.name) return;
-        const raw = String(t.parentTable || t.name).trim();
-        if (raw.includes('-')) {
-          const base = raw.replace(/-[A-Z]$/i, '').trim().toUpperCase();
-          if (base) allBaseNames.add(base);
-        }
-      });
-
-      allBaseNames.forEach((baseName) => {
-        const splits = result.filter((t) => {
-          if (!t || !t.name) return false;
-          const u = String(t.name).toUpperCase().trim();
-          const p = t.parentTable ? String(t.parentTable).toUpperCase().trim() : '';
-          return u === baseName || u.startsWith(`${baseName}-`) || p === baseName;
-        });
-
-        if (splits.length > 0) {
-          const activeSplits = splits.filter((t) => t.status === 'occupied' || t.status === 'bill_released' || (t.currentCart && t.currentCart.length > 0));
-
-          if (activeSplits.length === 0) {
-            // Remove all split variants and collapse back to single clean base table
-            result = result.filter((t) => {
-              if (!t || !t.name) return false;
-              const u = String(t.name).toUpperCase().trim();
-              const p = t.parentTable ? String(t.parentTable).toUpperCase().trim() : '';
-              return !(u === baseName || u.startsWith(`${baseName}-`) || p === baseName);
-            });
-            const sample = splits[0];
-            result.push({
-              ...sample,
-              id: sample.parentTable || sample.id,
-              name: baseName,
-              status: 'empty',
-              currentCart: [],
-              currentTokenNo: sample.currentTokenNo || (1000 + (parseInt(sample.id) || 1)).toString(),
-              isSplit: false,
-              parentTable: null,
-              customerName: '',
-              createdAt: null
-            });
-          } else {
-            // Prune empty split child tables (e.g. empty D9-B)
-            const emptyIds = new Set(
-              splits
-                .filter((t) => t.status !== 'occupied' && t.status !== 'bill_released' && (!t.currentCart || t.currentCart.length === 0))
-                .map((t) => t.id)
-            );
-            if (emptyIds.size > 0) {
-              result = result.filter((t) => !emptyIds.has(t.id));
-            }
-
-            // If only 1 portion remains (e.g. D9-A), rename D9-A back to D9
-            const remainingSplits = result.filter((t) => {
-              if (!t || !t.name) return false;
-              const u = String(t.name).toUpperCase().trim();
-              const p = t.parentTable ? String(t.parentTable).toUpperCase().trim() : '';
-              return u.startsWith(`${baseName}-`) || p === baseName;
-            });
-            if (remainingSplits.length === 1 && remainingSplits[0].name.endsWith('-A')) {
-              remainingSplits[0].name = baseName;
-              remainingSplits[0].isSplit = false;
-              remainingSplits[0].parentTable = null;
-            }
-          }
-        }
-      });
+      // Clean and collapse empty/settled split tables back into base table (preserve all user-created tables and parcel carts!)
+      result = cleanAndPruneSplitTables(result);
     }
 
     return result;
@@ -209,15 +134,16 @@ export default function App() {
 
   // Helper to sync all React state from database cache
   const syncStateFromCache = (cache) => {
-    if (cache.categories) setCategories(deduplicateById(cache.categories));
-    if (cache.subCategories) setSubCategories(deduplicateById(cache.subCategories));
-    if (cache.dishes) setDishes(deduplicateById(cache.dishes));
-    if (cache.sections) setSections(deduplicateById(cache.sections, false, true));
-    if (cache.diningTables) setTables(deduplicateById(cache.diningTables, true));
-    if (cache.bills) setBills(deduplicateById(cache.bills));
-    if (cache.billLogs) setBillLogs(deduplicateById(cache.billLogs));
-    if (cache.rawMaterials) setRawMaterials(deduplicateById(cache.rawMaterials));
-    if (cache.recipes) setRecipes(deduplicateById(cache.recipes));
+    const target = cache || (db.getCacheSnapshot ? db.getCacheSnapshot() : null) || {};
+    if (target.categories) setCategories(deduplicateById(target.categories));
+    if (target.subCategories) setSubCategories(deduplicateById(target.subCategories));
+    if (target.dishes) setDishes(deduplicateById(target.dishes));
+    if (target.sections) setSections(deduplicateById(target.sections, false, true));
+    if (target.diningTables) setTables(deduplicateById(target.diningTables, true));
+    if (target.bills) setBills(deduplicateById(target.bills));
+    if (target.billLogs) setBillLogs(deduplicateById(target.billLogs));
+    if (target.rawMaterials) setRawMaterials(deduplicateById(target.rawMaterials));
+    if (target.recipes) setRecipes(cleanAndDeduplicateRecipes(target.recipes));
   };
 
   const activeTableRef = useRef(activeTable);
@@ -357,9 +283,13 @@ export default function App() {
   const handleSplitTable = async (parentTable) => {
     if (!parentTable) return;
 
-    const rootName = parentTable.parentTable || parentTable.name.split('-')[0];
+    const rawName = String(parentTable.name || '').trim();
+    const rootName = (parentTable.baseName || parentTable.parentTable || rawName.replace(/-[A-Z]$/i, '')).trim();
+    const baseTableId = parentTable.baseTableId || parentTable.id;
+    const baseSectionId = parentTable.sectionId;
+
     const existingSplits = tables.filter(
-      (t) => t.parentTable === rootName || t.name.startsWith(`${rootName}-`) || t.name === rootName
+      (t) => t.parentTable === rootName || t.baseName === rootName || t.name.startsWith(`${rootName}-`) || t.name === rootName
     );
 
     let targetSplitTable = null;
@@ -369,17 +299,22 @@ export default function App() {
         name: `${rootName}-A`,
         isSplit: true,
         parentTable: rootName,
+        baseName: rootName,
+        baseTableId: baseTableId,
+        sectionId: baseSectionId,
         customerName: parentTable.customerName || 'Customer 1'
       });
 
       const splitBData = {
         name: `${rootName}-B`,
-        sectionId: parentTable.sectionId,
+        sectionId: baseSectionId,
         status: 'empty',
         currentCart: [],
         currentTokenNo: Math.floor(1000 + Math.random() * 9000).toString(),
         isSplit: true,
         parentTable: rootName,
+        baseName: rootName,
+        baseTableId: baseTableId,
         customerName: 'Customer 2',
         createdAt: null
       };
@@ -398,12 +333,14 @@ export default function App() {
       const nextCustomerNum = existingSplits.length + 1;
       const newSplitData = {
         name: `${rootName}-${nextLetter}`,
-        sectionId: parentTable.sectionId,
+        sectionId: baseSectionId,
         status: 'empty',
         currentCart: [],
         currentTokenNo: Math.floor(1000 + Math.random() * 9000).toString(),
         isSplit: true,
         parentTable: rootName,
+        baseName: rootName,
+        baseTableId: baseTableId,
         customerName: `Customer ${nextCustomerNum}`,
         createdAt: null
       };
@@ -418,36 +355,72 @@ export default function App() {
 
   // Add Table / Card from Admin
   const handleAddTable = async (tableData) => {
+    const trimmedName = (tableData.name || '').trim();
+    const targetSectionId = tableData.sectionId;
+    const isParcel = Boolean(tableData.isParcel);
+
+    // 1. Check if table with this name already exists in target section
+    const existingInSec = tables.find(
+      (t) => t && String(t.sectionId) === String(targetSectionId) && String(t.name).toUpperCase().trim() === trimmedName.toUpperCase()
+    );
+    if (existingInSec) {
+      await db.diningTables.update(existingInSec.id, {
+        isParcel,
+        status: existingInSec.status || 'empty'
+      });
+      syncStateFromCache();
+      return existingInSec.id;
+    }
+
+    // 2. Check if table with this name exists in an orphaned/unknown section, re-assign it to target section!
+    const existingElsewhere = tables.find(
+      (t) => t && String(t.name).toUpperCase().trim() === trimmedName.toUpperCase() &&
+      (!sections.some((s) => String(s.id) === String(t.sectionId)))
+    );
+    if (existingElsewhere) {
+      await db.diningTables.update(existingElsewhere.id, {
+        sectionId: targetSectionId,
+        isParcel
+      });
+      syncStateFromCache();
+      return existingElsewhere.id;
+    }
+
+    // 3. Otherwise insert fresh new table
     const newTable = {
-      name: tableData.name.trim(),
-      sectionId: tableData.sectionId,
+      name: trimmedName,
+      sectionId: targetSectionId,
       status: 'empty',
       currentCart: [],
       currentTokenNo: Math.floor(1000 + Math.random() * 9000).toString(),
       isSplit: false,
+      isParcel,
       createdAt: null
     };
     const newId = await db.diningTables.add(newTable);
+    syncStateFromCache();
     return newId;
   };
 
   // Delete / Remove Table
   const handleDeleteTable = async (tableId) => {
-    if (activeTable && activeTable.id === tableId) {
+    if (activeTable && (activeTable.id === tableId || activeTable.name === tableId)) {
       setActiveTable(null);
       setCartItems([]);
       setIsCartOpen(false);
     }
     await db.diningTables.delete(tableId);
+    syncStateFromCache();
   };
 
   // Create Table in Modal
   const handleCreateTableAndOpenMenu = async (tableData) => {
     const newId = await db.diningTables.add(tableData);
     const createdTable = { ...tableData, id: newId };
+    syncStateFromCache();
     
     if (tableData.sectionId) {
-      const matchSec = sections.find((s) => s.id === tableData.sectionId);
+      const matchSec = sections.find((s) => String(s.id) === String(tableData.sectionId));
       if (matchSec) setActiveSectionState(matchSec);
     }
 
@@ -638,41 +611,32 @@ export default function App() {
     const tableId = billData.tableId || activeTable?.id;
     const targetTable = tables.find((t) => String(t.id) === String(tableId)) || activeTable;
 
+    const billTotal = billData.total !== undefined ? billData.total : (billData.finalTotal || 0);
     const payload = {
       tableId: tableId || null,
       tokenNo: billData.tokenNo || targetTable?.currentTokenNo || (1000 + (parseInt(tableId) || 1)).toString(),
       tableNo: billData.tableNo || (targetTable ? targetTable.name : 'Takeaway'),
       items: billData.items || cartItems,
-      subtotal: billData.subtotal !== undefined ? billData.subtotal : (billData.total || 0),
+      subtotal: billData.subtotal !== undefined ? billData.subtotal : billTotal,
       sectionName: billData.sectionName || activeSection?.name || 'Dine In Area',
       sectionExtraCharge: 0,
-      total: billData.total !== undefined ? billData.total : 0,
+      total: billTotal,
+      finalTotal: billTotal,
+      grandTotal: billTotal,
+      paymentMode: billData.paymentMode || billData.paymentDetails?.mode || 'Cash',
       counter: activeCounter,
-      paymentDetails: billData.paymentDetails || { mode: 'Cash', cash: billData.total || 0, online: 0, card: 0 },
+      paymentDetails: billData.paymentDetails || { mode: billData.paymentMode || 'Cash', cash: billTotal, online: 0, card: 0 },
       status: 'settled',
-      createdAt: new Date().toISOString()
+      createdAt: billData.createdAt || new Date().toISOString()
     };
 
     const result = await db.settleBill(payload);
 
     if (targetTable) {
-      if (targetTable.sectionId === 4 || targetTable.name?.startsWith('P') || targetTable.isParcel || targetTable.isSplit || targetTable.name?.includes('-')) {
+      const isParcel = targetTable.sectionId === 4 || (targetTable.name && String(targetTable.name).toUpperCase().startsWith('P')) || targetTable.isParcel;
+      if (isParcel) {
         try {
           await db.diningTables.delete(targetTable.id);
-        } catch (e) {}
-      } else {
-        try {
-          await db.diningTables.update(targetTable.id, {
-            status: 'empty',
-            currentCart: [],
-            currentTokenNo: '',
-            lastPrintedCart: [],
-            kotCount: 0,
-            createdAt: null,
-            customerName: '',
-            pax: '1',
-            waiter: 'Raju'
-          });
         } catch (e) {}
       }
     }
@@ -689,12 +653,15 @@ export default function App() {
 
   // Update Settled Bill
   const handleUpdateSettledBill = async (updatedBill, changeDescription) => {
+    const finalAmount = updatedBill.finalTotal !== undefined ? updatedBill.finalTotal : (updatedBill.total || 0);
+    const pMode = updatedBill.paymentMode || updatedBill.paymentDetails?.mode || 'Cash';
     await db.bills.update(updatedBill.id, {
       items: updatedBill.items,
       subtotal: updatedBill.subtotal,
       total: updatedBill.total,
-      finalTotal: updatedBill.total || updatedBill.finalTotal,
-      paymentMode: updatedBill.paymentMode,
+      finalTotal: finalAmount,
+      grandTotal: finalAmount,
+      paymentMode: pMode,
       isResettled: true,
       resettledAt: updatedBill.resettledAt || new Date().toISOString()
     });
@@ -712,9 +679,15 @@ export default function App() {
   };
 
   const handleUpdateDish = async (idOrDish, optionalDishData) => {
-    const dishData = (typeof idOrDish === 'object' && idOrDish !== null) ? idOrDish : optionalDishData;
-    if (dishData && dishData.id) {
-      await db.dishes.put(dishData);
+    if (typeof idOrDish === 'object' && idOrDish !== null) {
+      await db.dishes.put(idOrDish);
+    } else if (idOrDish !== undefined && idOrDish !== null && optionalDishData) {
+      const existing = await db.dishes.get(idOrDish);
+      if (existing) {
+        await db.dishes.put({ ...existing, ...optionalDishData, id: idOrDish });
+      } else {
+        await db.dishes.put({ ...optionalDishData, id: idOrDish });
+      }
     }
   };
 
@@ -752,7 +725,9 @@ export default function App() {
 
   // Stock Management Handlers
   const handleAddRawMaterial = async (rmData) => {
-    await db.rawMaterials.add(rmData);
+    const id = await db.rawMaterials.add(rmData);
+    syncStateFromCache();
+    return id;
   };
 
   const handleUpdateRawMaterial = async (idOrData, updatedFields) => {
@@ -761,22 +736,37 @@ export default function App() {
     } else if (updatedFields) {
       await db.rawMaterials.update(idOrData, updatedFields);
     }
+    syncStateFromCache();
   };
 
   const handleDeleteRawMaterial = async (id) => {
     await db.rawMaterials.delete(id);
+    syncStateFromCache();
   };
 
   const handleSaveRecipeMapping = async (recipeData) => {
+    const rmName = (recipeData.rawMaterialName || '').trim().toLowerCase();
     const existing = recipes.find(
-      (r) => String(r.dishId) === String(recipeData.dishId) && String(r.rawMaterialId) === String(recipeData.rawMaterialId)
+      (r) => String(r.dishId) === String(recipeData.dishId) &&
+             (
+               (recipeData.rawMaterialId && String(r.rawMaterialId) === String(recipeData.rawMaterialId)) ||
+               (rmName && r.rawMaterialName && String(r.rawMaterialName).trim().toLowerCase() === rmName)
+             )
     );
     if (existing) {
-      const newQty = Math.round(((parseFloat(existing.qtyRequired) || 0) + (parseFloat(recipeData.qtyRequired) || 0)) * 100) / 100;
-      await db.recipes.update(existing.id, { qtyRequired: newQty });
+      await db.recipes.update(existing.id, {
+        ...existing,
+        ...recipeData,
+        baseQty: recipeData.baseQty || existing.baseQty || 1,
+        id: existing.id
+      });
     } else {
-      await db.recipes.add(recipeData);
+      await db.recipes.add({
+        ...recipeData,
+        baseQty: recipeData.baseQty || 1
+      });
     }
+    syncStateFromCache();
   };
 
   const ZOOM_STEPS = [100, 125, 150, 175, 200];
@@ -924,11 +914,14 @@ export default function App() {
             rawMaterials={rawMaterials}
             dishes={dishes}
             categories={categories}
+            subCategories={subCategories}
             recipes={recipes}
             onAddRawMaterial={handleAddRawMaterial}
             onUpdateRawMaterial={handleUpdateRawMaterial}
             onDeleteRawMaterial={handleDeleteRawMaterial}
             onSaveRecipeMapping={handleSaveRecipeMapping}
+            onUpdateDish={handleUpdateDish}
+            onSyncCache={syncStateFromCache}
           />
         )}
 

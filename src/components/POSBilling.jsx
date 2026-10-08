@@ -461,7 +461,7 @@ export default function POSBilling({
             onSelectTable(tbl);
           }
           if (typeof onOpenOrderPopupForTable === 'function') {
-            onOpenOrderPopupForTable();
+            onOpenOrderPopupForTable(tbl);
           }
         }}
       />
@@ -1152,7 +1152,8 @@ export default function POSBilling({
                 type="button"
                 onClick={async () => {
                   if (!activeTable) return;
-                  if (activeTable.isSplit || (activeTable.name && activeTable.name.includes('-')) || activeTable.sectionId === 4 || (activeTable.name && String(activeTable.name).toUpperCase().startsWith('P')) || activeTable.isParcel) {
+                  const isParcel = activeTable.isParcel || activeTable.sectionId === 4 || (activeTable.name && String(activeTable.name).toUpperCase().startsWith('P'));
+                  if (isParcel) {
                     await db.diningTables.delete(activeTable.id);
                   } else {
                     await db.diningTables.update(activeTable.id, {

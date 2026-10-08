@@ -30,6 +30,12 @@ export function exportFoodItemsToCSV(dishes = [], categories = [], subCategories
   document.body.removeChild(link);
 }
 
+function cleanNumber(str) {
+  if (str === undefined || str === null) return NaN;
+  const s = String(str).replace(/[₹\s,]|rs\.?|\/-/gi, '').trim();
+  return parseFloat(s);
+}
+
 export function parseCSVAndValidateRates(fileContent) {
   const cleanContent = (fileContent || '').replace(/^\uFEFF/, '');
   const lines = cleanContent.split(/\r?\n/).filter(line => line.trim() !== '');
@@ -37,26 +43,14 @@ export function parseCSVAndValidateRates(fileContent) {
     return { success: false, error: 'File is empty!' };
   }
 
-  // Parse header line
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
-  
-  const priceColIndex = headers.findIndex(h => h === 'price (₹)' || h.includes('price') || h.includes('rate'));
-  if (priceColIndex === -1) {
-    return {
-      success: false,
-      missingPriceAlert: true,
-      error: 'CRITICAL ALERT: Missing "Price" column in the imported CSV file! Price update aborted to prevent corruption.'
-    };
-  }
+  // Detect delimiter: comma, semicolon, or tab
+  const firstLine = lines[0];
+  let delimiter = ',';
+  if (!firstLine.includes(',') && firstLine.includes(';')) delimiter = ';';
+  else if (!firstLine.includes(',') && firstLine.includes('\t')) delimiter = '\t';
 
-  const nameColIndex = headers.findIndex(h => h.includes('dish name') || h.includes('name'));
-  const marathiColIndex = headers.findIndex(h => h.includes('marathi'));
-  const srNoColIndex = headers.findIndex(h => h.includes('sr') || h.includes('code') || h.includes('no'));
-  const pricePerKgColIndex = headers.findIndex(h => h.includes('per kg') || h.includes('kilo') || h.includes('sweet'));
-
-  const parsedItems = [];
-  for (let i = 1; i < lines.length; i++) {
-    const row = lines[i];
+  // Helper to split row respecting quotes
+  function splitCSVRow(row, delim) {
     const cols = [];
     let inQuote = false;
     let curr = '';
@@ -67,7 +61,7 @@ export function parseCSVAndValidateRates(fileContent) {
         c++;
       } else if (char === '"') {
         inQuote = !inQuote;
-      } else if (char === ',' && !inQuote) {
+      } else if (char === delim && !inQuote) {
         cols.push(curr.trim());
         curr = '';
       } else {
@@ -75,15 +69,48 @@ export function parseCSVAndValidateRates(fileContent) {
       }
     }
     cols.push(curr.trim());
+    return cols;
+  }
 
+  // Parse header line
+  const headerCols = splitCSVRow(lines[0], delimiter);
+  const headers = headerCols.map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
+  
+  const pricePerKgColIndex = headers.findIndex(h => h.includes('per kg') || h.includes('per kilo') || h.includes('kilo') || h.includes('sweet') || h.includes('किलो'));
+  const priceColIndex = headers.findIndex((h, idx) => idx !== pricePerKgColIndex && (h === 'price (₹)' || h.includes('price') || h.includes('rate') || h.includes('mrp') || h.includes('amount') || h.includes('किंमत') || h.includes('दर')));
+
+  if (priceColIndex === -1) {
+    return {
+      success: false,
+      missingPriceAlert: true,
+      error: 'CRITICAL ALERT: Missing "Price" column in the imported CSV file! Price update aborted to prevent corruption.'
+    };
+  }
+
+  const nameColIndex = headers.findIndex(h => h.includes('dish name') || h.includes('name') || h.includes('पदार्थ') || h.includes('नाव'));
+  const marathiColIndex = headers.findIndex(h => h.includes('marathi') || h.includes('मराठी'));
+  const srNoColIndex = headers.findIndex(h => h.startsWith('sr') || h.includes('code') || h.includes('क्रमांक') || h === 'no' || h === 'no.' || h.includes('sr. no') || h.includes('sr no'));
+  const subCategoryColIndex = headers.findIndex(h => h.includes('sub category') || h.includes('sub-category') || h.includes('subcategory') || h.includes('उपविभाग') || h.includes('उप कॅटेगरी') || h.includes('उप'));
+  const categoryColIndex = headers.findIndex((h, idx) => idx !== subCategoryColIndex && (h.includes('category') || h.includes('division') || h.includes('विभाग') || h.includes('कॅटेगरी')));
+  const counterColIndex = headers.findIndex(h => h.includes('counter') || h.includes('काऊंटर') || h.includes('काउंटर'));
+
+  const parsedItems = [];
+  for (let i = 1; i < lines.length; i++) {
+    const row = lines[i];
+    const cols = splitCSVRow(row, delimiter);
     if (cols.length < 2) continue;
 
     const name = nameColIndex !== -1 ? cols[nameColIndex]?.replace(/^"|"$/g, '').trim() : '';
     const marathiName = marathiColIndex !== -1 ? cols[marathiColIndex]?.replace(/^"|"$/g, '').trim() : '';
+    const category = categoryColIndex !== -1 ? cols[categoryColIndex]?.replace(/^"|"$/g, '').trim() : '';
+    const subCategory = subCategoryColIndex !== -1 ? cols[subCategoryColIndex]?.replace(/^"|"$/g, '').trim() : '';
+    const counter = counterColIndex !== -1 ? cols[counterColIndex]?.replace(/^"|"$/g, '').trim() : '';
     const priceStr = cols[priceColIndex]?.replace(/^"|"$/g, '').trim();
-    const price = parseFloat(priceStr);
+    const price = cleanNumber(priceStr);
 
     if (isNaN(price)) {
+      // If price string is completely empty, skip updating this row rather than failing the whole file
+      if (!priceStr) continue;
       return {
         success: false,
         missingPriceAlert: true,
@@ -92,15 +119,25 @@ export function parseCSVAndValidateRates(fileContent) {
     }
 
     const pricePerKgStr = pricePerKgColIndex !== -1 ? cols[pricePerKgColIndex]?.replace(/^"|"$/g, '').trim() : '';
-    const pricePerKg = pricePerKgStr ? parseFloat(pricePerKgStr) : undefined;
+    const pricePerKg = cleanNumber(pricePerKgStr);
+
+    const srNoRaw = srNoColIndex !== -1 ? cols[srNoColIndex]?.replace(/^"|"$/g, '').trim() : '';
+    const srNo = srNoRaw ? parseInt(srNoRaw.replace(/[^0-9]/g, ''), 10) : undefined;
 
     parsedItems.push({
-      srNo: srNoColIndex !== -1 ? parseInt(cols[srNoColIndex]?.replace(/^"|"$/g, '')) || undefined : undefined,
+      srNo: !isNaN(srNo) ? srNo : undefined,
       name,
       marathiName,
+      category: category || undefined,
+      subCategory: subCategory || undefined,
+      counter: counter || undefined,
       price,
       pricePerKg: !isNaN(pricePerKg) ? pricePerKg : undefined
     });
+  }
+
+  if (parsedItems.length === 0) {
+    return { success: false, error: 'No valid dish rows with prices found in the imported file.' };
   }
 
   return { success: true, items: parsedItems };

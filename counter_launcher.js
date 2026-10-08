@@ -11,7 +11,7 @@ console.log('🛒  STARTING KARUNA HOTEL POS - COUNTER BILLING DESKTOP TERMINAL'
 console.log('================================================================\n');
 
 // Read server IP from config or command line
-let serverIp = '10.40.145.195';
+let serverIp = '127.0.0.1';
 const configFile = path.join(__dirname, 'server_config.json');
 
 if (process.argv[2] && process.argv[2].trim() !== '') {

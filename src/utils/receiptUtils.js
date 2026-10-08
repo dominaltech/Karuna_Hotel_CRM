@@ -254,7 +254,11 @@ export function printKOTReceipt({
 
   const itemsHtml = items.map((item) => {
     const dishName = getPrintDishName(item, currentLang);
-    const qty = item.unit || item.qtyDisplay || item.qty || 1;
+    const itemQty = parseFloat(item.qty) || 1;
+    const isKgItem = item.weightKg !== undefined || (item.unit && (item.unit.includes('g') || item.unit.toLowerCase().includes('kg')));
+    const qty = isKgItem
+      ? (item.unit ? (itemQty > 1 ? `${itemQty} × ${item.unit}` : item.unit) : `${itemQty}`)
+      : (item.qtyDisplay || itemQty);
     const isParcel = item.isParcel || (item.customNote && item.customNote.toLowerCase().includes('parcel'));
     const displayName = `${dishName}${isParcel ? ' [PARCEL]' : ''}`;
     return `
@@ -500,7 +504,9 @@ export async function printThermalReceipt(billData, options = {}) {
     const itemPrice = parseFloat(item.price) || 0;
     const lineAmount = Math.round((itemPrice * itemQty) * 100) / 100;
     const isKgItem = item.weightKg !== undefined || (item.unit && (item.unit.includes('g') || item.unit.toLowerCase().includes('kg')));
-    const qtyDisplay = isKgItem ? (item.unit || `${itemQty}`) : `${itemQty}`;
+    const qtyDisplay = isKgItem
+      ? (item.unit ? (itemQty > 1 ? `${itemQty} × ${item.unit}` : item.unit) : `${itemQty}`)
+      : `${itemQty}`;
     const isParcel = item.isParcel || (item.customNote && item.customNote.toLowerCase().includes('parcel'));
     const displayName = `${dishName}${isParcel ? ' (Parcel)' : ''}`;
 

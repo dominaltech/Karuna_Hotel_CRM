@@ -1,1 +1,1 @@
-{ "isServer": false, "serverIp": "10.40.145.195", "port": 3001 } 
+{ "isServer": true, "serverIp": "127.0.0.1", "port": 3001 }

@@ -232,7 +232,159 @@ export const DEFAULT_DATABASE_DATA = {
 // In-memory Database State
 let dbState = JSON.parse(JSON.stringify(DEFAULT_DATABASE_DATA));
 
-// Auto-collapse empty split tables (e.g. D1-A and D1-B back to D1 when cleared)
+// Clean and deduplicate recipes (eliminates double-entries and orphaned recipes without dishId)
+export function cleanAndDeduplicateRecipes(recipes = []) {
+  if (!Array.isArray(recipes)) return [];
+  const result = [];
+  for (const r of recipes) {
+    if (!r || !r.dishId) continue;
+    const rmName = (r.rawMaterialName || '').trim().toLowerCase();
+    const rmId = r.rawMaterialId !== undefined && r.rawMaterialId !== null && r.rawMaterialId !== '' ? String(r.rawMaterialId) : null;
+    if (!rmId && !rmName) continue;
+
+    const existingIdx = result.findIndex((item) => {
+      if (String(item.dishId) !== String(r.dishId)) return false;
+      const itemRmId = item.rawMaterialId !== undefined && item.rawMaterialId !== null && item.rawMaterialId !== '' ? String(item.rawMaterialId) : null;
+      const itemRmName = (item.rawMaterialName || '').trim().toLowerCase();
+      if (rmId && itemRmId && rmId === itemRmId) return true;
+      if (rmName && itemRmName && rmName === itemRmName) return true;
+      return false;
+    });
+
+    if (existingIdx === -1) {
+      result.push({ ...r });
+    } else {
+      const existing = result[existingIdx];
+      result[existingIdx] = {
+        ...existing,
+        ...r,
+        id: existing.id || r.id,
+        rawMaterialId: existing.rawMaterialId || r.rawMaterialId,
+        rawMaterialName: existing.rawMaterialName || r.rawMaterialName,
+        currentStock: (r.currentStock !== undefined && r.currentStock !== null && r.currentStock !== '')
+          ? r.currentStock
+          : existing.currentStock,
+        qtyRequired: (r.qtyRequired !== undefined && r.qtyRequired !== null) ? r.qtyRequired : existing.qtyRequired,
+        baseQty: (r.baseQty !== undefined && r.baseQty !== null) ? r.baseQty : existing.baseQty,
+        unit: r.unit || existing.unit
+      };
+    }
+  }
+  return result;
+}
+
+// Clean, deduplicate and consolidate sections and tables
+export function cleanAndDeduplicateSectionsAndTables(sections = [], tables = []) {
+  if (!Array.isArray(sections)) sections = [];
+  if (!Array.isArray(tables)) tables = [];
+
+  const sectionMap = new Map();
+  const sectionIdRedirect = new Map(); // oldId -> canonicalId
+
+  // 1. Process and deduplicate sections by normalized name
+  for (const sec of sections) {
+    if (!sec || !sec.name) continue;
+    const norm = String(sec.name).trim().toLowerCase();
+    if (!sectionMap.has(norm)) {
+      sectionMap.set(norm, { ...sec });
+    } else {
+      const canonical = sectionMap.get(norm);
+      if (sec.id && canonical.id && String(sec.id) !== String(canonical.id)) {
+        sectionIdRedirect.set(String(sec.id), canonical.id);
+      }
+    }
+  }
+
+  // Ensure default sections are present or mapped
+  const defaultSections = DEFAULT_DATABASE_DATA.sections || [];
+  defaultSections.forEach((defSec) => {
+    const defNorm = String(defSec.name).trim().toLowerCase();
+    let matched = null;
+    for (const [norm, sec] of sectionMap.entries()) {
+      if (
+        norm === defNorm ||
+        (defNorm.includes('dine') && norm.includes('dine')) ||
+        (defNorm.includes('ac') && norm.includes('ac')) ||
+        (defNorm.includes('first') && norm.includes('first')) ||
+        (defNorm.includes('parcel') && norm.includes('parcel'))
+      ) {
+        matched = sec;
+        break;
+      }
+    }
+
+    if (matched) {
+      if (String(defSec.id) !== String(matched.id)) {
+        sectionIdRedirect.set(String(defSec.id), matched.id);
+      }
+    } else {
+      sectionMap.set(defNorm, { ...defSec });
+    }
+  });
+
+  const finalSections = Array.from(sectionMap.values());
+
+  // 2. Re-map tables to canonical section IDs and deduplicate duplicate tables in same section
+  const tableMap = new Map();
+  for (const tbl of tables) {
+    if (!tbl || !tbl.name) continue;
+    let secId = tbl.sectionId;
+    if (secId !== undefined && secId !== null && sectionIdRedirect.has(String(secId))) {
+      secId = sectionIdRedirect.get(String(secId));
+    }
+
+    // If sectionId is still orphaned/invalid, attempt to infer from table name
+    if (!finalSections.some((s) => String(s.id) === String(secId))) {
+      const upperName = String(tbl.name).toUpperCase().trim();
+      if (upperName.startsWith('D')) {
+        const dSec = finalSections.find((s) => s.name.toLowerCase().includes('dine'));
+        if (dSec) secId = dSec.id;
+      } else if (upperName.startsWith('F')) {
+        const fSec = finalSections.find((s) => s.name.toLowerCase().includes('first'));
+        if (fSec) secId = fSec.id;
+      } else if (upperName.startsWith('AC')) {
+        const acSec = finalSections.find((s) => s.name.toLowerCase().includes('ac'));
+        if (acSec) secId = acSec.id;
+      } else if (upperName.startsWith('P') || tbl.isParcel) {
+        const pSec = finalSections.find((s) => s.name.toLowerCase().includes('parcel'));
+        if (pSec) secId = pSec.id;
+      }
+    }
+
+    const isParcel = Boolean(
+      tbl.isParcel ||
+      String(tbl.name).toUpperCase().trim().startsWith('P') ||
+      finalSections.find((s) => String(s.id) === String(secId) && s.name.toLowerCase().includes('parcel'))
+    );
+
+    const updatedTable = {
+      ...tbl,
+      sectionId: secId !== undefined && secId !== null ? secId : (finalSections[0]?.id || 1),
+      isParcel
+    };
+
+    const key = `${updatedTable.sectionId}_${String(updatedTable.name).toUpperCase().trim()}`;
+    if (!tableMap.has(key)) {
+      tableMap.set(key, updatedTable);
+    } else {
+      const existing = tableMap.get(key);
+      const updatedHasCart = (updatedTable.status === 'occupied' || updatedTable.status === 'bill_released') && updatedTable.currentCart?.length > 0;
+      const existingHasCart = (existing.status === 'occupied' || existing.status === 'bill_released') && existing.currentCart?.length > 0;
+      if (updatedHasCart && !existingHasCart) {
+        tableMap.set(key, updatedTable);
+      } else if (updatedHasCart && existingHasCart) {
+        tableMap.set(key, { ...existing, ...updatedTable });
+      }
+    }
+  }
+
+  return {
+    sections: finalSections,
+    diningTables: Array.from(tableMap.values())
+  };
+}
+
+// Auto-collapse empty split tables (e.g. D1-A and D1-B back to D1 when cleared/settled)
 export function cleanAndPruneSplitTables(tables = []) {
   if (!Array.isArray(tables) || tables.length === 0) {
     return [];
@@ -244,9 +396,14 @@ export function cleanAndPruneSplitTables(tables = []) {
   const activeBaseNames = new Set();
   result.forEach((t) => {
     if (!t || !t.name) return;
-    const raw = String(t.parentTable || t.name).trim();
+    const raw = String(t.baseName || t.parentTable || t.name).trim();
     if (raw.includes('-')) {
       const base = raw.replace(/-[A-Z]$/i, '').trim().toUpperCase();
+      if (base) activeBaseNames.add(base);
+    } else if (t.isSplit && raw) {
+      activeBaseNames.add(raw.toUpperCase());
+    } else if (String(t.name).trim().match(/-[A-Z]$/i)) {
+      const base = String(t.name).trim().replace(/-[A-Z]$/i, '').toUpperCase();
       if (base) activeBaseNames.add(base);
     }
   });
@@ -256,7 +413,8 @@ export function cleanAndPruneSplitTables(tables = []) {
       if (!t || !t.name) return false;
       const upper = String(t.name).toUpperCase().trim();
       const parentUpper = t.parentTable ? String(t.parentTable).toUpperCase().trim() : '';
-      return upper === baseName || upper.startsWith(`${baseName}-`) || parentUpper === baseName;
+      const baseUpper = t.baseName ? String(t.baseName).toUpperCase().trim() : '';
+      return upper === baseName || upper.startsWith(`${baseName}-`) || parentUpper === baseName || baseUpper === baseName;
     });
 
     if (splitMatches.length > 0) {
@@ -264,50 +422,54 @@ export function cleanAndPruneSplitTables(tables = []) {
         (m) => m.status === 'occupied' || m.status === 'bill_released' || (m.currentCart && m.currentCart.length > 0)
       );
 
-      // If NO split portion is occupied, collapse all back to a single base table!
+      // If NO split portion is occupied (all portions are settled or empty):
+      // Collapse all back to a single normal base table (e.g. F1, C1, D1)
       if (occupiedMatches.length === 0) {
         result = result.filter((t) => {
           if (!t || !t.name) return false;
           const upper = String(t.name).toUpperCase().trim();
           const parentUpper = t.parentTable ? String(t.parentTable).toUpperCase().trim() : '';
-          return !(upper === baseName || upper.startsWith(`${baseName}-`) || parentUpper === baseName);
+          const baseUpper = t.baseName ? String(t.baseName).toUpperCase().trim() : '';
+          return !(upper === baseName || upper.startsWith(`${baseName}-`) || parentUpper === baseName || baseUpper === baseName);
         });
 
-        const sample = splitMatches[0];
+        const defaultMatch = (DEFAULT_DATABASE_DATA.diningTables || []).find(
+          (d) => d && d.name && d.name.toUpperCase() === baseName
+        );
+        const sampleWithBaseId = splitMatches.find((m) => m.baseTableId);
+        const sampleA = splitMatches.find((m) => m.name && m.name.toUpperCase().endsWith('-A'));
+        const firstNumericSample = splitMatches.find((m) => typeof m.id === 'number');
+        const fallbackSample = splitMatches[0];
+
+        const rawBaseId = (sampleWithBaseId && sampleWithBaseId.baseTableId) ||
+          (defaultMatch && defaultMatch.id) ||
+          (sampleA && sampleA.id) ||
+          (firstNumericSample && firstNumericSample.id) ||
+          fallbackSample.id;
+
+        const baseId = !isNaN(parseInt(rawBaseId)) ? parseInt(rawBaseId) : rawBaseId;
+        const sectionId = (defaultMatch && defaultMatch.sectionId) || fallbackSample.sectionId || 1;
+
         result.push({
-          ...sample,
-          id: sample.parentTable || sample.id,
+          ...fallbackSample,
+          id: baseId,
           name: baseName,
+          sectionId: sectionId,
           status: 'empty',
           currentCart: [],
-          currentTokenNo: sample.currentTokenNo || (1000 + (parseInt(sample.id) || 1)).toString(),
+          currentTokenNo: (defaultMatch && defaultMatch.currentTokenNo) || (1000 + (parseInt(baseId) || 1)).toString(),
           isSplit: false,
           parentTable: null,
+          baseName: null,
+          baseTableId: null,
           customerName: '',
-          createdAt: null
+          pax: '1',
+          waiter: 'Raju',
+          lastPrintedCart: [],
+          kotCount: 0,
+          createdAt: null,
+          parcelStatus: null
         });
-      } else {
-        // Remove empty split portions so empty D2-B cards don't linger next to active D2-A!
-        const emptySplits = splitMatches.filter(
-          (m) => m.status !== 'occupied' && m.status !== 'bill_released' && (!m.currentCart || m.currentCart.length === 0)
-        );
-        if (emptySplits.length > 0) {
-          const emptyIds = new Set(emptySplits.map((e) => e.id));
-          result = result.filter((t) => !emptyIds.has(t.id));
-        }
-
-        // If only 1 portion remains (e.g. D9-A), rename D9-A back to D9
-        const remainingSplits = result.filter((t) => {
-          if (!t || !t.name) return false;
-          const u = String(t.name).toUpperCase().trim();
-          const p = t.parentTable ? String(t.parentTable).toUpperCase().trim() : '';
-          return u.startsWith(`${baseName}-`) || p === baseName;
-        });
-        if (remainingSplits.length === 1 && remainingSplits[0].name.endsWith('-A')) {
-          remainingSplits[0].name = baseName;
-          remainingSplits[0].isSplit = false;
-          remainingSplits[0].parentTable = null;
-        }
       }
     }
   });
@@ -316,9 +478,12 @@ export function cleanAndPruneSplitTables(tables = []) {
 }
 
 export function ensureDefaultDiningTables(tables = []) {
+  const defaults = DEFAULT_DATABASE_DATA.diningTables || [];
   if (!Array.isArray(tables) || tables.length === 0) {
-    return JSON.parse(JSON.stringify(DEFAULT_DATABASE_DATA.diningTables || []));
+    return JSON.parse(JSON.stringify(defaults));
   }
+
+  // Clean and collapse empty/settled split tables back to base tables
   return cleanAndPruneSplitTables(tables);
 }
 
@@ -339,7 +504,10 @@ export function loadDatabase() {
     dbState = JSON.parse(JSON.stringify(DEFAULT_DATABASE_DATA));
   }
 
-  dbState.diningTables = ensureDefaultDiningTables(dbState.diningTables);
+  const cleaned = cleanAndDeduplicateSectionsAndTables(dbState.sections, dbState.diningTables);
+  dbState.sections = cleaned.sections;
+  dbState.diningTables = ensureDefaultDiningTables(cleaned.diningTables);
+  dbState.recipes = cleanAndDeduplicateRecipes(dbState.recipes);
   saveDatabaseSync();
 }
 
@@ -370,6 +538,7 @@ export function scheduleSaveDatabase() {
 export function getAllData() {
   if (dbState) {
     dbState.diningTables = ensureDefaultDiningTables(dbState.diningTables || []);
+    dbState.recipes = cleanAndDeduplicateRecipes(dbState.recipes || []);
   }
   return dbState;
 }
@@ -378,6 +547,10 @@ export function getCollection(collectionName) {
   if (collectionName === 'diningTables') {
     dbState.diningTables = ensureDefaultDiningTables(dbState.diningTables || []);
     return dbState.diningTables;
+  }
+  if (collectionName === 'recipes') {
+    dbState.recipes = cleanAndDeduplicateRecipes(dbState.recipes || []);
+    return dbState.recipes;
   }
   return dbState[collectionName] || [];
 }
@@ -392,10 +565,79 @@ export function insertItem(collectionName, itemData) {
     dbState[collectionName] = [];
   }
   const collection = dbState[collectionName];
-  
+
+  // Prevent duplicate recipe mappings for the same dish & raw material
+  if (collectionName === 'recipes' && itemData && itemData.dishId) {
+    const rmName = (itemData.rawMaterialName || '').trim().toLowerCase();
+    const existingIdx = collection.findIndex((r) => 
+      r && String(r.dishId) === String(itemData.dishId) &&
+      (
+        (itemData.rawMaterialId && String(r.rawMaterialId) === String(itemData.rawMaterialId)) ||
+        (rmName && r.rawMaterialName && String(r.rawMaterialName).trim().toLowerCase() === rmName)
+      )
+    );
+    if (existingIdx !== -1) {
+      collection[existingIdx] = {
+        ...collection[existingIdx],
+        ...itemData,
+        id: collection[existingIdx].id
+      };
+      scheduleSaveDatabase();
+      return collection[existingIdx];
+    }
+  }
+
+  // Prevent duplicate dining table entries for the same name and section
+  if (collectionName === 'diningTables' && itemData && itemData.name) {
+    const existingIdx = collection.findIndex(
+      (item) => item &&
+      String(item.name).toUpperCase().trim() === String(itemData.name).toUpperCase().trim() &&
+      String(item.sectionId) === String(itemData.sectionId)
+    );
+    if (existingIdx !== -1) {
+      collection[existingIdx] = {
+        ...collection[existingIdx],
+        ...itemData,
+        id: collection[existingIdx].id
+      };
+      scheduleSaveDatabase();
+      return collection[existingIdx];
+    }
+
+    // If table exists in an orphaned section not in sections list, re-assign it to this section
+    const orphanedIdx = collection.findIndex(
+      (item) => item &&
+      String(item.name).toUpperCase().trim() === String(itemData.name).toUpperCase().trim() &&
+      (!dbState.sections || !dbState.sections.some((s) => String(s.id) === String(item.sectionId)))
+    );
+    if (orphanedIdx !== -1) {
+      collection[orphanedIdx] = {
+        ...collection[orphanedIdx],
+        ...itemData,
+        id: collection[orphanedIdx].id,
+        sectionId: itemData.sectionId
+      };
+      scheduleSaveDatabase();
+      return collection[orphanedIdx];
+    }
+  }
+
+  // If itemData has an id that already exists in collection, update instead of duplicating
+  if (itemData && itemData.id !== undefined && itemData.id !== null) {
+    const existingIdx = collection.findIndex((item) => item && String(item.id) === String(itemData.id));
+    if (existingIdx !== -1) {
+      collection[existingIdx] = {
+        ...collection[existingIdx],
+        ...itemData
+      };
+      scheduleSaveDatabase();
+      return collection[existingIdx];
+    }
+  }
+
   let newId = 1;
   if (collection.length > 0) {
-    const maxId = collection.reduce((max, item) => (item && item.id > max ? item.id : max), 0);
+    const maxId = collection.reduce((max, item) => (item && typeof item.id === 'number' && item.id > max ? item.id : max), 0);
     newId = maxId + 1;
   }
 
@@ -413,6 +655,10 @@ export function updateItem(collectionName, id, updatedFields) {
     index = collection.findIndex((item) => item && String(item.name).toUpperCase() === String(updatedFields.name).toUpperCase());
   }
   if (index === -1) {
+    // Prevent creating invalid broken recipes without dishId
+    if (collectionName === 'recipes' && !updatedFields?.dishId) {
+      return null;
+    }
     const numId = parseInt(id) || (collection.length + 1);
     const created = { id: numId, ...updatedFields };
     collection.push(created);
@@ -427,7 +673,12 @@ export function updateItem(collectionName, id, updatedFields) {
 export function deleteItem(collectionName, id) {
   if (!dbState[collectionName]) return false;
   const initialLength = dbState[collectionName].length;
-  dbState[collectionName] = dbState[collectionName].filter((item) => String(item.id) !== String(id));
+  dbState[collectionName] = dbState[collectionName].filter((item) => {
+    if (!item) return false;
+    if (String(item.id) === String(id)) return false;
+    if (collectionName === 'diningTables' && item.name && String(item.name).toUpperCase().trim() === String(id).toUpperCase().trim()) return false;
+    return true;
+  });
   const changed = dbState[collectionName].length !== initialLength;
   if (changed) scheduleSaveDatabase();
   return changed;
@@ -480,9 +731,14 @@ export function settleBillTransaction(billData) {
     newBillId = maxBillId + 1;
   }
 
+  const billTotal = parseFloat(billData.total !== undefined ? billData.total : (billData.finalTotal || billData.grandTotal || 0)) || 0;
   const newBill = {
     ...billData,
     id: newBillId,
+    total: billData.total !== undefined ? billData.total : billTotal,
+    finalTotal: billData.finalTotal !== undefined ? billData.finalTotal : billTotal,
+    grandTotal: billData.grandTotal !== undefined ? billData.grandTotal : billTotal,
+    paymentMode: billData.paymentMode || billData.paymentDetails?.mode || 'Cash',
     status: 'settled',
     createdAt: billData.createdAt || new Date().toISOString()
   };
@@ -500,8 +756,38 @@ export function settleBillTransaction(billData) {
       // Deduct Finished Dish Stock Only
       const matchedDish = dishes.find((d) => d && (d.id === item.id || d.srNo === item.srNo || (d.name && item.name && d.name.toLowerCase().trim() === item.name.toLowerCase().trim())));
       if (matchedDish && matchedDish.stockQty !== undefined) {
-        matchedDish.stockQty = Math.max(0, Math.round(((matchedDish.stockQty || 0) - totalSoldKg) * 1000) / 1000);
-        if (matchedDish.stockQty <= 0) matchedDish.status = 'Out of Stock';
+        let totalSold = totalSoldKg;
+        const stockUnit = (matchedDish.stockUnit || '').toLowerCase();
+        if (stockUnit === 'per plate' || stockUnit === 'plate') {
+          totalSold = (item.weightKg !== undefined && item.weightKg !== null && !isNaN(parseFloat(item.weightKg)))
+            ? Math.round(parseFloat(item.weightKg) * qtyCount * 1000) / 1000
+            : qtyCount;
+        }
+        matchedDish.stockQty = Math.max(0, Math.round(((matchedDish.stockQty || 0) - totalSold) * 1000) / 1000);
+        matchedDish.status = matchedDish.stockQty > 0 ? 'In Stock' : 'Out of Stock';
+
+        // Deduct Raw Materials based on dish recipe measurement ratio:
+        // Full-batch only: Deduct if and only if cumulative sold reaches the set base quantity!
+        dbState.recipes = cleanAndDeduplicateRecipes(dbState.recipes);
+        const dishRecipes = (dbState.recipes || []).filter((r) => r && String(r.dishId) === String(matchedDish.id));
+        if (dishRecipes.length > 0) {
+          const baseQty = parseFloat(matchedDish.recipeBaseQty || (dishRecipes[0]?.baseQty) || 1) || 1;
+          const prevAccum = parseFloat(matchedDish.accumulatedSold) || 0;
+          const currentAccum = Math.round((prevAccum + totalSold) * 1000) / 1000;
+          const batchesCompleted = Math.floor(Math.round(currentAccum * 1000) / Math.round(baseQty * 1000));
+          matchedDish.accumulatedSold = Math.max(0, Math.round((currentAccum - (batchesCompleted * baseQty)) * 1000) / 1000);
+
+          if (batchesCompleted >= 1) {
+            for (const rec of dishRecipes) {
+              const rmDeduction = Math.round(batchesCompleted * (parseFloat(rec.qtyRequired) || 0) * 1000) / 1000;
+              const currentStock = (rec.currentStock !== undefined && rec.currentStock !== null)
+                ? (parseFloat(rec.currentStock) || 0)
+                : 10;
+
+              rec.currentStock = Math.max(0, Math.round((currentStock - rmDeduction) * 1000) / 1000);
+            }
+          }
+        }
       }
     }
   }
@@ -509,6 +795,7 @@ export function settleBillTransaction(billData) {
   // 3. Reset / Delete Dining Table
   let updatedTable = null;
   let deletedTableId = null;
+  let deletedTableIds = [];
   let table = null;
 
   if (billData.tableId) {
@@ -523,9 +810,95 @@ export function settleBillTransaction(billData) {
   }
 
   if (table) {
-    if (table.isSplit || (table.name && table.name.includes('-')) || table.sectionId === 4 || (table.name && String(table.name).toUpperCase().startsWith('P')) || table.isParcel) {
+    const isParcel = table.sectionId === 4 || (table.name && String(table.name).toUpperCase().startsWith('P')) || table.isParcel;
+    const isSplit = Boolean(table.isSplit || (table.name && table.name.includes('-')) || table.parentTable || table.baseName);
+
+    if (isParcel) {
       deleteItem('diningTables', table.id);
       deletedTableId = table.id;
+    } else if (isSplit) {
+      // Clear current split table
+      table = updateItem('diningTables', table.id, {
+        status: 'empty',
+        currentCart: [],
+        currentTokenNo: '',
+        lastPrintedCart: [],
+        kotCount: 0,
+        createdAt: null,
+        customerName: '',
+        pax: '1',
+        waiter: 'Raju'
+      });
+
+      const rawName = String(table.name || '').trim();
+      const baseName = (table.baseName || table.parentTable || rawName.replace(/-[A-Z]$/i, '')).trim().toUpperCase();
+
+      const allSplits = (dbState.diningTables || []).filter((t) => {
+        if (!t || !t.name) return false;
+        const u = String(t.name).toUpperCase().trim();
+        const p = t.parentTable ? String(t.parentTable).toUpperCase().trim() : '';
+        const b = t.baseName ? String(t.baseName).toUpperCase().trim() : '';
+        return u === baseName || u.startsWith(`${baseName}-`) || p === baseName || b === baseName;
+      });
+
+      const anyOccupied = allSplits.some(
+        (m) => m.status === 'occupied' || m.status === 'bill_released' || (m.currentCart && m.currentCart.length > 0)
+      );
+
+      if (!anyOccupied) {
+        // ALL split portions are settled! Collapse back to single base table (e.g. F1, C1)
+        const defaultMatch = (DEFAULT_DATABASE_DATA.diningTables || []).find((d) => d && d.name && d.name.toUpperCase() === baseName);
+        const sampleWithBaseId = allSplits.find((m) => m.baseTableId);
+        const sampleA = allSplits.find((m) => m.name && m.name.toUpperCase().endsWith('-A'));
+        const firstNumeric = allSplits.find((m) => typeof m.id === 'number');
+        const fallback = allSplits[0] || table;
+
+        const rawBaseId = (sampleWithBaseId && sampleWithBaseId.baseTableId) ||
+          (defaultMatch && defaultMatch.id) ||
+          (sampleA && sampleA.id) ||
+          (firstNumeric && firstNumeric.id) ||
+          fallback.id;
+        const baseId = !isNaN(parseInt(rawBaseId)) ? parseInt(rawBaseId) : rawBaseId;
+        const sectionId = (defaultMatch && defaultMatch.sectionId) || fallback.sectionId || 1;
+
+        // Delete extra split child rows
+        const idsToDelete = allSplits.filter((s) => s.id !== baseId).map((s) => s.id);
+        idsToDelete.forEach((id) => deleteItem('diningTables', id));
+        deletedTableIds = idsToDelete;
+        if (idsToDelete.includes(table.id)) {
+          deletedTableId = table.id;
+        }
+
+        const restoredTable = {
+          ...fallback,
+          id: baseId,
+          name: baseName,
+          sectionId: sectionId,
+          status: 'empty',
+          currentCart: [],
+          currentTokenNo: (defaultMatch && defaultMatch.currentTokenNo) || (1000 + (parseInt(baseId) || 1)).toString(),
+          isSplit: false,
+          parentTable: null,
+          baseName: null,
+          baseTableId: null,
+          customerName: '',
+          pax: '1',
+          waiter: 'Raju',
+          lastPrintedCart: [],
+          kotCount: 0,
+          createdAt: null
+        };
+
+        const existingBaseIdx = (dbState.diningTables || []).findIndex((t) => t && t.id === baseId);
+        if (existingBaseIdx !== -1) {
+          dbState.diningTables[existingBaseIdx] = restoredTable;
+        } else {
+          dbState.diningTables.push(restoredTable);
+        }
+        updatedTable = restoredTable;
+      } else {
+        updatedTable = table;
+      }
     } else {
       updatedTable = updateItem('diningTables', table.id, {
         status: 'empty',
@@ -541,33 +914,79 @@ export function settleBillTransaction(billData) {
     }
   }
 
-  // Auto-collapse split tables if all portions are now empty!
+  // Guarantee valid default dining tables & persist
   dbState.diningTables = ensureDefaultDiningTables(dbState.diningTables);
+  dbState.recipes = cleanAndDeduplicateRecipes(dbState.recipes);
 
   saveDatabaseSync();
 
   return {
     bill: newBill,
     rawMaterials: dbState.rawMaterials,
+    recipes: dbState.recipes,
     dishes: dbState.dishes,
     updatedTable,
-    deletedTableId
+    deletedTableId,
+    deletedTableIds
   };
+}
+
+// Helper to match dish by srNo, ID, English Name, or Marathi Name
+export function matchDish(dish, item) {
+  if (!dish || !item) return false;
+  if (item.srNo !== undefined && dish.srNo !== undefined && String(dish.srNo).trim() === String(item.srNo).trim()) {
+    return true;
+  }
+  if (item.srNo !== undefined && dish.id !== undefined && String(dish.id).trim() === String(item.srNo).trim()) {
+    return true;
+  }
+  if (item.id !== undefined && dish.id !== undefined && String(dish.id).trim() === String(item.id).trim()) {
+    return true;
+  }
+  if (item.name && dish.name && dish.name.toLowerCase().trim() === item.name.toLowerCase().trim()) {
+    return true;
+  }
+  if (item.marathiName && dish.marathiName && dish.marathiName.trim() === item.marathiName.trim()) {
+    return true;
+  }
+  return false;
 }
 
 // Bulk update dish prices
 export function bulkUpdateDishPrices(items) {
   if (!Array.isArray(items)) return [];
+  if (!Array.isArray(dbState.dishes)) dbState.dishes = [];
   const updatedDishes = [];
+
   for (const item of items) {
-    const dish = (dbState.dishes || []).find(
-      (d) => (item.srNo && String(d.srNo) === String(item.srNo)) ||
-             (d.name && item.name && d.name.toLowerCase().trim() === item.name.toLowerCase().trim())
-    );
+    const dish = dbState.dishes.find((d) => matchDish(d, item));
     if (dish) {
-      if (item.price !== undefined && !isNaN(parseFloat(item.price))) {
-        dish.price = parseFloat(item.price);
+      const oldPrice = parseFloat(dish.price) || 0;
+      const newPrice = (item.price !== undefined && !isNaN(parseFloat(item.price))) ? parseFloat(item.price) : oldPrice;
+      const priceDiff = newPrice - oldPrice;
+      dish.price = newPrice;
+
+      // 1. Update sectionPrices so POS Billing & Table Ordering reflect the new price!
+      if (!dish.sectionPrices || typeof dish.sectionPrices !== 'object') {
+        dish.sectionPrices = {};
       }
+      const secKeys = Object.keys(dish.sectionPrices);
+      if (secKeys.length > 0) {
+        for (const secId of secKeys) {
+          const oldSecPrice = parseFloat(dish.sectionPrices[secId]);
+          if (!isNaN(oldSecPrice)) {
+            if (oldSecPrice === oldPrice || secId === '1' || secId === '4') {
+              dish.sectionPrices[secId] = newPrice;
+            } else {
+              dish.sectionPrices[secId] = Math.max(0, Math.round(oldSecPrice + priceDiff));
+            }
+          }
+        }
+      } else {
+        dish.sectionPrices['1'] = newPrice;
+      }
+
+      // 2. Handle Multi-Price / Sweets items
       if (item.pricePerKg !== undefined && !isNaN(parseFloat(item.pricePerKg))) {
         dish.pricePerKg = parseFloat(item.pricePerKg);
         if (dish.hasMultiplePrices) {
@@ -578,13 +997,109 @@ export function bulkUpdateDishPrices(items) {
           ];
           dish.price = Math.round(dish.pricePerKg * 0.25);
         }
+      } else if (dish.hasMultiplePrices && newPrice !== oldPrice && oldPrice > 0) {
+        dish.pricePerKg = Math.round(newPrice * 4);
+        dish.variants = [
+          { unit: '250g', weightKg: 0.25, price: Math.round(newPrice) },
+          { unit: '500g', weightKg: 0.5, price: Math.round(newPrice * 2) },
+          { unit: '1 Kg', weightKg: 1, price: Math.round(newPrice * 4) }
+        ];
       }
+
       if (item.name) dish.name = item.name;
       if (item.marathiName) dish.marathiName = item.marathiName;
       updatedDishes.push(dish);
+    } else {
+      // BRAND NEW DISH IMPORTED VIA EXCEL
+      if (!item.name && item.srNo === undefined) continue;
+
+      const maxId = dbState.dishes.reduce((max, d) => Math.max(max, parseInt(d.id, 10) || 0), 0);
+      const newId = maxId + 1;
+
+      const maxSrNo = dbState.dishes.reduce((max, d) => Math.max(max, parseInt(d.srNo, 10) || 0), 100);
+      const isSrNoTaken = item.srNo !== undefined && dbState.dishes.some(d => String(d.srNo) === String(item.srNo));
+      const newSrNo = (item.srNo !== undefined && !isNaN(item.srNo) && !isSrNoTaken) ? item.srNo : (maxSrNo + 1);
+
+      // Resolve category & subCategory
+      let catId = 1;
+      let subCatId = 1;
+
+      if (item.category && Array.isArray(dbState.categories)) {
+        const cMatch = dbState.categories.find(c =>
+          c.name && (c.name.toLowerCase().includes(item.category.toLowerCase().trim()) || item.category.toLowerCase().trim().includes(c.name.toLowerCase()))
+        );
+        if (cMatch) catId = cMatch.id;
+      }
+
+      if (item.subCategory && Array.isArray(dbState.subCategories)) {
+        const sMatch = dbState.subCategories.find(s =>
+          s.name && (s.name.toLowerCase().includes(item.subCategory.toLowerCase().trim()) || item.subCategory.toLowerCase().trim().includes(s.name.toLowerCase()))
+        );
+        if (sMatch) {
+          subCatId = sMatch.id;
+          if (sMatch.parentCategoryId) catId = sMatch.parentCategoryId;
+        }
+      } else if (Array.isArray(dbState.subCategories)) {
+        const defaultSub = dbState.subCategories.find(s => s.parentCategoryId === catId);
+        if (defaultSub) subCatId = defaultSub.id;
+      }
+
+      let hasMultiplePrices = item.pricePerKg !== undefined && !isNaN(parseFloat(item.pricePerKg)) && parseFloat(item.pricePerKg) > 0;
+      let pricePerKg = hasMultiplePrices ? parseFloat(item.pricePerKg) : null;
+      let newPrice = (item.price !== undefined && !isNaN(parseFloat(item.price))) ? parseFloat(item.price) : 0;
+      if (hasMultiplePrices && (!newPrice || newPrice === 0)) {
+        newPrice = Math.round(pricePerKg * 0.25);
+      }
+
+      let variants = [];
+      if (hasMultiplePrices) {
+        variants = [
+          { unit: '250g', weightKg: 0.25, price: Math.round(pricePerKg * 0.25) },
+          { unit: '500g', weightKg: 0.5, price: Math.round(pricePerKg * 0.5) },
+          { unit: '1 Kg', weightKg: 1, price: Math.round(pricePerKg) }
+        ];
+      }
+
+      let counter = item.counter || (catId === 2 || hasMultiplePrices ? 'Sweets' : 'Breakfast');
+
+      // Initialize sectionPrices
+      const sectionPrices = {
+        '1': newPrice,
+        '4': newPrice
+      };
+      if (Array.isArray(dbState.sections) && dbState.sections.length > 0) {
+        for (const sec of dbState.sections) {
+          const extra = parseFloat(sec.extraCharge) || 0;
+          sectionPrices[sec.id] = newPrice + extra;
+        }
+      } else {
+        sectionPrices['2'] = newPrice;
+        sectionPrices['3'] = newPrice;
+      }
+
+      const newDish = {
+        id: newId,
+        srNo: newSrNo,
+        name: item.name || `Dish ${newSrNo}`,
+        marathiName: item.marathiName || '',
+        categoryId: catId,
+        subCategoryId: subCatId,
+        price: newPrice,
+        pricePerKg: pricePerKg,
+        hasMultiplePrices: hasMultiplePrices,
+        variants: variants,
+        sectionPrices: sectionPrices,
+        counter: counter,
+        status: 'In Stock',
+        stockQty: 30,
+        subItems: []
+      };
+
+      dbState.dishes.push(newDish);
+      updatedDishes.push(newDish);
     }
   }
-  scheduleSaveDatabase();
+  saveDatabaseSync();
   return updatedDishes;
 }
 
@@ -603,6 +1118,10 @@ export function restoreFullBackup(backupData) {
     throw new Error('Invalid backup data format');
   }
 
+  const actualData = (backupData.data && typeof backupData.data === 'object' && !Array.isArray(backupData.data))
+    ? backupData.data
+    : backupData;
+
   const collections = [
     'categories',
     'subCategories',
@@ -616,15 +1135,16 @@ export function restoreFullBackup(backupData) {
   ];
 
   for (const key of collections) {
-    if (Array.isArray(backupData[key])) {
-      dbState[key] = backupData[key];
+    if (Array.isArray(actualData[key])) {
+      dbState[key] = actualData[key];
     }
   }
 
-  if (backupData.systemSettings) {
-    dbState.systemSettings = backupData.systemSettings;
+  if (actualData.systemSettings) {
+    dbState.systemSettings = actualData.systemSettings;
   }
 
+  dbState.diningTables = ensureDefaultDiningTables(dbState.diningTables);
   saveDatabaseSync();
   return dbState;
 }
@@ -662,9 +1182,14 @@ export function syncOfflineBillsBatch(offlineBills = [], occupiedTables = []) {
       continue;
     }
 
+    const billTotal = parseFloat(billData.total !== undefined ? billData.total : (billData.finalTotal || billData.grandTotal || 0)) || 0;
     const newBill = {
       ...billData,
       id: billData.id || Date.now() + Math.floor(Math.random() * 1000),
+      total: billData.total !== undefined ? billData.total : billTotal,
+      finalTotal: billData.finalTotal !== undefined ? billData.finalTotal : billTotal,
+      grandTotal: billData.grandTotal !== undefined ? billData.grandTotal : billTotal,
+      paymentMode: billData.paymentMode || billData.paymentDetails?.mode || 'Cash',
       status: 'settled',
       syncedAt: new Date().toISOString(),
       wasOffline: true
@@ -684,8 +1209,27 @@ export function syncOfflineBillsBatch(offlineBills = [], occupiedTables = []) {
 
         const matchedDish = dishes.find((d) => d && (d.id === item.id || d.srNo === item.srNo || (d.name && item.name && d.name.toLowerCase().trim() === item.name.toLowerCase().trim())));
         if (matchedDish && matchedDish.stockQty !== undefined) {
-          matchedDish.stockQty = Math.max(0, Math.round(((matchedDish.stockQty || 0) - totalSoldKg) * 1000) / 1000);
-          if (matchedDish.stockQty <= 0) matchedDish.status = 'Out of Stock';
+          let totalSold = totalSoldKg;
+          const stockUnit = (matchedDish.stockUnit || '').toLowerCase();
+          if (stockUnit === 'per plate' || stockUnit === 'plate') {
+            totalSold = (item.weightKg !== undefined && item.weightKg !== null && !isNaN(parseFloat(item.weightKg)))
+              ? Math.round(parseFloat(item.weightKg) * qtyCount * 1000) / 1000
+              : qtyCount;
+          }
+          matchedDish.stockQty = Math.max(0, Math.round(((matchedDish.stockQty || 0) - totalSold) * 1000) / 1000);
+          matchedDish.status = matchedDish.stockQty > 0 ? 'In Stock' : 'Out of Stock';
+
+          // Deduct Raw Materials based on dish recipe measurement ratio
+          const dishRecipes = (dbState.recipes || []).filter((r) => r && String(r.dishId) === String(matchedDish.id));
+          const rawMaterials = dbState.rawMaterials || [];
+          for (const rec of dishRecipes) {
+            const rm = rawMaterials.find((m) => m && String(m.id) === String(rec.rawMaterialId));
+            if (rm) {
+              const baseQty = parseFloat(matchedDish.recipeBaseQty || rec.baseQty || 1) || 1;
+              const rmDeduction = Math.round((totalSold / baseQty) * (parseFloat(rec.qtyRequired) || 0) * 1000) / 1000;
+              rm.quantity = Math.max(0, Math.round(((rm.quantity || 0) - rmDeduction) * 1000) / 1000);
+            }
+          }
         }
       }
     }
@@ -700,6 +1244,7 @@ export function syncOfflineBillsBatch(offlineBills = [], occupiedTables = []) {
     syncedCount: syncedBills.length,
     syncedBills,
     rawMaterials: dbState.rawMaterials,
+    recipes: dbState.recipes,
     dishes: dbState.dishes
   };
 }

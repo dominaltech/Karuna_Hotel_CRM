@@ -52,7 +52,7 @@ if not exist "dist\index.html" (
 )
 
 :: 4. Master Server IP configuration
-set SERVER_IP=168.254.36.121
+set SERVER_IP=127.0.0.1
 if exist "server_config.json" (
     for /f "delims=" %%i in ('node -e "try{const c=JSON.parse(require('fs').readFileSync('server_config.json'));if(c.serverIp&&c.serverIp!='localhost'&&c.serverIp!='isServer')console.log(c.serverIp)}catch(e){}"') do (
         set SERVER_IP=%%i

@@ -204,7 +204,10 @@ export default function SettledBills({
       ...selectedBill,
       items: editedItems,
       subtotal: newSubtotal,
-      total: newTotal
+      total: newTotal,
+      finalTotal: newTotal,
+      grandTotal: newTotal,
+      paymentMode: selectedBill.paymentMode || selectedBill.paymentDetails?.mode || 'Cash'
     };
 
     onUpdateSettledBill(updatedBill, `Resettled Bill #${selectedBill.tokenNo || selectedBill.id}`);

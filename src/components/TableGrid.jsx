@@ -399,8 +399,8 @@ export default function TableGrid({
     });
 
     // 2. Clear or delete source table
-    const isTempTable = srcTable.isParcel || srcTable.isSplit || (srcTable.name && (srcTable.name.startsWith('P') || srcTable.name.includes('-')));
-    if (isTempTable) {
+    const isParcel = srcTable.isParcel || srcTable.sectionId === 4 || (srcTable.name && String(srcTable.name).toUpperCase().startsWith('P'));
+    if (isParcel) {
       try {
         await db.diningTables.delete(srcTable.id);
       } catch (e) {}
@@ -516,7 +516,7 @@ export default function TableGrid({
   const sortedSections = sortSectionsWithParcelsLast(sections);
   const displayedSections = activeAreaFilter === 'all'
     ? sortedSections
-    : sortedSections.filter((s) => s.id === activeAreaFilter);
+    : sortedSections.filter((s) => String(s.id) === String(activeAreaFilter));
 
   const handleCardClick = (tbl) => {
     if (typeof onAreaFilterChange === 'function') {
@@ -557,8 +557,8 @@ export default function TableGrid({
           </button>
 
           {sortedSections.map((sec, secIdx) => {
-            const isSelected = activeAreaFilter === sec.id;
-            const count = tables.filter((t) => t.sectionId === sec.id).length;
+            const isSelected = String(activeAreaFilter) === String(sec.id);
+            const count = tables.filter((t) => String(t.sectionId) === String(sec.id)).length;
             const theme = getSectionTheme(sec.name);
 
             return (
@@ -591,6 +591,17 @@ export default function TableGrid({
 
         {/* Right Controls: Shift Table, Stats & Refresh */}
         <div className="flex flex-wrap items-center space-x-3 pr-12">
+
+          {typeof onOpenAddTableModal === 'function' && (
+            <button
+              onClick={onOpenAddTableModal}
+              className="px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-700 text-white shadow-2xs"
+              title="Add Table or Parcel Card"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span>+ Add Table / Parcel</span>
+            </button>
+          )}
 
           {/* Shift Table Checkbox (Moved to Right Side) */}
           <label className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center space-x-2 border shadow-2xs ${
@@ -788,9 +799,9 @@ export default function TableGrid({
             {(() => {
               const parcelSec = sortedSections.find((s) => s && s.name && s.name.toLowerCase().includes('parcel')) || { id: 4, name: 'Parcels' };
               const regularSecs = sortedSections.filter((s) => !s || !s.name || !s.name.toLowerCase().includes('parcel'));
-              const regularSecIds = new Set(regularSecs.map((s) => s.id));
-              const isParcelTable = (t) => t && (t.sectionId === parcelSec.id || (t.name && String(t.name).toUpperCase().startsWith('P')) || t.isParcel);
-              const rawRegTables = tables.filter((t) => t && regularSecIds.has(t.sectionId) && !isParcelTable(t));
+              const regularSecIds = new Set(regularSecs.map((s) => String(s.id)));
+              const isParcelTable = (t) => t && ((parcelSec && String(t.sectionId) === String(parcelSec.id)) || (t.name && String(t.name).toUpperCase().startsWith('P')) || t.isParcel);
+              const rawRegTables = tables.filter((t) => t && regularSecIds.has(String(t.sectionId)) && !isParcelTable(t));
               
               const tableMap = new Map();
               rawRegTables.forEach((t) => {
@@ -937,7 +948,7 @@ export default function TableGrid({
             {/* 2. Separate Parcels Section at the Bottom */}
             {(() => {
               const parcelSec = sortedSections.find((s) => s && s.name && s.name.toLowerCase().includes('parcel')) || { id: 4, name: 'Parcels' };
-              const rawSecTables = tables.filter((t) => t && (t.sectionId === parcelSec.id || (t.name && String(t.name).toUpperCase().startsWith('P')) || t.isParcel));
+              const rawSecTables = tables.filter((t) => t && ((parcelSec && String(t.sectionId) === String(parcelSec.id)) || (t.name && String(t.name).toUpperCase().startsWith('P')) || t.isParcel));
               
               const tableMap = new Map();
               rawSecTables.forEach((t) => {
@@ -1187,7 +1198,7 @@ export default function TableGrid({
             const SectionIcon = getSectionIcon(sec.name);
             const theme = getSectionTheme(sec.name);
             const isParcel = sec.name && sec.name.toLowerCase().includes('parcel');
-            const rawSecTables = tables.filter((t) => t && (t.sectionId === sec.id || (isParcel && (t.name?.toUpperCase().startsWith('P') || t.isParcel))));
+            const rawSecTables = tables.filter((t) => t && (String(t.sectionId) === String(sec.id) || (isParcel && (t.name?.toUpperCase().startsWith('P') || t.isParcel))));
             
             const tableMap = new Map();
             rawSecTables.forEach((t) => {
@@ -1413,11 +1424,11 @@ export default function TableGrid({
                     );
                   })}
 
-                  {isParcel && (
+                  {isParcel ? (
                     <div
                       onClick={async () => {
                         const existingPNums = tables
-                          .filter((t) => t && t.name && (t.name.toUpperCase().startsWith('P') || t.sectionId === sec.id))
+                          .filter((t) => t && t.name && (t.name.toUpperCase().startsWith('P') || String(t.sectionId) === String(sec.id)))
                           .map((t) => {
                             const match = t.name.match(/\d+/);
                             return match ? parseInt(match[0], 10) : 0;
@@ -1450,6 +1461,22 @@ export default function TableGrid({
                       <span className="font-black text-xs text-slate-900 block">+ Add Parcel</span>
                       <span className="text-[10px] font-bold text-blue-700">Accept Order</span>
                     </div>
+                  ) : (
+                    typeof onOpenAddTableModal === 'function' && (
+                      <div
+                        onClick={onOpenAddTableModal}
+                        role="button"
+                        tabIndex={0}
+                        className="rounded-2xl p-2.5 border-2 border-dashed border-slate-300 bg-white/70 hover:bg-slate-50 text-slate-700 transition-all duration-150 cursor-pointer flex flex-col items-center justify-center min-h-[135px] text-center shadow-2xs group select-none"
+                        title={`Add new table or parcel to ${sec.name}`}
+                      >
+                        <div className="w-9 h-9 rounded-full bg-slate-800 text-white flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-2xs">
+                          <Plus className="w-5 h-5 stroke-[3]" />
+                        </div>
+                        <span className="font-black text-xs text-slate-900 block">+ Add Card</span>
+                        <span className="text-[10px] font-bold text-slate-500">Table or Parcel</span>
+                      </div>
+                    )
                   )}
                 </div>
               </div>
