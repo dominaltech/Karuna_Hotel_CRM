@@ -20,7 +20,7 @@ import {
   Receipt
 } from 'lucide-react';
 import TableGrid, { getSectionTheme } from './TableGrid';
-import { printKOTReceipt, printThermalReceipt } from '../utils/receiptUtils';
+import { printKOTReceipt, printThermalReceipt, formatItemQtyDisplay } from '../utils/receiptUtils';
 import { db, getDishPriceForSection } from '../db/db';
 
 const formatTokenNumber = (token, table) => {
@@ -154,9 +154,14 @@ export default function POSBilling({
     }
   };
 
-  // Ensure default main category is always Breakfast & Snacks when table is selected
+  // Ensure default main category matches table (lock to Sweets if sweet table)
   useEffect(() => {
-    if (sortedCategories && sortedCategories.length > 0) {
+    const isSweetTable = Boolean(activeTable?.isSweet || (activeTable?.name && String(activeTable.name).toUpperCase().startsWith('S')) || activeTable?.sectionId === 5);
+    if (isSweetTable) {
+      const sweetCat = sortedCategories.find((c) => c.id === 2 || c.name?.toLowerCase().includes('sweet'));
+      setSelectedMainCatId(sweetCat ? sweetCat.id : 2);
+      setSelectedSubCatId('all');
+    } else if (sortedCategories && sortedCategories.length > 0) {
       setSelectedMainCatId(sortedCategories[0].id);
       setSelectedSubCatId('all');
     }
@@ -204,7 +209,7 @@ export default function POSBilling({
     printKOTReceipt({
       tableNo: activeTable ? activeTable.name : 'Takeaway',
       billNo: activeTable?.currentBillNo || activeTable?.currentTokenNo?.replace(/^#/, '') || (activeTable?.name ? String(activeTable.name).replace(/\D/g, '') : '') || '1',
-      tokenNo: activeTable?.currentTokenNo || Math.floor(1000 + Math.random() * 9000).toString(),
+      tokenNo: activeTable?.currentTokenNo ? String(activeTable.currentTokenNo).replace(/^#/, '') : (activeTable?.name ? String(activeTable.name).replace(/\D/g, '') : '1'),
       sectionName: activeSection?.name || 'FIRST FLOOR',
       kotRunNo: currentKotCount || 1,
       items: itemsToDispatch,
@@ -411,13 +416,27 @@ export default function POSBilling({
     setEditValue('');
   };
 
+  const isSweetTable = Boolean(
+    activeTable?.isSweet ||
+    (activeTable?.name && String(activeTable.name).toUpperCase().startsWith('S')) ||
+    activeTable?.sectionId === 5
+  );
+
+  // Filter Categories: If sweet table, only show sweets division
+  const displayedCategories = isSweetTable
+    ? sortedCategories.filter((c) => c.id === 2 || c.name?.toLowerCase().includes('sweet'))
+    : sortedCategories;
+
   // Filter Sub Categories for selected Main Division
   const currentSubCats = subCategories.filter(
     (sc) => sc.parentCategoryId === selectedMainCatId
   );
 
-  // Filter Dishes by Division, Sub-Category & Search Query
+  // Filter Dishes by Division, Sub-Category & Search Query (lock to Sweets if sweet table)
   const filteredDishes = dishes.filter((dish) => {
+    if (isSweetTable && dish.categoryId !== 2 && !dish.counter?.toLowerCase().includes('sweet') && !dish.categoryName?.toLowerCase().includes('sweet')) {
+      return false;
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       const matchName = dish.name.toLowerCase().includes(q);
@@ -481,7 +500,7 @@ export default function POSBilling({
           <div className="text-[10px] font-black text-stone-400 uppercase tracking-wider px-1 mb-0.5">
             Menu Divisions
           </div>
-          {sortedCategories.map((cat, catIdx) => {
+          {displayedCategories.map((cat, catIdx) => {
             const isSelected = selectedMainCatId === cat.id;
             return (
               <button
@@ -597,6 +616,151 @@ export default function POSBilling({
 
         </div>
 
+        {/* REPOSITIONED UPWARD SWEETS QUANTITY / PORTIONS BAR (Larger & with Aligned Custom Kg Box) */}
+        {activeFooterDish && isSweetsDish(activeFooterDish) && (
+          <div className="bg-white border-2 border-blue-600 rounded-2xl shadow-lg p-3.5 px-5 z-20 mx-4 mt-3 flex flex-wrap items-center justify-between gap-3 animate-in slide-in-from-top-2 duration-150 shrink-0">
+            {/* Dish Info */}
+            <div className="flex items-center space-x-2 shrink-0">
+              <h4 className="font-black text-sm sm:text-base text-slate-900 leading-none flex items-center gap-2">
+                <span>{activeFooterDish.name}</span>
+                <span className="text-xs font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200 shadow-2xs">
+                  Rate: ₹{activeFooterDish.pricePerKg || activeFooterDish.price}{activeFooterDish.pricePerKg ? '/Kg' : ''}
+                </span>
+              </h4>
+            </div>
+
+            {/* Quantity & Portion Option Controls with (-) on Left & (+) on Right */}
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {activeFooterDish.hasMultiplePrices && activeFooterDish.variants && activeFooterDish.variants.length > 0 ? (
+                <>
+                  {activeFooterDish.variants.map((v, vIdx) => (
+                    <div
+                      key={`opt-btn-${v.unit}-${vIdx}`}
+                      className="bg-slate-50 border border-slate-300 hover:border-blue-600 rounded-xl p-1 shadow-2xs flex items-center space-x-1.5 transition-all"
+                    >
+                      {/* (-) Minus Button on Left */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (typeof onReduceFromCart === 'function') {
+                            onReduceFromCart({ ...activeFooterDish, unit: v.unit });
+                          }
+                        }}
+                        className="w-8 h-8 rounded-lg bg-white hover:bg-slate-200 text-slate-900 border border-slate-300 font-black flex items-center justify-center cursor-pointer transition text-sm shadow-2xs"
+                        title="Reduce from cart"
+                      >
+                        <Minus className="w-4 h-4 stroke-[3]" />
+                      </button>
+
+                      {/* Center Option Label */}
+                      <button
+                        type="button"
+                        onClick={() => handleSelectOptionFromFooter(v)}
+                        className="px-2.5 py-1 cursor-pointer flex items-center space-x-1.5 text-slate-900"
+                      >
+                        <span className="font-black text-xs sm:text-sm">{v.unit}</span>
+                        <span className="text-blue-600 font-black text-xs sm:text-sm">₹{v.price}</span>
+                      </button>
+
+                      {/* (+) Plus Button on Right */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectOptionFromFooter(v);
+                        }}
+                        className="w-8 h-8 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black flex items-center justify-center cursor-pointer transition text-sm shadow-2xs"
+                        title="Add to cart"
+                      >
+                        <Plus className="w-4 h-4 stroke-[3]" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Custom Weight Entry (Strictly in Kg, Fixed Alignment) */}
+                  <form onSubmit={handleAddCustomKg} className="flex items-center gap-1.5 bg-white border-2 border-stone-300 focus-within:border-blue-600 rounded-xl p-1 shadow-xs h-10">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (typeof onReduceFromCart === 'function') {
+                          onReduceFromCart(activeFooterDish);
+                        }
+                      }}
+                      className="w-8 h-8 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-900 font-black flex items-center justify-center cursor-pointer transition text-sm"
+                      title="Reduce custom quantity"
+                    >
+                      <Minus className="w-4 h-4 stroke-[3]" />
+                    </button>
+
+                    <input
+                      type="number"
+                      step="0.05"
+                      min="0.05"
+                      placeholder="Custom Kg"
+                      value={customKgInput}
+                      onChange={(e) => setCustomKgInput(e.target.value)}
+                      className="w-24 text-center text-sm font-black text-neutral-900 outline-none placeholder:text-stone-400 placeholder:font-normal"
+                    />
+                    <span className="text-xs font-black text-stone-500 pr-1 select-none">Kg</span>
+
+                    <button
+                      type="submit"
+                      disabled={!customKgInput}
+                      className="h-8 bg-neutral-900 hover:bg-black text-white font-black text-xs px-3.5 rounded-lg cursor-pointer disabled:opacity-40 shadow-xs flex items-center space-x-1"
+                    >
+                      <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                      <span>Add</span>
+                    </button>
+                  </form>
+                </>
+              ) : (
+                /* Standard Single Price Dish */
+                <div className="bg-white border border-stone-300 rounded-xl p-1 shadow-2xs flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof onReduceFromCart === 'function') {
+                        onReduceFromCart(activeFooterDish);
+                      }
+                    }}
+                    className="w-8 h-8 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-900 font-black flex items-center justify-center cursor-pointer text-sm transition"
+                    title="Reduce from cart"
+                  >
+                    <Minus className="w-4 h-4 stroke-[3]" />
+                  </button>
+
+                  <div className="px-2 py-0.5 text-center">
+                    <span className="font-black text-xs sm:text-sm text-neutral-900 block">{activeFooterDish.name}</span>
+                    <span className="font-black text-xs text-amber-700">₹{(getDishPriceForSection(activeFooterDish, activeSection?.id) || activeFooterDish.price || 0).toFixed(2)}</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const activePrice = getDishPriceForSection(activeFooterDish, activeSection?.id);
+                      onAddToCart({ ...activeFooterDish, price: activePrice });
+                    }}
+                    className="w-8 h-8 rounded-lg bg-neutral-900 hover:bg-black text-white font-black flex items-center justify-center cursor-pointer text-sm transition"
+                    title="Add to cart"
+                  >
+                    <Plus className="w-4 h-4 stroke-[3]" />
+                  </button>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setActiveFooterDish(null)}
+                className="p-1.5 rounded-xl text-stone-400 hover:text-stone-900 hover:bg-stone-100 transition-colors cursor-pointer ml-1"
+                title="Close options"
+              >
+                <X className="w-4.5 h-4.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Dishes Grid (Larger Cards with Clear Images & Bold Text - Exactly 5 per row) */}
         <div className="flex-1 p-4 overflow-y-auto min-h-0">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-4 pb-24">
@@ -647,7 +811,7 @@ export default function POSBilling({
                       {dish.name}
                     </div>
                     {dish.marathiName && (
-                      <div className="text-xs font-bold text-stone-400 truncate mt-0.5">
+                      <div className="text-sm font-black text-blue-950 bg-amber-50/90 border border-amber-200/80 px-2 py-0.5 rounded-md truncate mt-1 shadow-2xs block">
                         {dish.marathiName}
                       </div>
                     )}
@@ -677,148 +841,10 @@ export default function POSBilling({
           </div>
         </div>
 
-        {/* STICKY BOTTOM FOOTER BAR FOR PRODUCT QUANTITY / PORTIONS (SWEETS ONLY) */}
-        {activeFooterDish && isSweetsDish(activeFooterDish) && (
-          <div className="absolute bottom-3 left-3 right-3 bg-white border-2 border-blue-600 rounded-2xl shadow-xl p-2.5 px-4 z-30 animate-in slide-in-from-bottom-2 duration-150">
-            <div className="flex items-center justify-between gap-3 max-w-6xl mx-auto relative">
-              {/* Dish Info (Icon Removed as requested) */}
-              <div className="flex items-center space-x-2 shrink-0">
-                <h4 className="font-black text-sm text-slate-900 leading-none flex items-center gap-2">
-                  <span>{activeFooterDish.name}</span>
-                  <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
-                    #{activeFooterDish.srNo || activeFooterDish.id} • Rate: ₹{activeFooterDish.pricePerKg || activeFooterDish.price}{activeFooterDish.pricePerKg ? '/Kg' : ''}
-                  </span>
-                </h4>
-              </div>
-
-              {/* Quantity & Portion Option Controls with (-) on Left & (+) on Right */}
-              <div className="flex items-center space-x-2 shrink-0">
-                {activeFooterDish.hasMultiplePrices && activeFooterDish.variants && activeFooterDish.variants.length > 0 ? (
-                  <>
-                    {activeFooterDish.variants.map((v, vIdx) => (
-                      <div
-                        key={`opt-btn-${v.unit}-${vIdx}`}
-                        className="bg-slate-50 border border-slate-300 hover:border-blue-600 rounded-xl p-1 shadow-2xs flex items-center space-x-1.5 transition-all"
-                      >
-                        {/* (-) Minus Button on Left */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (typeof onReduceFromCart === 'function') {
-                              onReduceFromCart({ ...activeFooterDish, unit: v.unit });
-                            }
-                          }}
-                          className="w-7 h-7 rounded-lg bg-white hover:bg-slate-200 text-slate-900 border border-slate-300 font-black flex items-center justify-center cursor-pointer transition text-sm"
-                          title="Reduce from cart"
-                        >
-                          <Minus className="w-3.5 h-3.5 stroke-[3]" />
-                        </button>
-
-                        {/* Center Option Label */}
-                        <button
-                          type="button"
-                          onClick={() => handleSelectOptionFromFooter(v)}
-                          className="px-2 py-0.5 cursor-pointer flex items-center space-x-1.5 text-slate-900"
-                        >
-                          <span className="font-black text-xs sm:text-sm">{v.unit}</span>
-                          <span className="text-blue-600 font-black text-xs sm:text-sm">₹{v.price}</span>
-                        </button>
-
-                        {/* (+) Plus Button on Right */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectOptionFromFooter(v);
-                          }}
-                          className="w-7 h-7 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black flex items-center justify-center cursor-pointer transition text-sm"
-                          title="Add to cart"
-                        >
-                          <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                        </button>
-                      </div>
-                    ))}
-
-                    {/* Custom Weight Entry (Strictly in Kg) with (-) and (+) */}
-                    <form onSubmit={handleAddCustomKg} className="flex items-center space-x-1.5 bg-white border border-stone-300 rounded-xl p-1 shadow-2xs">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (typeof onReduceFromCart === 'function') {
-                            onReduceFromCart(activeFooterDish);
-                          }
-                        }}
-                        className="w-7 h-7 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-900 font-black flex items-center justify-center cursor-pointer transition text-sm"
-                        title="Reduce custom quantity"
-                      >
-                        <Minus className="w-3.5 h-3.5 stroke-[3]" />
-                      </button>
-
-                      <input
-                        type="number"
-                        step="0.05"
-                        min="0.05"
-                        placeholder="Kg (e.g. 0.75)"
-                        value={customKgInput}
-                        onChange={(e) => setCustomKgInput(e.target.value)}
-                        className="w-32 bg-transparent border-0 px-2 py-0.5 text-xs font-black text-neutral-900 outline-none"
-                      />
-
-                      <button
-                        type="submit"
-                        disabled={!customKgInput}
-                        className="bg-neutral-900 hover:bg-black text-white font-black text-xs px-3 py-1 rounded-lg cursor-pointer disabled:opacity-40 shadow-2xs flex items-center space-x-1"
-                      >
-                        <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                        <span>Add</span>
-                      </button>
-                    </form>
-                  </>
-                ) : (
-                  /* Standard Single Price Dish: (-) Left & (+) Right */
-                  <div className="bg-white border border-stone-300 rounded-xl p-1 shadow-2xs flex items-center space-x-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (typeof onReduceFromCart === 'function') {
-                          onReduceFromCart(activeFooterDish);
-                        }
-                      }}
-                      className="w-7 h-7 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-900 font-black flex items-center justify-center cursor-pointer text-sm transition"
-                      title="Reduce from cart"
-                    >
-                      <Minus className="w-3.5 h-3.5 stroke-[3]" />
-                    </button>
-
-                    <div className="px-2 py-0.5 text-center">
-                      <span className="font-black text-xs sm:text-sm text-neutral-900 block">{activeFooterDish.name}</span>
-                      <span className="font-black text-xs text-amber-700">₹{(getDishPriceForSection(activeFooterDish, activeSection?.id) || activeFooterDish.price || 0).toFixed(2)}</span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const activePrice = getDishPriceForSection(activeFooterDish, activeSection?.id);
-                        onAddToCart({ ...activeFooterDish, price: activePrice });
-                      }}
-                      className="w-7 h-7 rounded-lg bg-neutral-900 hover:bg-black text-white font-black flex items-center justify-center cursor-pointer text-sm transition"
-                      title="Add to cart"
-                    >
-                      <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                    </button>
-                  </div>
-                )}
-              </div>
-
-            </div>
-          </div>
-        )}
-
       </main>
 
-      {/* COLUMN 3: RIGHT SIDE ITEMS CART (Requirement 3: Interactive with Inline Edits) */}
-      <aside className="w-80 md:w-96 bg-white border-l border-stone-200 flex flex-col shrink-0 shadow-lg select-none">
+      {/* COLUMN 3: RIGHT SIDE ITEMS CART (Enlarged Items & Controls) */}
+      <aside className="w-88 md:w-[420px] lg:w-[440px] bg-white border-l border-stone-200 flex flex-col shrink-0 shadow-lg select-none">
         
         {/* Top Dark Header Bar (TABLE, TOKEN, CUSTOMER) */}
         <div className="bg-[#111111] text-white p-3 flex items-center justify-between text-xs font-bold border-b border-stone-800">
@@ -831,7 +857,7 @@ export default function POSBilling({
           <div className="text-center cursor-pointer" onClick={() => setEditingMeta(editingMeta === 'token' ? null : 'token')}>
             <span className="text-[10px] text-stone-400 block uppercase font-bold">TOKEN</span>
             <span className="text-emerald-400 font-extrabold text-sm bg-stone-900 px-2.5 py-0.5 rounded border border-stone-700 hover:border-emerald-500 transition-colors shadow-xs">
-              #{formatTokenNumber(tokenNo, activeTable)}
+              {formatTokenNumber(tokenNo, activeTable)}
             </span>
           </div>
 
@@ -922,17 +948,7 @@ export default function POSBilling({
             cartItems.map((item, itemIdx) => {
               const itemQty = parseFloat(item.qty) || 1;
               const isKgItem = item.weightKg !== undefined || (item.unit && (item.unit.includes('g') || item.unit.toLowerCase().includes('kg'))) || item.hasMultiplePrices;
-              
-              let qtyDisplay;
-              if (isKgItem) {
-                if (itemQty > 1 && item.unit && !item.unit.startsWith(`${itemQty} `) && !item.unit.startsWith(`${itemQty}×`)) {
-                  qtyDisplay = `${itemQty} × ${item.unit}`;
-                } else {
-                  qtyDisplay = item.unit || `${itemQty} Kg`;
-                }
-              } else {
-                qtyDisplay = `${itemQty}`;
-              }
+              const qtyDisplay = formatItemQtyDisplay(item);
 
               const lineAmount = (item.price || 0) * itemQty;
               const targetKey = item.cartItemId || item.id;
@@ -942,28 +958,28 @@ export default function POSBilling({
                 <div
                   key={`side-cart-item-${item.cartItemId || item.id}-${item.unit || ''}-${itemIdx}`}
                   onClick={() => handleCartItemClick(item, itemIdx)}
-                  className={`grid grid-cols-12 items-center gap-1 py-2 border-b border-stone-100 text-xs text-neutral-800 rounded-lg px-2 cursor-pointer transition-colors ${
-                    editingCartItemIndex === itemIdx ? 'bg-amber-100/80 border-amber-400 ring-1 ring-amber-400' : 'hover:bg-stone-50/80'
+                  className={`grid grid-cols-12 items-center gap-2 py-3 border-b border-stone-200 text-xs text-neutral-800 rounded-xl px-2.5 cursor-pointer transition-colors ${
+                    editingCartItemIndex === itemIdx ? 'bg-amber-100/90 border-amber-400 ring-2 ring-amber-400 shadow-xs' : 'hover:bg-stone-50'
                   }`}
                 >
                   {/* Clean Item Name + Parcel Tag */}
                   <div className="col-span-6 pr-1">
                     <div className="flex items-center space-x-1.5 flex-wrap">
-                      <span className="font-extrabold text-neutral-900 text-xs truncate">
+                      <span className="font-black text-neutral-900 text-sm leading-snug">
                         {item.name}
                       </span>
                       {item.isParcel && (
-                        <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-black px-1.5 py-0.2 rounded shadow-2xs">
+                        <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black px-1.5 py-0.2 rounded shadow-2xs">
                           📦 Parcel
                         </span>
                       )}
                     </div>
-                    <div className="text-[10px] font-bold text-stone-400 mt-0.5">
-                      #{item.srNo || item.id}
+                    <div className="text-[11px] font-bold text-stone-400 mt-0.5">
+                      Code: {item.srNo || item.id}
                     </div>
                   </div>
 
-                  {/* QTY / Unit Column (Requirement 2: No +/- buttons for Kg items; +/- only for regular items) */}
+                  {/* QTY / Unit Column (Enlarged Stepper Buttons) */}
                   <div className="col-span-3 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
                     {isEditingQty ? (
                       <div className="flex items-center space-x-1">
@@ -977,32 +993,33 @@ export default function POSBilling({
                             if (e.key === 'Enter') handleCommitInlineEdit(item, itemIdx);
                             if (e.key === 'Escape') setEditingCartItemId(null);
                           }}
-                          className="w-14 bg-amber-50 border border-amber-500 text-center text-xs font-black rounded p-0.5 outline-none"
+                          className="w-16 bg-amber-50 border border-amber-500 text-center text-sm font-black rounded-lg p-1 outline-none"
                         />
                         <button
                           onClick={() => handleCommitInlineEdit(item, itemIdx)}
-                          className="text-emerald-700 font-bold text-xs"
+                          className="text-emerald-700 font-black text-sm px-1 cursor-pointer"
                         >
                           ✓
                         </button>
                       </div>
                     ) : isKgItem ? (
-                      /* Kg Item: Clean badge only, no -, + stepper buttons */
+                      /* Kg Item: Clean prominent badge */
                       <span
                         onClick={() => handleCartItemClick(item, itemIdx)}
-                        className="font-black text-xs px-2 py-0.5 bg-blue-50 border border-blue-200 text-blue-900 rounded-md text-center whitespace-nowrap hover:bg-blue-100 cursor-pointer shadow-2xs"
+                        className="font-black text-xs sm:text-sm px-2.5 py-1 bg-blue-50 border border-blue-200 text-blue-900 rounded-lg text-center whitespace-nowrap hover:bg-blue-100 cursor-pointer shadow-2xs"
                         title="Click to change portion"
                       >
                         {qtyDisplay}
                       </span>
                     ) : (
-                      /* Regular Item: Keep -, + stepper buttons */
-                      <div className="flex items-center space-x-1">
+                      /* Regular Item: Enlarged -, + stepper buttons */
+                      <div className="flex items-center space-x-1.5">
                         <button
                           onClick={() => onUpdateCartQty(targetKey, itemQty - 1, item.unit)}
-                          className="w-4 h-4 rounded bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center font-black cursor-pointer text-[10px]"
+                          className="w-8 h-8 rounded-lg bg-stone-100 hover:bg-stone-300 active:scale-95 text-stone-900 flex items-center justify-center font-black cursor-pointer text-sm shadow-2xs transition"
+                          title="Reduce quantity"
                         >
-                          -
+                          <Minus className="w-4 h-4 stroke-[3]" />
                         </button>
                         <span
                           onClick={() => {
@@ -1010,30 +1027,31 @@ export default function POSBilling({
                             setEditingField('qty');
                             setEditValue(itemQty.toString());
                           }}
-                          className="font-black text-xs px-1 text-center whitespace-nowrap hover:bg-amber-100 hover:text-amber-900 rounded cursor-text"
+                          className="font-black text-sm px-1.5 text-center min-w-[24px] whitespace-nowrap hover:bg-amber-100 hover:text-amber-900 rounded cursor-text"
                           title="Click to type quantity"
                         >
                           {qtyDisplay}
                         </span>
                         <button
                           onClick={() => onUpdateCartQty(targetKey, itemQty + 1, item.unit)}
-                          className="w-4 h-4 rounded bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center font-black cursor-pointer text-[10px]"
+                          className="w-8 h-8 rounded-lg bg-stone-900 hover:bg-black active:scale-95 text-white flex items-center justify-center font-black cursor-pointer text-sm shadow-2xs transition"
+                          title="Increase quantity"
                         >
-                          +
+                          <Plus className="w-4 h-4 stroke-[3]" />
                         </button>
                       </div>
                     )}
                   </div>
 
-                  {/* Amount Column */}
-                  <div className="col-span-3 text-right font-black text-neutral-900 text-xs flex items-center justify-end space-x-1" onClick={(e) => e.stopPropagation()}>
+                  {/* Amount Column + Enlarged Delete Button */}
+                  <div className="col-span-3 text-right font-black text-neutral-900 text-sm flex items-center justify-end space-x-2" onClick={(e) => e.stopPropagation()}>
                     <span>₹{lineAmount.toFixed(2)}</span>
                     <button
                       onClick={() => onRemoveCartItem(targetKey, item.unit)}
-                      className="text-stone-300 hover:text-rose-600 p-0.5 cursor-pointer ml-1"
+                      className="p-1.5 rounded-lg text-rose-400 hover:text-rose-700 hover:bg-rose-50 cursor-pointer transition shadow-2xs"
                       title="Remove item"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-4.5 h-4.5 stroke-[2.2]" />
                     </button>
                   </div>
                 </div>

@@ -106,3 +106,4 @@ console.log('\nTest 3: Remaining tab only displays dishes configured in Setting 
 }
 
 console.log('\n🎉 ALL STOCK MASTER RECIPE & MEASUREMENT LOGIC TESTS PASSED!');
+process.exit(0);

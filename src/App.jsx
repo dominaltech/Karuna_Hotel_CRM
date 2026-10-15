@@ -20,6 +20,7 @@ import SettledBills from './components/SettledBills';
 import OwnerAdmin from './components/OwnerAdmin';
 import StockManagement from './components/StockManagement';
 import ServerMonitorPanel from './components/ServerMonitorPanel';
+import { formatItemQtyDisplay } from './utils/receiptUtils';
 import { ShieldCheck, Lock, X, Check, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function App() {
@@ -62,6 +63,7 @@ export default function App() {
   const [billLogs, setBillLogs] = useState([]);
   const [rawMaterials, setRawMaterials] = useState(DEFAULT_INITIAL_DATA.rawMaterials);
   const [recipes, setRecipes] = useState(DEFAULT_INITIAL_DATA.recipes);
+  const [stockMode, setStockMode] = useState(localStorage.getItem('karuna_stock_mode') || 'item_wise');
 
   // Cart State & Active Table State
   const [cartItems, setCartItems] = useState([]);
@@ -118,15 +120,28 @@ export default function App() {
       if (!hasParcels) {
         result.push({ id: 4, name: 'Parcels', extraCharge: 0, color: 'amber' });
       }
-      // Always position Parcels section AT THE VERY END (LAST)
-      const nonParcels = result.filter((s) => !s.name || !s.name.toLowerCase().includes('parcel'));
-      const parcels = result.filter((s) => s.name && s.name.toLowerCase().includes('parcel'));
-      result = [...nonParcels, ...parcels];
+      const hasSweets = result.some((s) => s.name && s.name.toLowerCase().includes('sweet'));
+      if (!hasSweets) {
+        result.push({ id: 5, name: 'Sweets', extraCharge: 0, color: 'rose' });
+      }
+      const regularSections = result.filter((s) => !s.name || (!s.name.toLowerCase().includes('parcel') && !s.name.toLowerCase().includes('sweet')));
+      const parcelSections = result.filter((s) => s.name && s.name.toLowerCase().includes('parcel'));
+      const sweetSections = result.filter((s) => s.name && s.name.toLowerCase().includes('sweet'));
+      result = [...regularSections, ...parcelSections, ...sweetSections];
     }
 
     if (isTableCollection) {
-      // Clean and collapse empty/settled split tables back into base table (preserve all user-created tables and parcel carts!)
+      // Clean and collapse empty/settled split tables back into base table
       result = cleanAndPruneSplitTables(result);
+      // Ensure settled/empty parcel and sweet carts disappear from the grid
+      result = result.filter((t) => {
+        const isP = t.sectionId === 4 || (t.name && String(t.name).toUpperCase().startsWith('P')) || t.isParcel;
+        const isS = t.sectionId === 5 || (t.name && String(t.name).toUpperCase().startsWith('S')) || t.isSweet;
+        if ((isP || isS) && (t.status === 'empty' || !t.currentCart || t.currentCart.length === 0) && t.status !== 'bill_released') {
+          return false;
+        }
+        return true;
+      });
     }
 
     return result;
@@ -144,6 +159,10 @@ export default function App() {
     if (target.billLogs) setBillLogs(deduplicateById(target.billLogs));
     if (target.rawMaterials) setRawMaterials(deduplicateById(target.rawMaterials));
     if (target.recipes) setRecipes(cleanAndDeduplicateRecipes(target.recipes));
+    if (target.systemSettings?.stockMode) {
+      setStockMode(target.systemSettings.stockMode);
+      localStorage.setItem('karuna_stock_mode', target.systemSettings.stockMode);
+    }
   };
 
   const activeTableRef = useRef(activeTable);
@@ -480,29 +499,34 @@ export default function App() {
       const existing = updated[existingIndex];
       const newQty = (parseFloat(existing.qty) || 1) + initialQty;
       
-      const newUnit = unitKey || existing.unit;
+      const rawUnit = unitKey || existing.unit;
+      const cleanUnit = rawUnit ? rawUnit.replace(/^\d+\s*[xX×]\s*/, '').trim() : null;
       const newPrice = dishItem.price !== undefined ? dishItem.price : existing.price;
       const newWeight = dishItem.weightKg !== undefined ? dishItem.weightKg : existing.weightKg;
 
-      updated[existingIndex] = {
+      const updatedItem = {
         ...existing,
         qty: newQty,
-        unit: newUnit,
+        unit: cleanUnit,
         price: newPrice,
-        weightKg: newWeight,
-        qtyDisplay: newUnit ? (newQty > 1 ? `${newQty} × ${newUnit}` : newUnit) : `${newQty}`
+        weightKg: newWeight
       };
+      updatedItem.qtyDisplay = formatItemQtyDisplay(updatedItem);
+      updated[existingIndex] = updatedItem;
     } else {
+      const rawUnit = unitKey;
+      const cleanUnit = rawUnit ? rawUnit.replace(/^\d+\s*[xX×]\s*/, '').trim() : null;
       const cartItemId = `${dishItem.id}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       
-      updated = [...cartItems, {
+      const newItem = {
         ...dishItem,
         cartItemId,
         qty: initialQty,
-        unit: unitKey,
-        isParcel,
-        qtyDisplay: unitKey ? (initialQty > 1 ? `${initialQty} × ${unitKey}` : unitKey) : `${initialQty}`
-      }];
+        unit: cleanUnit,
+        isParcel
+      };
+      newItem.qtyDisplay = formatItemQtyDisplay(newItem);
+      updated = [...cartItems, newItem];
     }
 
     setCartItems(updated);
@@ -541,11 +565,12 @@ export default function App() {
     if (curQty > 1) {
       updated = [...cartItems];
       const newQty = curQty - 1;
-      updated[existingIndex] = {
+      const updatedItem = {
         ...existing,
-        qty: newQty,
-        qtyDisplay: existing.unit ? (newQty > 1 ? `${newQty} × ${existing.unit}` : existing.unit) : `${newQty}`
+        qty: newQty
       };
+      updatedItem.qtyDisplay = formatItemQtyDisplay(updatedItem);
+      updated[existingIndex] = updatedItem;
     } else {
       updated = cartItems.filter((_, idx) => idx !== existingIndex);
     }
@@ -613,11 +638,22 @@ export default function App() {
 
     const billTotal = billData.total !== undefined ? billData.total : (billData.finalTotal || 0);
     const payload = {
+      ...billData,
       tableId: tableId || null,
       tokenNo: billData.tokenNo || targetTable?.currentTokenNo || (1000 + (parseInt(tableId) || 1)).toString(),
       tableNo: billData.tableNo || (targetTable ? targetTable.name : 'Takeaway'),
       items: billData.items || cartItems,
       subtotal: billData.subtotal !== undefined ? billData.subtotal : billTotal,
+      discount: billData.discount || 0,
+      discountAmount: billData.discountAmount || billData.discount || 0,
+      discountType: billData.discountType || '₹',
+      discountValue: billData.discountValue || 0,
+      deliveryCharge: parseFloat(billData.deliveryCharge) || 0,
+      containerCharge: parseFloat(billData.containerCharge) || 0,
+      waiterTip: parseFloat(billData.waiterTip) || 0,
+      serviceCharge: parseFloat(billData.serviceCharge) || 0,
+      serviceChargeType: billData.serviceChargeType || '₹',
+      serviceChargeValue: billData.serviceChargeValue || 0,
       sectionName: billData.sectionName || activeSection?.name || 'Dine In Area',
       sectionExtraCharge: 0,
       total: billTotal,
@@ -634,7 +670,8 @@ export default function App() {
 
     if (targetTable) {
       const isParcel = targetTable.sectionId === 4 || (targetTable.name && String(targetTable.name).toUpperCase().startsWith('P')) || targetTable.isParcel;
-      if (isParcel) {
+      const isSweet = targetTable.sectionId === 5 || (targetTable.name && String(targetTable.name).toUpperCase().startsWith('S')) || targetTable.isSweet;
+      if (isParcel || isSweet) {
         try {
           await db.diningTables.delete(targetTable.id);
         } catch (e) {}
@@ -657,8 +694,18 @@ export default function App() {
     const pMode = updatedBill.paymentMode || updatedBill.paymentDetails?.mode || 'Cash';
     await db.bills.update(updatedBill.id, {
       items: updatedBill.items,
-      subtotal: updatedBill.subtotal,
-      total: updatedBill.total,
+      subtotal: updatedBill.subtotal !== undefined ? updatedBill.subtotal : finalAmount,
+      discount: updatedBill.discount || 0,
+      discountAmount: updatedBill.discountAmount || updatedBill.discount || 0,
+      discountType: updatedBill.discountType || '₹',
+      discountValue: updatedBill.discountValue || 0,
+      deliveryCharge: parseFloat(updatedBill.deliveryCharge) || 0,
+      containerCharge: parseFloat(updatedBill.containerCharge) || 0,
+      waiterTip: parseFloat(updatedBill.waiterTip) || 0,
+      serviceCharge: parseFloat(updatedBill.serviceCharge) || 0,
+      serviceChargeType: updatedBill.serviceChargeType || '₹',
+      serviceChargeValue: updatedBill.serviceChargeValue || 0,
+      total: updatedBill.total !== undefined ? updatedBill.total : finalAmount,
       finalTotal: finalAmount,
       grandTotal: finalAmount,
       paymentMode: pMode,
@@ -767,6 +814,26 @@ export default function App() {
       });
     }
     syncStateFromCache();
+  };
+
+  const handleUpdateStockMode = async (newMode) => {
+    setStockMode(newMode);
+    localStorage.setItem('karuna_stock_mode', newMode);
+    try {
+      await db.systemSettings.put({
+        id: 1,
+        stockMode: newMode,
+        lastSyncTime: new Date().toISOString()
+      });
+    } catch (e) {
+      console.warn('Error saving stockMode:', e);
+    }
+    const snapshot = db.getCacheSnapshot ? db.getCacheSnapshot() : null;
+    if (snapshot) {
+      if (!snapshot.systemSettings) snapshot.systemSettings = {};
+      snapshot.systemSettings.stockMode = newMode;
+    }
+    syncStateFromCache(snapshot);
   };
 
   const ZOOM_STEPS = [100, 125, 150, 175, 200];
@@ -911,6 +978,7 @@ export default function App() {
 
         {activeTab === 'stock' && (
           <StockManagement
+            stockMode={stockMode}
             rawMaterials={rawMaterials}
             dishes={dishes}
             categories={categories}
@@ -944,6 +1012,8 @@ export default function App() {
             tables={tables}
             bills={bills}
             billLogs={billLogs}
+            stockMode={stockMode}
+            onUpdateStockMode={handleUpdateStockMode}
             onAddDish={handleAddDish}
             onUpdateDish={handleUpdateDish}
             onDeleteDish={handleDeleteDish}

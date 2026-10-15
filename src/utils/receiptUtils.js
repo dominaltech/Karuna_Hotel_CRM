@@ -217,6 +217,112 @@ export function formatReceiptDate(dateVal = new Date()) {
   return `${day}-${month}-${year}`;
 }
 
+// Clean Quantity / Weight Formatter for receipts and cart display
+// Ensures sweet/kg items sold twice or thrice print cleanly like "2x50g", "3x50g"
+// and ensures price never leaks into or collides with the qty column.
+export function formatItemQtyDisplay(item) {
+  if (!item) return '1';
+  const itemQty = parseFloat(item.qty) || 1;
+  const isKgItem = item.weightKg !== undefined || (item.unit && (item.unit.includes('g') || item.unit.toLowerCase().includes('kg'))) || item.hasMultiplePrices;
+
+  if (!isKgItem) {
+    return `${itemQty}`;
+  }
+
+  let cleanUnit = (item.unit || '').trim();
+  const itemPrice = parseFloat(item.price) || 0;
+  if (itemPrice > 0) {
+    cleanUnit = cleanUnit.replace(new RegExp(`^₹?\\s*${itemPrice}\\s*`, 'i'), '').trim();
+  }
+  cleanUnit = cleanUnit.replace(/^\d+\s*[xX×]\s*/, '').trim();
+
+  if (!cleanUnit) {
+    cleanUnit = item.weightKg ? `${item.weightKg} Kg` : 'Kg';
+  }
+
+  return itemQty > 1 ? `${itemQty}x${cleanUnit}` : cleanUnit;
+}
+
+// Global print throttle state to strictly prevent "Ignoring too frequent calls to print()"
+let lastPrintCallTime = 0;
+let activePrintTimeout = null;
+
+/**
+ * Print HTML silently through a hidden iframe to prevent popup windows
+ * Uses a single-execution trigger and debounce throttle to strictly prevent duplicate print prompts
+ */
+export function printHtmlThroughHiddenIframe(html) {
+  if (typeof document === 'undefined') return;
+
+  const now = Date.now();
+  if (now - lastPrintCallTime < 800) {
+    console.warn('POS Print Throttled: preventing rapid duplicate print calls within 800ms');
+    return;
+  }
+  lastPrintCallTime = now;
+
+  if (activePrintTimeout) {
+    clearTimeout(activePrintTimeout);
+    activePrintTimeout = null;
+  }
+
+  // Strip any inline window.print() script from HTML to avoid double-printing
+  const cleanHtml = (html || '').replace(/<script[\s\S]*?window\.print\(\)[\s\S]*?<\/script>/gi, '');
+
+  try {
+    let iframe = document.getElementById('pos-silent-print-frame');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'pos-silent-print-frame';
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0px';
+      iframe.style.height = '0px';
+      iframe.style.border = '0';
+      iframe.style.opacity = '0';
+      iframe.style.pointerEvents = 'none';
+      document.body.appendChild(iframe);
+    }
+
+    const iframeDoc = iframe.contentWindow?.document || iframe.contentDocument;
+    if (iframeDoc) {
+      iframeDoc.open();
+      iframeDoc.write(cleanHtml);
+      iframeDoc.close();
+
+      let hasPrinted = false;
+      const triggerSinglePrint = () => {
+        if (hasPrinted) return;
+        hasPrinted = true;
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } catch (e) {
+          console.warn('Iframe print notice:', e);
+        }
+      };
+
+      // Trigger print exactly once after content is loaded into iframe
+      activePrintTimeout = setTimeout(triggerSinglePrint, 250);
+      return;
+    }
+  } catch (err) {
+    console.warn('Hidden iframe print error:', err);
+  }
+
+  // Fallback if iframe fails
+  const printWindow = window.open('', '_blank', 'width=440,height=650');
+  if (printWindow) {
+    printWindow.document.write(cleanHtml);
+    printWindow.document.close();
+    activePrintTimeout = setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+    }, 250);
+  }
+}
+
 /**
  * Print Kitchen Order Ticket (KOT)
  * Matches exact layout provided in Photo 1
@@ -234,12 +340,6 @@ export function printKOTReceipt({
 }) {
   if (!items || items.length === 0) return;
 
-  const printWindow = window.open('', '_blank', 'width=420,height=600');
-  if (!printWindow) {
-    console.warn('Print pop-up window was blocked by the browser. Please allow pop-ups for this POS site.');
-    return;
-  }
-
   const now = new Date();
   const dateFormatted = formatReceiptDate(now);
   const timeFormatted = format12HourTime(now);
@@ -254,11 +354,7 @@ export function printKOTReceipt({
 
   const itemsHtml = items.map((item) => {
     const dishName = getPrintDishName(item, currentLang);
-    const itemQty = parseFloat(item.qty) || 1;
-    const isKgItem = item.weightKg !== undefined || (item.unit && (item.unit.includes('g') || item.unit.toLowerCase().includes('kg')));
-    const qty = isKgItem
-      ? (item.unit ? (itemQty > 1 ? `${itemQty} × ${item.unit}` : item.unit) : `${itemQty}`)
-      : (item.qtyDisplay || itemQty);
+    const qty = formatItemQtyDisplay(item);
     const isParcel = item.isParcel || (item.customNote && item.customNote.toLowerCase().includes('parcel'));
     const displayName = `${dishName}${isParcel ? ' [PARCEL]' : ''}`;
     return `
@@ -446,18 +542,11 @@ export function printKOTReceipt({
         <div class="dashed-line"></div>
         ${orderNote ? `<div style="font-size: 11px; font-weight: 600; margin-top: 3px; color: #000;">Note: ${orderNote}</div>` : ''}
       </div>
-
-      <script>
-        window.onload = function() {
-          window.print();
-        }
-      </script>
     </body>
     </html>
   `;
 
-  printWindow.document.write(html);
-  printWindow.document.close();
+  printHtmlThroughHiddenIframe(html);
 }
 
 /**
@@ -465,12 +554,6 @@ export function printKOTReceipt({
  * Matches exact layout provided in Photo 2 with Smartphone Scanner Icon & Google Fonts
  */
 export async function printThermalReceipt(billData, options = {}) {
-  const printWindow = window.open('', '_blank', 'width=440,height=650');
-  if (!printWindow) {
-    console.warn('Print pop-up window was blocked by the browser. Please allow pop-ups for this POS site.');
-    return;
-  }
-
   const billDate = new Date(billData.createdAt || Date.now());
   const dateFormatted = formatReceiptDate(billDate);
   const timeFormatted = format12HourTime(billDate);
@@ -480,7 +563,15 @@ export async function printThermalReceipt(billData, options = {}) {
   const tableName = billData.tableNo || '16A';
   const sectionName = (billData.sectionName || 'FIRST FLOOR').toUpperCase();
   const waiterName = billData.waiter || billData.paymentDetails?.waiter || 'Raju';
-  const grandTotal = billData.total || billData.grandTotal || 0;
+  const grandTotal = billData.total !== undefined ? billData.total : (billData.grandTotal || 0);
+
+  const subtotal = billData.subtotal !== undefined ? billData.subtotal : grandTotal;
+  const discountAmount = parseFloat(billData.discountAmount) || (typeof billData.discount === 'number' ? billData.discount : (parseFloat(billData.discount?.amount || billData.discount?.value) || 0));
+  const deliveryCharge = parseFloat(billData.deliveryCharge) || 0;
+  const containerCharge = parseFloat(billData.containerCharge) || 0;
+  const waiterTip = parseFloat(billData.waiterTip) || 0;
+  const serviceCharge = parseFloat(billData.serviceCharge) || 0;
+  const hasExtraLines = discountAmount > 0 || deliveryCharge > 0 || containerCharge > 0 || waiterTip > 0 || serviceCharge > 0;
 
   // Dynamically resolve UPI configurations
   const upiId = (typeof localStorage !== 'undefined' && localStorage.getItem('karuna_upi_id')) || '8446091809@ybl';
@@ -503,10 +594,7 @@ export async function printThermalReceipt(billData, options = {}) {
     const itemQty = parseFloat(item.qty) || 1;
     const itemPrice = parseFloat(item.price) || 0;
     const lineAmount = Math.round((itemPrice * itemQty) * 100) / 100;
-    const isKgItem = item.weightKg !== undefined || (item.unit && (item.unit.includes('g') || item.unit.toLowerCase().includes('kg')));
-    const qtyDisplay = isKgItem
-      ? (item.unit ? (itemQty > 1 ? `${itemQty} × ${item.unit}` : item.unit) : `${itemQty}`)
-      : `${itemQty}`;
+    const qtyDisplay = formatItemQtyDisplay(item);
     const isParcel = item.isParcel || (item.customNote && item.customNote.toLowerCase().includes('parcel'));
     const displayName = `${dishName}${isParcel ? ' (Parcel)' : ''}`;
 
@@ -642,29 +730,29 @@ export async function printThermalReceipt(billData, options = {}) {
           vertical-align: top;
         }
         .col-item {
-          width: 44%;
+          width: 38%;
           text-align: left;
           word-break: break-word;
-          padding-right: 3px;
+          padding-right: 4px;
         }
         .col-price {
           width: 18%;
           text-align: right;
           font-family: 'Montserrat', sans-serif;
           font-weight: 700;
-          padding-right: 3px;
+          padding-right: 8px;
           white-space: nowrap;
         }
         .col-qty {
-          width: 14%;
+          width: 22%;
           text-align: center;
           font-family: 'Montserrat', sans-serif;
           font-weight: 700;
-          padding-right: 2px;
+          padding: 0 4px;
           white-space: nowrap;
         }
         .col-amount {
-          width: 24%;
+          width: 22%;
           text-align: right;
           font-family: 'Montserrat', sans-serif;
           font-weight: 800;
@@ -679,7 +767,7 @@ export async function printThermalReceipt(billData, options = {}) {
           margin-top: 5px;
         }
         .qr-col {
-          width: 48%;
+          width: 44%;
           display: flex;
           flex-direction: column;
           align-items: flex-start;
@@ -713,7 +801,7 @@ export async function printThermalReceipt(billData, options = {}) {
           flex-shrink: 0;
         }
         .total-col {
-          width: 50%;
+          width: 54%;
           display: flex;
           flex-direction: column;
           align-items: flex-end;
@@ -824,25 +912,44 @@ export async function printThermalReceipt(billData, options = {}) {
           </div>
 
           <div class="total-col">
+            ${hasExtraLines ? `
+              <div style="font-size: 10px; font-weight: 700; color: #334155; display: flex; justify-content: space-between; width: 100%; margin-bottom: 2px;">
+                <span>Subtotal:</span><span>₹${Number(subtotal).toFixed(2)}</span>
+              </div>
+              ${discountAmount > 0 ? `
+              <div style="font-size: 10px; font-weight: 700; color: #dc2626; display: flex; justify-content: space-between; width: 100%; margin-bottom: 2px;">
+                <span>Discount:</span><span>-₹${Number(discountAmount).toFixed(2)}</span>
+              </div>` : ''}
+              ${deliveryCharge > 0 ? `
+              <div style="font-size: 10px; font-weight: 700; color: #334155; display: flex; justify-content: space-between; width: 100%; margin-bottom: 2px;">
+                <span>Delivery Charge:</span><span>+₹${deliveryCharge.toFixed(2)}</span>
+              </div>` : ''}
+              ${containerCharge > 0 ? `
+              <div style="font-size: 10px; font-weight: 700; color: #334155; display: flex; justify-content: space-between; width: 100%; margin-bottom: 2px;">
+                <span>Container Charge:</span><span>+₹${containerCharge.toFixed(2)}</span>
+              </div>` : ''}
+              ${waiterTip > 0 ? `
+              <div style="font-size: 10px; font-weight: 700; color: #334155; display: flex; justify-content: space-between; width: 100%; margin-bottom: 2px;">
+                <span>Waiter Tip:</span><span>+₹${waiterTip.toFixed(2)}</span>
+              </div>` : ''}
+              ${serviceCharge > 0 ? `
+              <div style="font-size: 10px; font-weight: 700; color: #334155; display: flex; justify-content: space-between; width: 100%; margin-bottom: 2px;">
+                <span>Service Charge:</span><span>+₹${serviceCharge.toFixed(2)}</span>
+              </div>` : ''}
+              <div class="dashed-line" style="margin: 2px 0 3px 0;"></div>
+            ` : ''}
             <div class="total-line">
               <span class="total-label">Total:</span>
-              <span class="total-val">₹${grandTotal}</span>
+              <span class="total-val">₹${typeof grandTotal === 'number' ? grandTotal.toFixed(2) : Number(grandTotal).toFixed(2)}</span>
             </div>
             <div class="dashed-line" style="margin: 4px 0;"></div>
             <div class="thank-you-text">Thank You! Visit Again!</div>
           </div>
         </div>
       </div>
-
-      <script>
-        window.onload = function() {
-          window.print();
-        }
-      </script>
     </body>
     </html>
   `;
 
-  printWindow.document.write(html);
-  printWindow.document.close();
+  printHtmlThroughHiddenIframe(html);
 }

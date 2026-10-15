@@ -24,6 +24,7 @@ export default function CreateNewTableModal({
     if (secName.includes('first') || secName.includes('floor')) return 'F';
     if (secName.includes('ac')) return 'AC';
     if (secName.includes('parcel') || secName.includes('takeaway')) return 'P';
+    if (secName.includes('sweet') || secName.includes('mithai')) return 'S';
     if (secName.includes('roof') || secName.includes('top')) return 'R';
     if (secName.includes('garden')) return 'G';
     const firstChar = (secObj?.name || '').trim().charAt(0).toUpperCase();

@@ -19,9 +19,10 @@ import {
   Printer,
   Edit3,
   History,
-  Minus
+  Minus,
+  Sparkles
 } from 'lucide-react';
-import { db } from '../db/db';
+import { db, getNextSequentialNumber } from '../db/db';
 import { printThermalReceipt } from '../utils/receiptUtils';
 import { getSectionTheme } from '../utils/themeUtils';
 export { getSectionTheme };
@@ -105,7 +106,6 @@ export default function TableGrid({
       setActiveAreaFilter(initialAreaFilter);
     }
   }, [initialAreaFilter]);
-  const [selectedRedTable, setSelectedRedTable] = useState(null);
   const [openStatusDropdownTableId, setOpenStatusDropdownTableId] = useState(null);
   const currentZoom = propZoom || 100;
 
@@ -503,14 +503,16 @@ export default function TableGrid({
     if (lname.includes('first') || lname.includes('floor')) return Building;
     if (lname.includes('ac')) return Snowflake;
     if (lname.includes('parcel')) return ShoppingBag;
+    if (lname.includes('sweet')) return Sparkles;
     return Layers;
   };
 
   const sortSectionsWithParcelsLast = (secArray) => {
     if (!Array.isArray(secArray)) return [];
-    const nonParcels = secArray.filter((s) => !s || !s.name || !s.name.toLowerCase().includes('parcel'));
+    const regular = secArray.filter((s) => !s || (!s.name?.toLowerCase().includes('parcel') && !s.name?.toLowerCase().includes('sweet')));
     const parcels = secArray.filter((s) => s && s.name && s.name.toLowerCase().includes('parcel'));
-    return [...nonParcels, ...parcels];
+    const sweets = secArray.filter((s) => s && s.name && s.name.toLowerCase().includes('sweet'));
+    return [...regular, ...parcels, ...sweets];
   };
 
   const sortedSections = sortSectionsWithParcelsLast(sections);
@@ -522,11 +524,7 @@ export default function TableGrid({
     if (typeof onAreaFilterChange === 'function') {
       onAreaFilterChange(activeAreaFilter);
     }
-    if (tbl.status === 'bill_released') {
-      setSelectedRedTable(tbl);
-    } else {
-      onSelectTable(tbl);
-    }
+    onSelectTable(tbl);
   };
 
   return (
@@ -913,12 +911,7 @@ export default function TableGrid({
 
                           {hasActiveOrder && (
                             <div className="flex items-center justify-center space-x-1.5">
-                              <span className={`text-[11px] font-black px-2 py-0.5 rounded-md shadow-2xs ${
-                                isBillReleased ? 'bg-rose-900 text-rose-100' : 'bg-blue-800 text-blue-100'
-                              }`}>
-                                #{tokenStr}
-                              </span>
-                              <span className="text-xs font-black text-amber-300 flex items-center space-x-1 px-2 py-0.5 rounded-md bg-black/30 border border-white/10">
+                              <span className="text-xs font-black text-amber-300 flex items-center space-x-1 px-2.5 py-1 rounded-md bg-black/35 border border-white/10">
                                 <Clock className="w-3.5 h-3.5 text-amber-300 stroke-[2.5]" />
                                 <span className="leading-none">{elapsedMins}m</span>
                               </span>
@@ -1055,12 +1048,7 @@ export default function TableGrid({
 
                             {hasActiveOrder && (
                               <div className="flex items-center justify-center space-x-1.5">
-                                <span className={`text-[11px] font-black px-2 py-0.5 rounded-md shadow-2xs ${
-                                  isBillReleased ? 'bg-rose-900 text-rose-100' : 'bg-blue-800 text-blue-100'
-                                }`}>
-                                  #{tokenStr}
-                                </span>
-                                <span className="text-xs font-black text-amber-300 flex items-center space-x-1 px-2 py-0.5 rounded-md bg-black/30 border border-white/10">
+                                <span className="text-xs font-black text-amber-300 flex items-center space-x-1 px-2.5 py-1 rounded-md bg-black/35 border border-white/10">
                                   <Clock className="w-3.5 h-3.5 text-amber-300 stroke-[2.5]" />
                                   <span className="leading-none">{elapsedMins}m</span>
                                 </span>
@@ -1150,17 +1138,10 @@ export default function TableGrid({
                       );
                     })}
 
-                    {/* Dashed "+ Add Parcel" Tile */}
+                    {/* Dashed "+ Add Parcel" Tile (Cycles P1..P99 and wraps to P1) */}
                     <div
                       onClick={async () => {
-                        const existingPNums = tables
-                          .filter((t) => t && t.name && (t.name.toUpperCase().startsWith('P') || (parcelSec && t.sectionId === parcelSec.id)))
-                          .map((t) => {
-                            const match = t.name.match(/\d+/);
-                            return match ? parseInt(match[0], 10) : 0;
-                          });
-                        const maxNum = existingPNums.length > 0 ? Math.max(...existingPNums) : 0;
-                        const nextNum = maxNum + 1;
+                        const nextNum = getNextSequentialNumber('P', tables);
                         const newParcelName = `P${nextNum}`;
                         const newParcelTable = {
                           name: newParcelName,
@@ -1168,7 +1149,7 @@ export default function TableGrid({
                           status: 'occupied',
                           parcelStatus: 'process',
                           currentCart: [],
-                          currentTokenNo: Math.floor(1000 + Math.random() * 9000).toString(),
+                          currentTokenNo: `P${nextNum}`,
                           isSplit: false,
                           isParcel: true,
                           createdAt: new Date().toISOString()
@@ -1179,13 +1160,185 @@ export default function TableGrid({
                       role="button"
                       tabIndex={0}
                       className="rounded-2xl p-2.5 border-2 border-dashed border-blue-400 bg-blue-50/70 hover:bg-blue-100 text-blue-950 transition-all duration-150 cursor-pointer flex flex-col items-center justify-center min-h-[135px] text-center shadow-2xs group select-none"
-                      title="Accept new parcel order"
+                      title="Accept new parcel order (P1..P99)"
                     >
                       <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-2xs">
                         <Plus className="w-5 h-5 stroke-[3]" />
                       </div>
                       <span className="font-black text-xs text-slate-900 block">+ Add Parcel</span>
                       <span className="text-[10px] font-bold text-blue-800">Accept Order</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* 3. Dedicated Sweets Section at the Bottom (Cycles S1..S99 and wraps to S1) */}
+            {(() => {
+              const sweetSec = sortedSections.find((s) => s && s.name && s.name.toLowerCase().includes('sweet')) || { id: 5, name: 'Sweets' };
+              const rawSecTables = tables.filter((t) => t && ((sweetSec && String(t.sectionId) === String(sweetSec.id)) || (t.name && String(t.name).toUpperCase().startsWith('S')) || t.isSweet));
+
+              const tableMap = new Map();
+              rawSecTables.forEach((t) => {
+                if (!t || !t.name) return;
+                const k = String(t.name).toUpperCase().trim();
+                const existing = tableMap.get(k);
+                if (!existing) {
+                  tableMap.set(k, t);
+                } else {
+                  const tHasCart = (t.status === 'occupied' || t.status === 'bill_released') || (t.currentCart && t.currentCart.length > 0);
+                  const eHasCart = (existing.status === 'occupied' || existing.status === 'bill_released') || (existing.currentCart && existing.currentCart.length > 0);
+                  if (tHasCart && !eHasCart) tableMap.set(k, t);
+                }
+              });
+              const sweetTables = Array.from(tableMap.values()).sort(sortTablesNaturally);
+              const sweetRunning = sweetTables.filter((t) => t.status === 'occupied' || t.status === 'bill_released').length;
+              const SectionIcon = getSectionIcon('Sweets');
+              const theme = getSectionTheme('Sweets');
+
+              return (
+                <div className="space-y-3 pt-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-2 text-neutral-900 font-extrabold text-sm">
+                      <SectionIcon className="w-4 h-4 text-pink-600" />
+                      <span>Sweets (मिठाई)</span>
+                    </div>
+
+                    <span className={`border text-[10px] font-bold px-2 py-0.5 rounded-md ${theme.headerBadge}`}>
+                      {sweetTables.length} Cards • {sweetRunning} Running
+                    </span>
+
+                    <div className="flex-1 h-[1.5px] bg-stone-300/80"></div>
+                  </div>
+
+                  <div className={`grid ${getGridColsClass(currentZoom)}`}>
+                    {sweetTables.map((tbl, tblIdx) => {
+                      const isBillReleased = tbl.status === 'bill_released';
+                      const isOccupied = tbl.status === 'occupied' && tbl.currentCart && tbl.currentCart.length > 0;
+                      const hasActiveOrder = isOccupied || isBillReleased;
+                      const cartTotal = tbl.currentCart ? tbl.currentCart.reduce((a, i) => a + (i.price || 0) * (i.qty || 1), 0) : 0;
+
+                      let elapsedMins = '00';
+                      if (hasActiveOrder && tbl.createdAt) {
+                        const diffMs = Math.max(0, Date.now() - new Date(tbl.createdAt).getTime());
+                        const mins = Math.floor(diffMs / 60000);
+                        elapsedMins = mins < 10 ? `0${mins}` : `${mins}`;
+                      }
+
+                      const arrivalSeq = getArrivalOrderIndex(tbl);
+
+                      let cardBgStyle = 'bg-white text-neutral-900 border border-stone-200 hover:border-neutral-900 hover:shadow-md';
+                      let borderDividerStyle = 'border-t border-stone-100';
+                      let priceStyle = 'text-neutral-900 font-black text-xs sm:text-sm';
+
+                      if (isBillReleased) {
+                        cardBgStyle = 'bg-rose-600 text-white border border-rose-700 hover:bg-rose-700 shadow-md ring-2 ring-rose-500/50';
+                        borderDividerStyle = 'border-t border-rose-500/60';
+                        priceStyle = 'text-amber-200 font-black text-xs sm:text-sm';
+                      } else if (isOccupied) {
+                        cardBgStyle = 'bg-pink-600 text-white border border-pink-700 hover:bg-pink-700 shadow-md';
+                        borderDividerStyle = 'border-t border-pink-500/60';
+                        priceStyle = 'text-amber-300 font-black text-xs sm:text-sm';
+                      }
+
+                      const dragProps = getDragHandlers(tbl, hasActiveOrder);
+
+                      return (
+                        <div
+                          key={`tbl-card-swt-${tbl.id || tbl.name}-${tblIdx}`}
+                          onClick={() => handleCardClick(tbl)}
+                          draggable={dragProps.draggable}
+                          onDragStart={dragProps.onDragStart}
+                          onDragEnd={dragProps.onDragEnd}
+                          onDragOver={dragProps.onDragOver}
+                          onDragEnter={dragProps.onDragEnter}
+                          onDragLeave={dragProps.onDragLeave}
+                          onDrop={dragProps.onDrop}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleCardClick(tbl);
+                            }
+                          }}
+                          className={`rounded-2xl text-left transition-all duration-150 cursor-pointer flex flex-col justify-between h-auto shadow-xs relative select-none ${getCardHeightClass(currentZoom)} ${cardBgStyle} ${dragProps.dragClasses}`}
+                        >
+                          <div className="flex items-center justify-between w-full min-h-[22px]">
+                            {arrivalSeq ? (
+                              <span
+                                className="bg-amber-400 text-neutral-950 font-black text-[11px] px-1.5 py-0.5 rounded-md shadow-2xs whitespace-nowrap leading-none"
+                                title={`Arrival sequence #${arrivalSeq}`}
+                              >
+                                ({arrivalSeq})
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <div className="my-auto py-1 text-center flex flex-col items-center justify-center space-y-1">
+                            <span className="font-black text-2xl sm:text-3xl tracking-tight leading-none block">
+                              {tbl.name}
+                            </span>
+
+                            {hasActiveOrder && (
+                              <div className="flex items-center justify-center space-x-1.5">
+                                <span className="text-xs font-black text-amber-300 flex items-center space-x-1 px-2.5 py-1 rounded-md bg-black/35 border border-white/10">
+                                  <Clock className="w-3.5 h-3.5 text-amber-300 stroke-[2.5]" />
+                                  <span className="leading-none">{elapsedMins}m</span>
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className={`pt-2 flex items-center justify-between text-xs font-bold gap-1 ${borderDividerStyle}`}>
+                            <span className={`${priceStyle} truncate shrink-0`}>
+                              ₹{hasActiveOrder ? cartTotal.toFixed(2) : '0.00'}
+                            </span>
+
+                            {hasActiveOrder ? (
+                              <span className="px-2 py-0.5 rounded-lg bg-pink-100 text-pink-900 border border-pink-300 text-[10px] font-black">
+                                🍬 Sweets
+                              </span>
+                            ) : (
+                              <span className="flex items-center space-x-1 text-xs font-extrabold text-stone-500 shrink-0">
+                                <Clock className="w-3.5 h-3.5 text-stone-400 stroke-[2.5]" />
+                                <span>00 mins</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Dashed "+ Add Sweet" Tile (Cycles S1..S99 and wraps to S1) */}
+                    <div
+                      onClick={async () => {
+                        const nextNum = getNextSequentialNumber('S', tables);
+                        const newSweetName = `S${nextNum}`;
+                        const newSweetTable = {
+                          name: newSweetName,
+                          sectionId: sweetSec ? sweetSec.id : 5,
+                          status: 'occupied',
+                          parcelStatus: 'process',
+                          currentCart: [],
+                          currentTokenNo: `S${nextNum}`,
+                          isSplit: false,
+                          isSweet: true,
+                          createdAt: new Date().toISOString()
+                        };
+                        const newId = await db.diningTables.add(newSweetTable);
+                        onSelectTable({ ...newSweetTable, id: newId });
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      className="rounded-2xl p-2.5 border-2 border-dashed border-pink-400 bg-pink-50/70 hover:bg-pink-100 text-pink-950 transition-all duration-150 cursor-pointer flex flex-col items-center justify-center min-h-[135px] text-center shadow-2xs group select-none"
+                      title="Accept new sweets order (S1..S99)"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-pink-600 text-white flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-2xs">
+                        <Plus className="w-5 h-5 stroke-[3]" />
+                      </div>
+                      <span className="font-black text-xs text-slate-900 block">+ Add Sweet</span>
+                      <span className="text-[10px] font-bold text-pink-800">Accept Order</span>
                     </div>
                   </div>
                 </div>
@@ -1327,12 +1480,7 @@ export default function TableGrid({
 
                           {hasActiveOrder && (
                             <div className="flex items-center justify-center space-x-1.5">
-                              <span className={`text-[11px] font-black px-2 py-0.5 rounded-md shadow-2xs ${
-                                isBillReleased ? 'bg-rose-900 text-rose-100' : 'bg-blue-800 text-blue-100'
-                              }`}>
-                                #{tokenStr}
-                              </span>
-                              <span className="text-xs font-black text-amber-300 flex items-center space-x-1 px-2 py-0.5 rounded-md bg-black/30 border border-white/10">
+                              <span className="text-xs font-black text-amber-300 flex items-center space-x-1 px-2.5 py-1 rounded-md bg-black/35 border border-white/10">
                                 <Clock className="w-3.5 h-3.5 text-amber-300 stroke-[2.5]" />
                                 <span className="leading-none">{elapsedMins}m</span>
                               </span>
@@ -1427,14 +1575,7 @@ export default function TableGrid({
                   {isParcel ? (
                     <div
                       onClick={async () => {
-                        const existingPNums = tables
-                          .filter((t) => t && t.name && (t.name.toUpperCase().startsWith('P') || String(t.sectionId) === String(sec.id)))
-                          .map((t) => {
-                            const match = t.name.match(/\d+/);
-                            return match ? parseInt(match[0], 10) : 0;
-                          });
-                        const maxNum = existingPNums.length > 0 ? Math.max(...existingPNums) : 0;
-                        const nextNum = maxNum + 1;
+                        const nextNum = getNextSequentialNumber('P', tables);
                         const newParcelName = `P${nextNum}`;
                         const newParcelTable = {
                           name: newParcelName,
@@ -1442,7 +1583,7 @@ export default function TableGrid({
                           status: 'occupied',
                           parcelStatus: 'process',
                           currentCart: [],
-                          currentTokenNo: Math.floor(1000 + Math.random() * 9000).toString(),
+                          currentTokenNo: `P${nextNum}`,
                           isSplit: false,
                           isParcel: true,
                           createdAt: new Date().toISOString()
@@ -1453,13 +1594,43 @@ export default function TableGrid({
                       role="button"
                       tabIndex={0}
                       className="rounded-2xl p-2.5 border-2 border-dashed border-blue-400 bg-blue-50/70 hover:bg-blue-100 text-blue-950 transition-all duration-150 cursor-pointer flex flex-col items-center justify-center min-h-[135px] text-center shadow-2xs group select-none"
-                      title="Accept new parcel order"
+                      title="Accept new parcel order (P1..P99)"
                     >
                       <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-2xs">
                         <Plus className="w-5 h-5 stroke-[3]" />
                       </div>
                       <span className="font-black text-xs text-slate-900 block">+ Add Parcel</span>
                       <span className="text-[10px] font-bold text-blue-700">Accept Order</span>
+                    </div>
+                  ) : sec.name && sec.name.toLowerCase().includes('sweet') ? (
+                    <div
+                      onClick={async () => {
+                        const nextNum = getNextSequentialNumber('S', tables);
+                        const newSweetName = `S${nextNum}`;
+                        const newSweetTable = {
+                          name: newSweetName,
+                          sectionId: sec.id,
+                          status: 'occupied',
+                          parcelStatus: 'process',
+                          currentCart: [],
+                          currentTokenNo: `S${nextNum}`,
+                          isSplit: false,
+                          isSweet: true,
+                          createdAt: new Date().toISOString()
+                        };
+                        const newId = await db.diningTables.add(newSweetTable);
+                        onSelectTable({ ...newSweetTable, id: newId });
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      className="rounded-2xl p-2.5 border-2 border-dashed border-pink-400 bg-pink-50/70 hover:bg-pink-100 text-pink-950 transition-all duration-150 cursor-pointer flex flex-col items-center justify-center min-h-[135px] text-center shadow-2xs group select-none"
+                      title="Accept new sweets order (S1..S99)"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-pink-600 text-white flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-2xs">
+                        <Plus className="w-5 h-5 stroke-[3]" />
+                      </div>
+                      <span className="font-black text-xs text-slate-900 block">+ Add Sweet</span>
+                      <span className="text-[10px] font-bold text-pink-700">Accept Order</span>
                     </div>
                   ) : (
                     typeof onOpenAddTableModal === 'function' && (
@@ -1485,72 +1656,7 @@ export default function TableGrid({
         )}
       </div>
 
-      {/* Red Table Action Modal (Clicking Red Table gives choice to Add Items or Pay Bill) */}
-      {selectedRedTable && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl p-6 shadow-2xl max-w-md w-full border border-slate-200 space-y-5 relative">
-            
-            <button
-              onClick={() => setSelectedRedTable(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
 
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 rounded-2xl bg-rose-100 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0">
-                <Receipt className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-lg font-black text-neutral-900">
-                  Table {selectedRedTable.name} (Bill Released)
-                </h3>
-                <p className="text-xs font-bold text-rose-600">
-                  Token #{selectedRedTable.currentTokenNo || '1000'} • Bill Amount: ₹
-                  {((selectedRedTable.currentCart || []).reduce((a, i) => a + (i.price || 0) * (i.qty || 1), 0)).toFixed(2)}
-                </p>
-              </div>
-            </div>
-
-            <p className="text-xs font-semibold text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-200">
-              The bill for this table was released. Would you like to add more items to this table order or proceed directly to settle the bill?
-            </p>
-
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const tbl = selectedRedTable;
-                  setSelectedRedTable(null);
-                  onSelectTable(tbl);
-                }}
-                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-900 font-extrabold text-xs py-3 px-4 rounded-xl border border-slate-300 transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-xs"
-              >
-                <PlusCircle className="w-4 h-4 text-blue-600" />
-                <span>Add Items</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const tbl = selectedRedTable;
-                  setSelectedRedTable(null);
-                  if (typeof onOpenOrderPopupForTable === 'function') {
-                    onOpenOrderPopupForTable(tbl);
-                  } else if (typeof onSelectTable === 'function') {
-                    onSelectTable(tbl);
-                  }
-                }}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs py-3 px-4 rounded-xl transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-md"
-              >
-                <CreditCard className="w-4 h-4" />
-                <span>Settle</span>
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
 
       {/* Edit & Resettle Bill Modal */}
       {selectedBill && (

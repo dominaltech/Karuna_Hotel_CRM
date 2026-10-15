@@ -6,7 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { parseItemWeightInKg, getCounterPrefix, generateCounterInvoiceNo } from '../src/db/db.js';
 import { parseCSVAndValidateRates } from '../src/utils/excelUtils.js';
-import { getPrintDishName, format12HourTime, formatReceiptDate } from '../src/utils/receiptUtils.js';
+import { getPrintDishName, format12HourTime, formatReceiptDate, formatItemQtyDisplay } from '../src/utils/receiptUtils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -111,13 +111,20 @@ async function runQATestSuite() {
     }
   }
 
-  // --- TEST CASE 1: Weight & Unit Parsing ---
+  // --- TEST CASE 1: Weight & Unit Parsing & Kg Qty Formatting ---
   await runTestCase('TC-01', 'Accurate Weight & Unit Parsing in Kg', () => {
     assert.strictEqual(parseItemWeightInKg({ unit: '250g' }), 0.25, '250g should parse to 0.25 Kg');
     assert.strictEqual(parseItemWeightInKg({ unit: '500g' }), 0.5, '500g should parse to 0.5 Kg');
     assert.strictEqual(parseItemWeightInKg({ unit: '1 Kg' }), 1, '1 Kg should parse to 1.0 Kg');
     assert.strictEqual(parseItemWeightInKg({ weightKg: 0.75 }), 0.75, 'weightKg field priority should be 0.75');
     assert.strictEqual(parseItemWeightInKg({ unit: '1 Plate' }), 1, 'Standard plate should parse to 1 unit count');
+
+    // Sweet / Kg item added twice or thrice must format as 2x50g, 3x50g without price in qty
+    assert.strictEqual(formatItemQtyDisplay({ unit: '50g', price: 25, qty: 2 }), '2x50g', '50g added twice must format as 2x50g');
+    assert.strictEqual(formatItemQtyDisplay({ unit: '50g', price: 25, qty: 3 }), '3x50g', '50g added thrice must format as 3x50g');
+    assert.strictEqual(formatItemQtyDisplay({ unit: '50g', price: 25, qty: 1 }), '50g', '50g added once must format as 50g');
+    assert.strictEqual(formatItemQtyDisplay({ unit: '250g', price: 80, qty: 2 }), '2x250g', '250g added twice must format as 2x250g');
+    assert.strictEqual(formatItemQtyDisplay({ unit: '₹25 50g', price: 25, qty: 2 }), '2x50g', 'Unit with price must be sanitized to 2x50g');
   });
 
   // --- TEST CASE 2: Counter Prefix & Sequential Invoice Numbering ---
@@ -1065,6 +1072,98 @@ async function runQATestSuite() {
     await apiRequest(`/api/rawMaterials/${rm2Id}`, 'DELETE');
     await apiRequest(`/api/rawMaterials/${rm3Id}`, 'DELETE');
     await apiRequest(`/api/dishes/${dishId}`, 'DELETE');
+  });
+
+  // --------------------------------------------------------------------------
+  // TEST CASE 20: Final Bill Single-Print Execution & 5 Settlement Charges (Discount, Delivery, Container, Waiter Tip, Service Charge)
+  // --------------------------------------------------------------------------
+  await runTestCase('TC-20', 'Final Bill Single-Print Execution & 5 Settlement Charges', async () => {
+    // 1. Verify receiptUtils.js does not contain duplicate auto-print scripts
+    const fs = await import('fs');
+    const receiptUtilsPath = path.resolve(__dirname, '../src/utils/receiptUtils.js');
+    const receiptSource = fs.readFileSync(receiptUtilsPath, 'utf8');
+
+    assert(!receiptSource.includes('window.onload = function() { window.print(); }'), 'Thermal receipt HTML does not contain duplicate inline window.print onload trigger');
+    assert(receiptSource.includes('hasPrinted = true'), 'printHtmlThroughHiddenIframe contains single-execution guard');
+    assert(!receiptSource.includes('Walter Tip'), 'Walter Tip is completely eliminated and renamed to Waiter Tip');
+    assert(receiptSource.includes('Waiter Tip'), 'Waiter Tip label is present in receipt utility');
+
+    // 2. Create and settle a bill with all 5 settlement charges
+    const subtotal = 500;
+    const discountAmount = 50;
+    const deliveryCharge = 40;
+    const containerCharge = 20;
+    const waiterTip = 30;
+    const serviceCharge = 25;
+    const expectedTotal = subtotal - discountAmount + deliveryCharge + containerCharge + waiterTip + serviceCharge; // 565
+
+    const billPayload = {
+      tokenNo: 'TC20-CHG-01',
+      tableNo: 'QA-CHG-TBL',
+      tableName: 'QA-CHG-TBL',
+      counter: 'Counter 1',
+      items: [
+        { id: 9999, name: 'QA Test Thali', price: 250, qty: 2 }
+      ],
+      subtotal,
+      discount: discountAmount,
+      discountAmount,
+      discountType: '₹',
+      discountValue: discountAmount,
+      deliveryCharge,
+      containerCharge,
+      waiterTip,
+      serviceCharge,
+      serviceChargeType: '₹',
+      serviceChargeValue: serviceCharge,
+      total: expectedTotal,
+      finalTotal: expectedTotal,
+      grandTotal: expectedTotal,
+      paymentDetails: { mode: 'Cash', cashGiven: 600, returnChange: 35 }
+    };
+
+    const settleRes = await apiRequest('/api/bills/settle', 'POST', billPayload);
+    assert.strictEqual(settleRes.status, 200, 'Settled bill with 5 optional charges saved successfully');
+    const savedBill = settleRes.data?.bill || settleRes.data?.data || settleRes.data;
+    const billId = savedBill?.id;
+    assert(billId, 'Created settled bill received valid ID');
+
+    // 3. Fetch from API and verify all 5 charges are preserved in database
+    const fetchRes = await apiRequest('/api/bills');
+    assert.strictEqual(fetchRes.status, 200, 'Fetched bills list');
+    const allBills = fetchRes.data?.data || fetchRes.data || [];
+    const retrievedBill = allBills.find(b => String(b.id) === String(billId));
+    assert(retrievedBill, 'Settled bill found in database bills collection');
+
+    assert.strictEqual(Number(retrievedBill.subtotal), 500, 'Subtotal is 500');
+    assert.strictEqual(Number(retrievedBill.discountAmount || retrievedBill.discount), 50, 'Discount is 50');
+    assert.strictEqual(Number(retrievedBill.deliveryCharge), 40, 'Delivery Charge is 40');
+    assert.strictEqual(Number(retrievedBill.containerCharge), 20, 'Container Charge is 20');
+    assert.strictEqual(Number(retrievedBill.waiterTip), 30, 'Waiter Tip is 30');
+    assert.strictEqual(Number(retrievedBill.serviceCharge), 25, 'Service Charge is 25');
+    assert.strictEqual(Number(retrievedBill.total), 565, 'Final total correctly equals 565');
+
+    // 4. Update the bill with modified charges (e.g. discount 60, tip 50) and verify recalculation
+    const updatedPayload = {
+      ...retrievedBill,
+      discount: 60,
+      discountAmount: 60,
+      waiterTip: 50,
+      total: 500 - 60 + 40 + 20 + 50 + 25 // 575
+    };
+    const updateRes = await apiRequest(`/api/bills/${billId}`, 'PUT', updatedPayload);
+    assert.strictEqual(updateRes.status, 200, 'Updated settled bill charges successfully');
+
+    const verifyUpdateRes = await apiRequest('/api/bills');
+    const verifyBills = verifyUpdateRes.data?.data || verifyUpdateRes.data || [];
+    const verifyUpdated = verifyBills.find(b => String(b.id) === String(billId));
+    assert(verifyUpdated, 'Updated bill found in database');
+    assert.strictEqual(Number(verifyUpdated.discountAmount || verifyUpdated.discount), 60, 'Updated discount is 60');
+    assert.strictEqual(Number(verifyUpdated.waiterTip), 50, 'Updated Waiter Tip is 50');
+    assert.strictEqual(Number(verifyUpdated.total), 575, 'Updated total is 575');
+
+    // Clean up
+    await apiRequest(`/api/bills/${billId}`, 'DELETE');
   });
 
   } finally {

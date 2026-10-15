@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Printer,
@@ -12,7 +12,7 @@ import {
   Split,
   CreditCard
 } from 'lucide-react';
-import { printThermalReceipt } from '../utils/receiptUtils';
+import { printThermalReceipt, formatItemQtyDisplay } from '../utils/receiptUtils';
 
 export default function OrderCartPopup({
   isOpen,
@@ -26,46 +26,106 @@ export default function OrderCartPopup({
   onSettleBill
 }) {
   const [tokenNo, setTokenNo] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
   
   // 4 Payment Modes: 'cash' | 'online' | 'split' | 'card'
   const [paymentMode, setPaymentMode] = useState('cash');
   const [splitOnlineInput, setSplitOnlineInput] = useState('');
   const [splitCashInput, setSplitCashInput] = useState('');
 
-  const grandTotal = cartItems.reduce(
+  // 5 Optional Charges / Adjustments (Requirement 9)
+  const [discountType, setDiscountType] = useState('₹'); // '₹' | '%'
+  const [discountValue, setDiscountValue] = useState('');
+  const [deliveryCharge, setDeliveryCharge] = useState('');
+  const [containerCharge, setContainerCharge] = useState('');
+  const [waiterTip, setWaiterTip] = useState('');
+  const [serviceChargeType, setServiceChargeType] = useState('₹'); // '₹' | '%'
+  const [serviceChargeValue, setServiceChargeValue] = useState('');
+
+  const subtotal = cartItems.reduce(
     (sum, item) => sum + (item.price || 0) * (item.qty || 1),
     0
   );
 
-  // Generate or load 4-digit token number when opening
+  const parsedDiscount = parseFloat(discountValue) || 0;
+  const discountAmount = discountType === '%'
+    ? Math.round(((subtotal * parsedDiscount) / 100) * 100) / 100
+    : parsedDiscount;
+
+  const parsedService = parseFloat(serviceChargeValue) || 0;
+  const serviceChargeAmount = serviceChargeType === '%'
+    ? Math.round(((subtotal * parsedService) / 100) * 100) / 100
+    : parsedService;
+
+  const deliveryChargeAmount = parseFloat(deliveryCharge) || 0;
+  const containerChargeAmount = parseFloat(containerCharge) || 0;
+  const waiterTipAmount = parseFloat(waiterTip) || 0;
+
+  const calculatedTotal = Math.max(
+    0,
+    subtotal - discountAmount + serviceChargeAmount + deliveryChargeAmount + containerChargeAmount + waiterTipAmount
+  );
+  const finalGrandTotal = Math.round(calculatedTotal * 100) / 100;
+
+  // Initialize token and charges when opening (Requirement 1: No random '#' number!)
   useEffect(() => {
     if (isOpen) {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
       if (activeTable?.currentTokenNo) {
-        setTokenNo(activeTable.currentTokenNo);
+        setTokenNo(String(activeTable.currentTokenNo).replace(/^#/, ''));
       } else {
-        const randomToken = Math.floor(1000 + Math.random() * 9000).toString();
-        setTokenNo(randomToken);
+        const cleanNo = activeTable?.name ? String(activeTable.name).replace(/\D/g, '') : '1';
+        setTokenNo(cleanNo || '1');
       }
       setPaymentMode('cash');
-      setSplitOnlineInput('0');
-      setSplitCashInput(grandTotal ? String(grandTotal) : '0');
+      setDiscountValue('');
+      setDeliveryCharge('');
+      setContainerCharge('');
+      setWaiterTip('');
+      setServiceChargeValue('');
     }
-  }, [isOpen, activeTable, grandTotal]);
+  }, [isOpen, activeTable]);
+
+  // Keep split cash / online inputs synced with live final grand total
+  useEffect(() => {
+    if (paymentMode === 'cash') {
+      setSplitCashInput(String(finalGrandTotal));
+      setSplitOnlineInput('0');
+    } else if (paymentMode === 'online') {
+      setSplitOnlineInput(String(finalGrandTotal));
+      setSplitCashInput('0');
+    } else if (paymentMode === 'split') {
+      const online = parseFloat(splitOnlineInput) || 0;
+      const remainingCash = Math.max(0, finalGrandTotal - online);
+      setSplitCashInput(String(remainingCash));
+    }
+  }, [finalGrandTotal, paymentMode]);
 
   const parsedOnlineSplit = parseFloat(splitOnlineInput) || 0;
   const parsedCashSplit = parseFloat(splitCashInput) || 0;
 
   const handleCheckout = (isPrint) => {
-    if (cartItems.length === 0) return;
+    if (isSubmittingRef.current || cartItems.length === 0) return;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
 
-    let paymentDetails = { mode: 'Cash', cash: grandTotal, online: 0, card: 0 };
+    let paymentDetails = { mode: 'Cash', cash: finalGrandTotal, online: 0, card: 0 };
 
     if (paymentMode === 'cash') {
-      paymentDetails = { mode: 'Cash', cash: grandTotal, online: 0, card: 0 };
+      paymentDetails = { mode: 'Cash', cash: finalGrandTotal, online: 0, card: 0 };
     } else if (paymentMode === 'online') {
-      paymentDetails = { mode: 'Online', cash: 0, online: grandTotal, card: 0 };
+      paymentDetails = { mode: 'Online', cash: 0, online: finalGrandTotal, card: 0 };
     } else if (paymentMode === 'card') {
-      paymentDetails = { mode: 'Card', cash: 0, online: 0, card: grandTotal };
+      paymentDetails = { mode: 'Card', cash: 0, online: 0, card: finalGrandTotal };
     } else if (paymentMode === 'split') {
       paymentDetails = {
         mode: 'Split',
@@ -76,14 +136,26 @@ export default function OrderCartPopup({
     }
 
     const billPayload = {
-      tokenNo,
+      tokenNo: String(tokenNo).replace(/^#/, ''),
       tableNo: activeTable ? activeTable.name : 'Takeaway',
       tableId: activeTable ? activeTable.id : null,
       items: cartItems,
-      subtotal: grandTotal,
+      subtotal: subtotal,
+      discount: discountAmount,
+      discountAmount: discountAmount,
+      discountType,
+      discountValue: parsedDiscount,
+      deliveryCharge: deliveryChargeAmount,
+      containerCharge: containerChargeAmount,
+      waiterTip: waiterTipAmount,
+      serviceCharge: serviceChargeAmount,
+      serviceChargeType,
+      serviceChargeValue: parsedService,
       sectionName: activeSection?.name || 'Dine In Area',
       sectionExtraCharge: 0,
-      total: grandTotal,
+      total: finalGrandTotal,
+      finalTotal: finalGrandTotal,
+      grandTotal: finalGrandTotal,
       paymentDetails,
       createdAt: new Date().toISOString(),
       isPrinted: isPrint
@@ -97,7 +169,7 @@ export default function OrderCartPopup({
 
     onSettleBill(billPayload);
 
-    // Reset popup state instantly
+    // Reset popup state
     setTokenNo('');
     setPaymentMode('cash');
     setSplitOnlineInput('0');
@@ -111,6 +183,7 @@ export default function OrderCartPopup({
 
     const handleKeyDown = (e) => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+      if (e.repeat) return; // Prevent repeated triggers when key is held down
 
       if (e.key === 'p' || e.key === 'P') {
         e.preventDefault();
@@ -126,19 +199,19 @@ export default function OrderCartPopup({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, cartItems, grandTotal, paymentMode, parsedOnlineSplit, parsedCashSplit, tokenNo, activeTable, activeSection]);
+  }, [isOpen, cartItems, finalGrandTotal, paymentMode, parsedOnlineSplit, parsedCashSplit, tokenNo, activeTable, activeSection]);
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-neutral-900/60 backdrop-blur-xs flex items-center justify-center p-4 select-none animate-in fade-in duration-100">
-      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150">
+      <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-150">
         
         {/* Header with Table & Section info */}
         <div className="bg-slate-50 p-4 border-b border-slate-200 flex items-center justify-between">
           <div>
-            <h3 className="font-black text-slate-900 text-base">
-              Settle
+            <h3 className="font-black text-slate-900 text-lg">
+              Settle Order & Bill
             </h3>
             <div className="flex items-center space-x-2 text-xs font-bold text-slate-500 mt-0.5">
               <span>Table: <strong className="text-blue-600 font-black">{activeTable ? activeTable.name : 'Takeaway'}</strong></span>
@@ -149,14 +222,14 @@ export default function OrderCartPopup({
 
           <button
             onClick={onClose}
-            className="text-stone-400 hover:text-neutral-900 p-1.5 rounded-xl hover:bg-stone-100 cursor-pointer transition-colors"
+            className="text-stone-400 hover:text-neutral-900 p-2 rounded-xl hover:bg-stone-100 cursor-pointer transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Order Items List Preview */}
-        <div className="p-4 overflow-y-auto max-h-56 space-y-2 flex-1">
+        {/* Order Items List Preview (Enlarged rows and +/- controls) */}
+        <div className="p-4 overflow-y-auto max-h-48 space-y-2 flex-1 border-b border-slate-100">
           <div className="text-[10px] font-black text-stone-400 uppercase tracking-wider mb-1">
             Bill Items Summary ({cartItems.length} items)
           </div>
@@ -169,17 +242,7 @@ export default function OrderCartPopup({
             cartItems.map((item, itemIdx) => {
               const itemQty = parseFloat(item.qty) || 1;
               const isKgItem = item.weightKg !== undefined || (item.unit && (item.unit.includes('g') || item.unit.toLowerCase().includes('kg'))) || item.hasMultiplePrices;
-              
-              let qtyDisplay;
-              if (isKgItem) {
-                if (itemQty > 1 && item.unit && !item.unit.startsWith(`${itemQty} `) && !item.unit.startsWith(`${itemQty}×`)) {
-                  qtyDisplay = `${itemQty} × ${item.unit}`;
-                } else {
-                  qtyDisplay = item.unit || `${itemQty} Kg`;
-                }
-              } else {
-                qtyDisplay = `${itemQty}`;
-              }
+              const qtyDisplay = formatItemQtyDisplay(item);
 
               const lineAmount = (item.price || 0) * itemQty;
               const targetKey = item.cartItemId || item.id;
@@ -191,9 +254,9 @@ export default function OrderCartPopup({
                 >
                   <div className="flex-1">
                     <div className="flex items-center space-x-1.5 flex-wrap">
-                      <h4 className="font-extrabold text-slate-900">{item.name}</h4>
+                      <h4 className="font-black text-slate-900 text-sm">{item.name}</h4>
                       {item.isParcel && (
-                        <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-black px-1.5 py-0.2 rounded">
+                        <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black px-1.5 py-0.2 rounded">
                           📦 Parcel
                         </span>
                       )}
@@ -202,7 +265,7 @@ export default function OrderCartPopup({
                       <div className="text-[10px] font-bold text-blue-600">{item.customNote}</div>
                     )}
                     <div className="text-xs font-semibold text-stone-500 mt-0.5">
-                      Qty / Unit: <span className="font-bold text-neutral-800">{qtyDisplay}</span> • Amount: <span className="font-black text-neutral-900">₹{lineAmount.toFixed(2)}</span>
+                      Qty / Unit: <span className="font-black text-neutral-800">{qtyDisplay}</span> • Amount: <span className="font-black text-neutral-900">₹{lineAmount.toFixed(2)}</span>
                     </div>
                   </div>
 
@@ -211,28 +274,31 @@ export default function OrderCartPopup({
                       {qtyDisplay}
                     </span>
                   ) : (
-                    <div className="flex items-center space-x-1.5 bg-white border border-stone-200 rounded-xl p-1 shadow-2xs">
+                    <div className="flex items-center space-x-1.5 bg-white border border-stone-300 rounded-xl p-1 shadow-2xs">
                       <button
                         onClick={() => onUpdateQty(targetKey, itemQty - 1, item.unit)}
-                        className="p-1 text-stone-600 hover:bg-stone-100 rounded-lg cursor-pointer"
+                        className="w-7 h-7 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-800 flex items-center justify-center font-black text-sm cursor-pointer"
+                        title="Reduce quantity"
                       >
-                        <Minus className="w-3.5 h-3.5" />
+                        <Minus className="w-3.5 h-3.5 stroke-[3]" />
                       </button>
-                      <span className="font-extrabold text-xs text-neutral-900 px-1.5">{qtyDisplay}</span>
+                      <span className="font-black text-sm text-neutral-900 px-2 min-w-[24px] text-center">{qtyDisplay}</span>
                       <button
                         onClick={() => onUpdateQty(targetKey, itemQty + 1, item.unit)}
-                        className="p-1 text-stone-600 hover:bg-stone-100 rounded-lg cursor-pointer"
+                        className="w-7 h-7 rounded-lg bg-stone-900 hover:bg-black text-white flex items-center justify-center font-black text-sm cursor-pointer"
+                        title="Increase quantity"
                       >
-                        <Plus className="w-3.5 h-3.5" />
+                        <Plus className="w-3.5 h-3.5 stroke-[3]" />
                       </button>
                     </div>
                   )}
 
                   <button
                     onClick={() => onRemoveItem(targetKey, item.unit)}
-                    className="text-stone-400 hover:text-rose-600 p-1.5 rounded-lg transition-colors cursor-pointer"
+                    className="p-2 rounded-lg bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer ml-1"
+                    title="Remove item"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-4.5 h-4.5 stroke-[2.2]" />
                   </button>
                 </div>
               );
@@ -241,12 +307,128 @@ export default function OrderCartPopup({
         </div>
 
         {/* Payment & Summary Footer */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50 space-y-3.5">
+        <div className="p-4 bg-slate-50 space-y-3 overflow-y-auto">
           
-          {/* Total Row */}
-          <div className="bg-white border border-stone-200 rounded-xl p-3 flex justify-between items-center">
-            <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Total Bill Amount</span>
-            <span className="text-xl font-black text-neutral-900">₹{grandTotal.toFixed(2)}</span>
+          {/* Requirement 9: 5 Optional Charges (Discount, Delivery, Container, Tip, Service Charge) */}
+          <div className="bg-white border border-stone-200 rounded-xl p-3 space-y-2 shadow-2xs">
+            <div className="text-[10px] font-black text-stone-500 uppercase tracking-wider flex items-center justify-between">
+              <span>Optional Charges & Adjustments</span>
+              <span className="text-[9px] font-bold text-stone-400">All Optional</span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+              {/* 1. Discount (Price & Percentage both applicable) */}
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-extrabold text-slate-700">1. Discount</span>
+                  <button
+                    type="button"
+                    onClick={() => setDiscountType(discountType === '₹' ? '%' : '₹')}
+                    className="text-[10px] font-black px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer shadow-2xs"
+                    title="Toggle between Price (₹) and Percentage (%)"
+                  >
+                    {discountType}
+                  </button>
+                </div>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder={`0 (${discountType})`}
+                  value={discountValue}
+                  onChange={(e) => setDiscountValue(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded px-2 py-1 font-black text-slate-900 outline-none text-xs"
+                />
+                {discountAmount > 0 && (
+                  <span className="text-[10px] font-black text-emerald-600 mt-0.5 block truncate">
+                    -₹{discountAmount.toFixed(2)}
+                  </span>
+                )}
+              </div>
+
+              {/* 2. Delivery Charge */}
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                <span className="font-extrabold text-slate-700 block mb-1">2. Delivery (₹)</span>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="₹ 0"
+                  value={deliveryCharge}
+                  onChange={(e) => setDeliveryCharge(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded px-2 py-1 font-black text-slate-900 outline-none text-xs"
+                />
+              </div>
+
+              {/* 3. Container Charge */}
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                <span className="font-extrabold text-slate-700 block mb-1">3. Container (₹)</span>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="₹ 0"
+                  value={containerCharge}
+                  onChange={(e) => setContainerCharge(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded px-2 py-1 font-black text-slate-900 outline-none text-xs"
+                />
+              </div>
+
+              {/* 4. Waiter Tip */}
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                <span className="font-extrabold text-slate-700 block mb-1">4. Waiter Tip (₹)</span>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="₹ 0"
+                  value={waiterTip}
+                  onChange={(e) => setWaiterTip(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded px-2 py-1 font-black text-slate-900 outline-none text-xs"
+                />
+              </div>
+
+              {/* 5. Service Charge */}
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-extrabold text-slate-700">5. Service Chg</span>
+                  <button
+                    type="button"
+                    onClick={() => setServiceChargeType(serviceChargeType === '₹' ? '%' : '₹')}
+                    className="text-[10px] font-black px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer shadow-2xs"
+                    title="Toggle between Price (₹) and Percentage (%)"
+                  >
+                    {serviceChargeType}
+                  </button>
+                </div>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder={`0 (${serviceChargeType})`}
+                  value={serviceChargeValue}
+                  onChange={(e) => setServiceChargeValue(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded px-2 py-1 font-black text-slate-900 outline-none text-xs"
+                />
+                {serviceChargeAmount > 0 && (
+                  <span className="text-[10px] font-black text-blue-600 mt-0.5 block truncate">
+                    +₹{serviceChargeAmount.toFixed(2)}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Grand Total Breakdown Row */}
+          <div className="bg-white border border-stone-200 rounded-xl p-3 flex justify-between items-center shadow-xs">
+            <div>
+              <span className="text-xs font-black text-stone-500 uppercase tracking-wider block">Total Payable Amount</span>
+              <span className="text-[11px] font-bold text-stone-400">
+                Subtotal: ₹{subtotal.toFixed(2)}
+                {discountAmount > 0 ? ` • Disc: -₹${discountAmount.toFixed(2)}` : ''}
+              </span>
+            </div>
+            <span className="text-2xl font-black text-blue-600">₹{finalGrandTotal.toFixed(2)}</span>
           </div>
 
           {/* 4 Payment Options: Cash, Online, Split, Card */}
@@ -287,7 +469,7 @@ export default function OrderCartPopup({
                 onClick={() => {
                   setPaymentMode('split');
                   setSplitOnlineInput('0');
-                  setSplitCashInput(String(grandTotal));
+                  setSplitCashInput(String(finalGrandTotal));
                 }}
                 className={`py-2.5 px-2 rounded-xl text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center space-y-1 ${
                   paymentMode === 'split'
@@ -336,7 +518,7 @@ export default function OrderCartPopup({
                         const val = e.target.value;
                         setSplitOnlineInput(val);
                         const num = parseFloat(val) || 0;
-                        const remainingCash = Math.max(0, grandTotal - num);
+                        const remainingCash = Math.max(0, finalGrandTotal - num);
                         setSplitCashInput(remainingCash > 0 ? String(remainingCash) : '0');
                       }}
                       className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -357,7 +539,7 @@ export default function OrderCartPopup({
                         const val = e.target.value;
                         setSplitCashInput(val);
                         const num = parseFloat(val) || 0;
-                        const remainingOnline = Math.max(0, grandTotal - num);
+                        const remainingOnline = Math.max(0, finalGrandTotal - num);
                         setSplitOnlineInput(remainingOnline > 0 ? String(remainingOnline) : '0');
                       }}
                       className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -370,7 +552,7 @@ export default function OrderCartPopup({
                   <span className="text-slate-400">+</span>
                   <span>Cash: <strong className="text-blue-600 font-black">₹{parsedCashSplit}</strong></span>
                   <span className="text-slate-400">=</span>
-                  <span>Total: <strong className="font-black text-slate-900">₹{grandTotal.toFixed(2)}</strong></span>
+                  <span>Total: <strong className="font-black text-slate-900">₹{finalGrandTotal.toFixed(2)}</strong></span>
                 </div>
               </div>
             )}
@@ -405,3 +587,4 @@ export default function OrderCartPopup({
     </div>
   );
 }
+

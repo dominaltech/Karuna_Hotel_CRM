@@ -36,7 +36,8 @@ export const DEFAULT_DATABASE_DATA = {
     { id: 1, name: 'Dine In Area', extraCharge: 0, color: 'blue' },
     { id: 2, name: 'First Floor', extraCharge: 0, color: 'emerald' },
     { id: 3, name: 'AC Hall', extraCharge: 0, color: 'purple' },
-    { id: 4, name: 'Parcels', extraCharge: 0, color: 'amber' }
+    { id: 4, name: 'Parcels', extraCharge: 0, color: 'amber' },
+    { id: 5, name: 'Sweets', extraCharge: 0, color: 'rose' }
   ],
   dishes: [
     { id: 1, srNo: 101, name: 'Single Idli Vada', marathiName: 'सिंगल इडली वडा', categoryId: 1, subCategoryId: 1, price: 50, stockQty: 30, hasMultiplePrices: false, variants: [], sectionPrices: { 1: 50, 2: 50, 3: 60, 4: 50 }, counter: 'Breakfast', status: 'In Stock', subItems: [{ name: 'Chutney', qty: '1' }, { name: 'Sambar', qty: '1' }] },
@@ -198,21 +199,17 @@ export const DEFAULT_DATABASE_DATA = {
     { id: 16, name: 'AC2', sectionId: 3, status: 'empty', currentCart: [], currentTokenNo: '1016', isSplit: false, createdAt: null },
     { id: 17, name: 'AC3', sectionId: 3, status: 'empty', currentCart: [], currentTokenNo: '1017', isSplit: false, createdAt: null },
     { id: 18, name: 'AC4', sectionId: 3, status: 'empty', currentCart: [], currentTokenNo: '1018', isSplit: false, createdAt: null },
-    { id: 19, name: 'AC5', sectionId: 3, status: 'empty', currentCart: [], currentTokenNo: '1019', isSplit: false, createdAt: null },
-    { id: 20, name: 'P1', sectionId: 4, status: 'empty', currentCart: [], currentTokenNo: '1020', isSplit: false, createdAt: null },
-    { id: 21, name: 'P2', sectionId: 4, status: 'empty', currentCart: [], currentTokenNo: '1021', isSplit: false, createdAt: null },
-    { id: 22, name: 'P3', sectionId: 4, status: 'empty', currentCart: [], currentTokenNo: '1022', isSplit: false, createdAt: null },
-    { id: 23, name: 'P4', sectionId: 4, status: 'empty', currentCart: [], currentTokenNo: '1023', isSplit: false, createdAt: null }
+    { id: 19, name: 'AC5', sectionId: 3, status: 'empty', currentCart: [], currentTokenNo: '1019', isSplit: false, createdAt: null }
   ],
   bills: [],
   billLogs: [],
   rawMaterials: [
-    { id: 1, name: 'Milk', quantity: 50, minThreshold: 10, unit: 'Kg' },
-    { id: 2, name: 'Sugar', quantity: 30, minThreshold: 5, unit: 'Kg' },
-    { id: 3, name: 'Rice Batter', quantity: 20, minThreshold: 5, unit: 'Kg' },
-    { id: 4, name: 'Paneer', quantity: 15, minThreshold: 4, unit: 'Kg' },
-    { id: 5, name: 'Cashew (Kaju)', quantity: 25, minThreshold: 5, unit: 'Kg' },
-    { id: 6, name: 'Mawa / Khoya', quantity: 18, minThreshold: 4, unit: 'Kg' }
+    { id: 1, name: 'Milk', quantity: 50, inwardQty: 50, minThreshold: 10, unit: 'Kg' },
+    { id: 2, name: 'Sugar', quantity: 30, inwardQty: 30, minThreshold: 5, unit: 'Kg' },
+    { id: 3, name: 'Rice Batter', quantity: 20, inwardQty: 20, minThreshold: 5, unit: 'Kg' },
+    { id: 4, name: 'Paneer', quantity: 15, inwardQty: 15, minThreshold: 4, unit: 'Kg' },
+    { id: 5, name: 'Cashew (Kaju)', quantity: 25, inwardQty: 25, minThreshold: 5, unit: 'Kg' },
+    { id: 6, name: 'Mawa / Khoya', quantity: 18, inwardQty: 18, minThreshold: 4, unit: 'Kg' }
   ],
   recipes: [
     { id: 1, dishId: 1, rawMaterialId: 3, qtyRequired: 0.2 },
@@ -225,6 +222,7 @@ export const DEFAULT_DATABASE_DATA = {
     hotelName: 'Karuna Hotel',
     location: 'Solapur',
     phone: '8446091809',
+    stockMode: 'raw_material_wise',
     lastSyncTime: new Date().toISOString()
   }
 };
@@ -544,6 +542,9 @@ export function getAllData() {
 }
 
 export function getCollection(collectionName) {
+  if (collectionName === 'systemSettings') {
+    return dbState.systemSettings || {};
+  }
   if (collectionName === 'diningTables') {
     dbState.diningTables = ensureDefaultDiningTables(dbState.diningTables || []);
     return dbState.diningTables;
@@ -557,10 +558,19 @@ export function getCollection(collectionName) {
 
 export function getById(collectionName, id) {
   const collection = getCollection(collectionName);
+  if (collectionName === 'systemSettings') return collection;
   return collection.find((item) => item && String(item.id) === String(id)) || null;
 }
 
 export function insertItem(collectionName, itemData) {
+  if (collectionName === 'systemSettings') {
+    dbState.systemSettings = {
+      ...(dbState.systemSettings || {}),
+      ...itemData
+    };
+    scheduleSaveDatabase();
+    return dbState.systemSettings;
+  }
   if (!dbState[collectionName]) {
     dbState[collectionName] = [];
   }
@@ -648,6 +658,14 @@ export function insertItem(collectionName, itemData) {
 }
 
 export function updateItem(collectionName, id, updatedFields) {
+  if (collectionName === 'systemSettings') {
+    dbState.systemSettings = {
+      ...(dbState.systemSettings || {}),
+      ...updatedFields
+    };
+    scheduleSaveDatabase();
+    return dbState.systemSettings;
+  }
   if (!dbState[collectionName]) dbState[collectionName] = [];
   const collection = dbState[collectionName];
   let index = collection.findIndex((item) => item && String(item.id) === String(id));
@@ -785,6 +803,10 @@ export function settleBillTransaction(billData) {
                 : 10;
 
               rec.currentStock = Math.max(0, Math.round((currentStock - rmDeduction) * 1000) / 1000);
+              const rawMat = (dbState.rawMaterials || []).find((m) => m && String(m.id) === String(rec.rawMaterialId));
+              if (rawMat) {
+                rawMat.quantity = Math.max(0, Math.round(((rawMat.quantity || 0) - rmDeduction) * 1000) / 1000);
+              }
             }
           }
         }
@@ -811,9 +833,10 @@ export function settleBillTransaction(billData) {
 
   if (table) {
     const isParcel = table.sectionId === 4 || (table.name && String(table.name).toUpperCase().startsWith('P')) || table.isParcel;
+    const isSweet = table.sectionId === 5 || (table.name && String(table.name).toUpperCase().startsWith('S')) || table.isSweet;
     const isSplit = Boolean(table.isSplit || (table.name && table.name.includes('-')) || table.parentTable || table.baseName);
 
-    if (isParcel) {
+    if (isParcel || isSweet) {
       deleteItem('diningTables', table.id);
       deletedTableId = table.id;
     } else if (isSplit) {

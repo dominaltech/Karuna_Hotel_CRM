@@ -37,6 +37,15 @@ export default function SettledBills({
   const [addDishId, setAddDishId] = useState('');
   const [toastMessage, setToastMessage] = useState(null);
 
+  // Optional Charges State for Bill Editing / Resettlement
+  const [editedDiscountValue, setEditedDiscountValue] = useState('');
+  const [editedDiscountType, setEditedDiscountType] = useState('₹');
+  const [editedDeliveryCharge, setEditedDeliveryCharge] = useState('');
+  const [editedContainerCharge, setEditedContainerCharge] = useState('');
+  const [editedWaiterTip, setEditedWaiterTip] = useState('');
+  const [editedServiceChargeValue, setEditedServiceChargeValue] = useState('');
+  const [editedServiceChargeType, setEditedServiceChargeType] = useState('₹');
+
   // Helper for accurate local YYYY-MM-DD date string
   const getLocalDateStr = (dateObjOrStr) => {
     if (!dateObjOrStr) return '';
@@ -146,6 +155,23 @@ export default function SettledBills({
     setEditedItems(JSON.parse(JSON.stringify(bill.items || [])));
     setIsEditing(true); // Open directly in edit mode for adding/removing items
     setAddDishId('');
+
+    // Pre-populate charges from settled bill
+    const rawDiscVal = bill.discountValue !== undefined && bill.discountValue !== ''
+      ? bill.discountValue
+      : (bill.discountAmount !== undefined ? bill.discountAmount : (bill.discount || ''));
+    setEditedDiscountValue(rawDiscVal ? String(rawDiscVal) : '');
+    setEditedDiscountType(bill.discountType || '₹');
+
+    setEditedDeliveryCharge(bill.deliveryCharge ? String(bill.deliveryCharge) : '');
+    setEditedContainerCharge(bill.containerCharge ? String(bill.containerCharge) : '');
+    setEditedWaiterTip(bill.waiterTip ? String(bill.waiterTip) : '');
+
+    const rawServVal = bill.serviceChargeValue !== undefined && bill.serviceChargeValue !== ''
+      ? bill.serviceChargeValue
+      : (bill.serviceCharge ? String(bill.serviceCharge) : '');
+    setEditedServiceChargeValue(rawServVal ? String(rawServVal) : '');
+    setEditedServiceChargeType(bill.serviceChargeType || '₹');
   };
 
   const handleUpdateItemQty = (index, delta) => {
@@ -191,35 +217,65 @@ export default function SettledBills({
     setAddDishId('');
   };
 
+  // Live item subtotal & charges calculations
+  const liveItemsSubtotal = editedItems.reduce(
+    (sum, item) => sum + (item.price || 0) * (item.qty || 1),
+    0
+  );
+
+  const parsedEditDisc = parseFloat(editedDiscountValue) || 0;
+  const editDiscAmount = editedDiscountType === '%'
+    ? Math.round(((liveItemsSubtotal * parsedEditDisc) / 100) * 100) / 100
+    : parsedEditDisc;
+
+  const parsedEditService = parseFloat(editedServiceChargeValue) || 0;
+  const editServiceAmount = editedServiceChargeType === '%'
+    ? Math.round(((liveItemsSubtotal * parsedEditService) / 100) * 100) / 100
+    : parsedEditService;
+
+  const editDeliveryAmount = parseFloat(editedDeliveryCharge) || 0;
+  const editContainerAmount = parseFloat(editedContainerCharge) || 0;
+  const editWaiterTipAmount = parseFloat(editedWaiterTip) || 0;
+
+  const liveCalculatedTotal = Math.max(
+    0,
+    liveItemsSubtotal - editDiscAmount + editDeliveryAmount + editContainerAmount + editWaiterTipAmount + editServiceAmount
+  );
+  const liveFinalTotal = Math.round(liveCalculatedTotal * 100) / 100;
+
   const handleSaveBillModifications = () => {
     if (!selectedBill) return;
-
-    const newSubtotal = editedItems.reduce(
-      (sum, item) => sum + (item.price || 0) * (item.qty || 1),
-      0
-    );
-    const newTotal = newSubtotal;
 
     const updatedBill = {
       ...selectedBill,
       items: editedItems,
-      subtotal: newSubtotal,
-      total: newTotal,
-      finalTotal: newTotal,
-      grandTotal: newTotal,
+      subtotal: liveItemsSubtotal,
+      discount: editDiscAmount,
+      discountAmount: editDiscAmount,
+      discountType: editedDiscountType,
+      discountValue: parsedEditDisc,
+      deliveryCharge: editDeliveryAmount,
+      containerCharge: editContainerAmount,
+      waiterTip: editWaiterTipAmount,
+      serviceCharge: editServiceAmount,
+      serviceChargeType: editedServiceChargeType,
+      serviceChargeValue: parsedEditService,
+      total: liveFinalTotal,
+      finalTotal: liveFinalTotal,
+      grandTotal: liveFinalTotal,
       paymentMode: selectedBill.paymentMode || selectedBill.paymentDetails?.mode || 'Cash'
     };
 
-    onUpdateSettledBill(updatedBill, `Resettled Bill #${selectedBill.tokenNo || selectedBill.id}`);
+    onUpdateSettledBill(updatedBill, `Resettled Bill #${selectedBill.tokenNo || selectedBill.id} - Total: ₹${liveFinalTotal.toFixed(2)}`);
     
-    setToastMessage(`Bill #${selectedBill.tokenNo || selectedBill.id} Resettled Successfully! Total: ₹${newTotal.toFixed(2)}`);
+    setToastMessage(`Bill #${selectedBill.tokenNo || selectedBill.id} Resettled Successfully! Total: ₹${liveFinalTotal.toFixed(2)}`);
     setTimeout(() => setToastMessage(null), 3000);
 
     setSelectedBill(null);
   };
 
   const relatedLogs = billLogs.filter((log) => log.billId === selectedBill?.id);
-  const liveTotal = editedItems.reduce((sum, item) => sum + (item.price || 0) * (item.qty || 1), 0);
+  const liveTotal = liveFinalTotal;
 
   return (
     <div className="flex-1 flex flex-col p-6 bg-slate-100 overflow-y-auto select-none min-h-0 h-full relative">
@@ -382,8 +438,53 @@ export default function SettledBills({
                         <div className="text-[10px] text-stone-400">{formattedTime}</div>
                       </td>
 
-                      <td className="py-3.5 px-4 text-right font-black text-sm text-neutral-900">
-                        ₹{(bill.total || 0).toFixed(2)}
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="font-black text-sm text-neutral-900">
+                          ₹{(bill.total !== undefined ? bill.total : (bill.finalTotal || 0)).toFixed(2)}
+                        </div>
+                        {(() => {
+                          const bDisc = parseFloat(bill.discountAmount) || (typeof bill.discount === 'number' ? bill.discount : (parseFloat(bill.discount?.amount || bill.discount?.value) || 0));
+                          const bDel = parseFloat(bill.deliveryCharge) || 0;
+                          const bCont = parseFloat(bill.containerCharge) || 0;
+                          const bTip = parseFloat(bill.waiterTip) || 0;
+                          const bServ = parseFloat(bill.serviceCharge) || 0;
+                          const hasAny = bDisc > 0 || bDel > 0 || bCont > 0 || bTip > 0 || bServ > 0;
+                          if (!hasAny) return null;
+                          return (
+                            <div className="flex flex-wrap justify-end gap-1 mt-1 max-w-[210px] ml-auto">
+                              {bDisc > 0 && (
+                                <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                                  Disc -₹{bDisc.toFixed(2)}
+                                </span>
+                              )}
+                              {bDel > 0 && (
+                                <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                                  Del +₹{bDel.toFixed(2)}
+                                </span>
+                              )}
+                              {bCont > 0 && (
+                                <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                                  Cont +₹{bCont.toFixed(2)}
+                                </span>
+                              )}
+                              {bTip > 0 && (
+                                <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  Tip +₹{bTip.toFixed(2)}
+                                </span>
+                              )}
+                              {bServ > 0 && (
+                                <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                  Serv +₹{bServ.toFixed(2)}
+                                </span>
+                              )}
+                              {bill.subtotal !== undefined && bill.subtotal !== bill.total && (
+                                <span className="text-[10px] font-bold text-slate-400 block w-full text-right">
+                                  Subtotal: ₹{Number(bill.subtotal).toFixed(2)}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
@@ -451,7 +552,24 @@ export default function SettledBills({
 
               <div className="flex items-center space-x-2">
                 <button
-                  onClick={() => printThermalReceipt({ ...selectedBill, items: editedItems, subtotal: liveTotal, total: liveTotal }, { language: printLanguage })}
+                  onClick={() => {
+                    const billToReprint = {
+                      ...selectedBill,
+                      items: editedItems,
+                      subtotal: liveItemsSubtotal,
+                      discount: editDiscAmount,
+                      discountAmount: editDiscAmount,
+                      discountType: editedDiscountType,
+                      deliveryCharge: editDeliveryAmount,
+                      containerCharge: editContainerAmount,
+                      waiterTip: editWaiterTipAmount,
+                      serviceCharge: editServiceAmount,
+                      total: liveFinalTotal,
+                      finalTotal: liveFinalTotal,
+                      grandTotal: liveFinalTotal
+                    };
+                    printThermalReceipt(billToReprint, { language: printLanguage });
+                  }}
                   className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-1.5 rounded-xl font-bold text-xs flex items-center space-x-1.5 cursor-pointer transition-all border border-slate-300"
                 >
                   <Printer className="w-3.5 h-3.5" />
@@ -470,15 +588,19 @@ export default function SettledBills({
             {/* Modal Body */}
             <div className="p-4 overflow-y-auto flex-1 space-y-4">
               
-              {/* Payment Summary */}
+              {/* Payment & Grand Total Summary */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex justify-between items-center text-xs">
                 <div>
                   <span className="text-slate-500 font-bold block">Payment Mode</span>
                   <div className="mt-0.5">{getPaymentModeBadge(selectedBill)}</div>
                 </div>
+                <div className="text-center">
+                  <span className="text-slate-500 font-bold block">Items Subtotal</span>
+                  <span className="text-sm font-extrabold text-slate-700">₹{liveItemsSubtotal.toFixed(2)}</span>
+                </div>
                 <div className="text-right">
-                  <span className="text-slate-500 font-bold block">Total Amount</span>
-                  <span className="text-lg font-black text-blue-600">₹{liveTotal.toFixed(2)}</span>
+                  <span className="text-slate-500 font-bold block">Net Total Amount</span>
+                  <span className="text-lg font-black text-blue-600">₹{liveFinalTotal.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -600,6 +722,115 @@ export default function SettledBills({
                     <Plus className="w-3.5 h-3.5" />
                     <span>Add Item</span>
                   </button>
+                </div>
+              </div>
+
+              {/* Optional Charges & Discounts Section (Requirement 9 & Followup) */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                <span className="text-[11px] font-black text-slate-700 uppercase tracking-wider block">
+                  Optional Charges & Discounts
+                </span>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-xs">
+                  {/* 1. Discount */}
+                  <div className="bg-white border border-slate-200 rounded-lg p-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-extrabold text-slate-700">1. Discount</span>
+                      <button
+                        type="button"
+                        onClick={() => setEditedDiscountType(editedDiscountType === '₹' ? '%' : '₹')}
+                        className="text-[10px] font-black px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer shadow-2xs"
+                        title="Toggle Price (₹) or Percentage (%)"
+                      >
+                        {editedDiscountType}
+                      </button>
+                    </div>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      placeholder={`0 (${editedDiscountType})`}
+                      value={editedDiscountValue}
+                      onChange={(e) => setEditedDiscountValue(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 font-black text-slate-900 outline-none text-xs"
+                    />
+                    {editDiscAmount > 0 && (
+                      <span className="text-[10px] font-black text-emerald-600 mt-0.5 block truncate">
+                        -₹{editDiscAmount.toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* 2. Delivery Charge */}
+                  <div className="bg-white border border-slate-200 rounded-lg p-2">
+                    <span className="font-extrabold text-slate-700 block mb-1">2. Delivery (₹)</span>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      placeholder="₹ 0"
+                      value={editedDeliveryCharge}
+                      onChange={(e) => setEditedDeliveryCharge(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 font-black text-slate-900 outline-none text-xs"
+                    />
+                  </div>
+
+                  {/* 3. Container Charge */}
+                  <div className="bg-white border border-slate-200 rounded-lg p-2">
+                    <span className="font-extrabold text-slate-700 block mb-1">3. Container (₹)</span>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      placeholder="₹ 0"
+                      value={editedContainerCharge}
+                      onChange={(e) => setEditedContainerCharge(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 font-black text-slate-900 outline-none text-xs"
+                    />
+                  </div>
+
+                  {/* 4. Waiter Tip */}
+                  <div className="bg-white border border-slate-200 rounded-lg p-2">
+                    <span className="font-extrabold text-slate-700 block mb-1">4. Waiter Tip (₹)</span>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      placeholder="₹ 0"
+                      value={editedWaiterTip}
+                      onChange={(e) => setEditedWaiterTip(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 font-black text-slate-900 outline-none text-xs"
+                    />
+                  </div>
+
+                  {/* 5. Service Charge */}
+                  <div className="bg-white border border-slate-200 rounded-lg p-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-extrabold text-slate-700">5. Service Chg</span>
+                      <button
+                        type="button"
+                        onClick={() => setEditedServiceChargeType(editedServiceChargeType === '₹' ? '%' : '₹')}
+                        className="text-[10px] font-black px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer shadow-2xs"
+                        title="Toggle Price (₹) or Percentage (%)"
+                      >
+                        {editedServiceChargeType}
+                      </button>
+                    </div>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      placeholder={`0 (${editedServiceChargeType})`}
+                      value={editedServiceChargeValue}
+                      onChange={(e) => setEditedServiceChargeValue(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 font-black text-slate-900 outline-none text-xs"
+                    />
+                    {editServiceAmount > 0 && (
+                      <span className="text-[10px] font-black text-blue-600 mt-0.5 block truncate">
+                        +₹{editServiceAmount.toFixed(2)}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 

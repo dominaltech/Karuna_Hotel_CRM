@@ -40,11 +40,15 @@ import {
   Calendar,
   X,
   Edit3,
-  QrCode
+  QrCode,
+  Package,
+  CheckCircle,
+  Sliders
 } from 'lucide-react';
 import { db, getDishPriceForSection } from '../db/db';
 import { exportFoodItemsToCSV, parseCSVAndValidateRates } from '../utils/excelUtils';
 import { printThermalReceipt } from '../utils/receiptUtils';
+import { generateRevenuePDFReport } from '../utils/pdfUtils';
 import { AVAILABLE_COUNTERS } from './Header';
 
 export default function OwnerAdmin({
@@ -67,7 +71,9 @@ export default function OwnerAdmin({
   onDeleteTable,
   onBulkUpdatePrices,
   onUpdateSettledBill,
-  printLanguage = 'mr'
+  printLanguage = 'mr',
+  stockMode: propStockMode,
+  onUpdateStockMode
 }) {
   const sortSectionsWithParcelsLast = (secArray) => {
     if (!Array.isArray(secArray)) return [];
@@ -115,6 +121,42 @@ export default function OwnerAdmin({
   const [payeeName, setPayeeName] = useState(localStorage.getItem('karuna_payee_name') || 'Karuna Hotel');
   const [upiSavedToast, setUpiSavedToast] = useState(false);
 
+  // Stock Master Operating Mode State
+  const [selectedStockMode, setSelectedStockMode] = useState(
+    propStockMode || localStorage.getItem('karuna_stock_mode') || 'item_wise'
+  );
+  const [stockModeSavedToast, setStockModeSavedToast] = useState(false);
+
+  useEffect(() => {
+    if (propStockMode) {
+      setSelectedStockMode(propStockMode);
+    }
+  }, [propStockMode]);
+
+  const handleSaveStockMode = async (modeToSave) => {
+    const finalMode = modeToSave || selectedStockMode;
+    if (selectedStockMode && modeToSave && modeToSave !== selectedStockMode) {
+      const modeLabel = modeToSave === 'item_wise' ? 'Option 1 (Item & Recipe-Wise)' : 'Option 2 (Raw Material-Wise Only)';
+      if (!window.confirm(`Are you sure you want to change the Stock Master Operating Mode to ${modeLabel}? Once saved, this mode is permanently remembered.`)) {
+        return;
+      }
+    }
+    setSelectedStockMode(finalMode);
+    localStorage.setItem('karuna_stock_mode', finalMode);
+    if (typeof onUpdateStockMode === 'function') {
+      await onUpdateStockMode(finalMode);
+    }
+    try {
+      await db.systemSettings.put({
+        id: 1,
+        stockMode: finalMode,
+        lastSyncTime: new Date().toISOString()
+      });
+    } catch (e) {}
+    setStockModeSavedToast(true);
+    setTimeout(() => setStockModeSavedToast(false), 3500);
+  };
+
   // Backup & Import Feedback State
   const [bulkRatesMessage, setBulkRatesMessage] = useState(null);
   const [jsonRestoreMessage, setJsonRestoreMessage] = useState(null);
@@ -159,7 +201,8 @@ export default function OwnerAdmin({
   };
 
   // History Tab Filters & Modal State (Requirement 11)
-  const [historyTimeFilter, setHistoryTimeFilter] = useState('today'); // 'today' | 'all'
+  const [historyTimeFilter, setHistoryTimeFilter] = useState('all'); // 'all' | 'date'
+  const [historySelectedDate, setHistorySelectedDate] = useState('');
   const [historyCounterFilter, setHistoryCounterFilter] = useState('all');
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [historySelectedBill, setHistorySelectedBill] = useState(null);
@@ -393,12 +436,16 @@ export default function OwnerAdmin({
     return dishes.filter((d) => d.subCategoryId === subCatId).length;
   };
 
-  // Filter Bills for History Tab (Requirement 11)
-  const todayStr = new Date().toISOString().slice(0, 10);
+  // Filter Bills for History Tab (Requirement 8: Date-Wise / All Time)
   const baseTimeBills = bills.filter((b) => {
-    if (historyTimeFilter === 'all') return true;
-    if (!b.createdAt) return true;
-    return new Date(b.createdAt).toISOString().slice(0, 10) === todayStr;
+    if (historyTimeFilter === 'all' || !historySelectedDate) return true;
+    if (!b.createdAt) return false;
+    const bDate = new Date(b.createdAt);
+    const year = bDate.getFullYear();
+    const month = String(bDate.getMonth() + 1).padStart(2, '0');
+    const day = String(bDate.getDate()).padStart(2, '0');
+    const localDateStr = `${year}-${month}-${day}`;
+    return localDateStr === historySelectedDate;
   });
 
   const baseCounterBills = baseTimeBills.filter((b) => {
@@ -423,7 +470,20 @@ export default function OwnerAdmin({
   let totalOnline = 0;
   let totalCard = 0;
 
+  let totalDiscounts = 0;
+  let totalDelivery = 0;
+  let totalContainer = 0;
+  let totalWaiterTips = 0;
+  let totalServiceCharges = 0;
+
   baseCounterBills.forEach((b) => {
+    const disc = parseFloat(b.discountAmount) || (typeof b.discount === 'number' ? b.discount : (parseFloat(b.discount?.amount || b.discount?.value) || 0));
+    totalDiscounts += disc;
+    totalDelivery += parseFloat(b.deliveryCharge) || 0;
+    totalContainer += parseFloat(b.containerCharge) || 0;
+    totalWaiterTips += parseFloat(b.waiterTip) || 0;
+    totalServiceCharges += parseFloat(b.serviceCharge) || 0;
+
     if (b.paymentDetails) {
       if (b.paymentDetails.cash) totalCash += parseFloat(b.paymentDetails.cash) || 0;
       if (b.paymentDetails.online || b.paymentDetails.upi) totalOnline += parseFloat(b.paymentDetails.online || b.paymentDetails.upi) || 0;
@@ -511,6 +571,18 @@ export default function OwnerAdmin({
           >
             <Layers className="w-3.5 h-3.5" />
             <span>Area Rates Matrix</span>
+          </button>
+
+          <button
+            onClick={() => setActiveAdminSubTab('stock_settings')}
+            className={`px-3.5 py-2 rounded-lg font-black text-xs transition-all cursor-pointer flex items-center space-x-1.5 ${
+              activeAdminSubTab === 'stock_settings'
+                ? 'bg-neutral-900 text-white shadow-xs'
+                : 'text-stone-600 hover:bg-stone-100'
+            }`}
+          >
+            <Package className="w-3.5 h-3.5 text-amber-500" />
+            <span>Stock Master Mode</span>
           </button>
 
           <button
@@ -876,30 +948,81 @@ export default function OwnerAdmin({
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              {/* Today vs All Time */}
-              <div className="flex items-center bg-white border border-slate-300 rounded-xl p-1 shadow-2xs">
-                <button
-                  onClick={() => setHistoryTimeFilter('today')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center space-x-1.5 ${
-                    historyTimeFilter === 'today'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-700 hover:text-black'
-                  }`}
-                >
-                  <Calendar className="w-3.5 h-3.5" />
-                  <span>Today</span>
-                </button>
+              {/* Calendar Date-Wise Picker & All Time Button */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center space-x-1.5 bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 shadow-2xs">
+                  <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
+                  <input
+                    type="date"
+                    value={historySelectedDate}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setHistorySelectedDate(val);
+                      setHistoryTimeFilter(val ? 'date' : 'all');
+                    }}
+                    className="text-xs font-black text-slate-800 bg-transparent outline-none cursor-pointer"
+                    title="Filter revenue by specific date"
+                  />
+                  {historySelectedDate && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHistorySelectedDate('');
+                        setHistoryTimeFilter('all');
+                      }}
+                      className="text-slate-400 hover:text-slate-700 text-xs font-black px-1 rounded cursor-pointer"
+                      title="Clear date (Show All Time)"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
 
                 <button
-                  onClick={() => setHistoryTimeFilter('all')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center space-x-1.5 ${
-                    historyTimeFilter === 'all'
+                  type="button"
+                  onClick={() => {
+                    setHistorySelectedDate('');
+                    setHistoryTimeFilter('all');
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center space-x-1.5 ${
+                    historyTimeFilter === 'all' && !historySelectedDate
                       ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-700 hover:text-black'
+                      : 'bg-white border border-slate-300 text-slate-700 hover:text-black hover:bg-slate-50 shadow-2xs'
                   }`}
+                  title="Show all time cumulative revenue"
                 >
                   <History className="w-3.5 h-3.5" />
                   <span>All Time</span>
+                </button>
+
+                {/* Download Revenue PDF Button (Requirement 8) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    generateRevenuePDFReport({
+                      bills: displayedHistoryBills,
+                      metrics: {
+                        totalRevenue: totalHistoryRevenue,
+                        totalBills: baseCounterBills.length,
+                        cashTotal: totalCash,
+                        onlineTotal: totalOnline,
+                        cardTotal: totalCard,
+                        totalDiscounts,
+                        totalDelivery,
+                        totalContainer,
+                        totalWaiterTips,
+                        totalServiceCharges
+                      },
+                      dateFilterLabel: historySelectedDate ? `Date: ${historySelectedDate}` : 'All Time',
+                      counterFilterLabel: historyCounterFilter === 'all' ? 'All Counters' : historyCounterFilter,
+                      selectedDate: historySelectedDate || null
+                    });
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                  title="Download and print full PDF Revenue Report"
+                >
+                  <Download className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Download Revenue PDF</span>
                 </button>
               </div>
 
@@ -934,50 +1057,72 @@ export default function OwnerAdmin({
             </div>
           </div>
 
-          {/* ALL SUMMARY METRIC BOXES (Requirement 11) */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
+          {/* ALL SUMMARY METRIC BOXES WITH CHARGES (Requirement 8, 9 & 11) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+            <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-xs">
               <div className="flex items-center justify-between text-slate-400 mb-1">
                 <span className="text-[10px] font-black uppercase tracking-wider">Total Sales</span>
                 <TrendingUp className="w-4 h-4 text-blue-600" />
               </div>
-              <div className="text-xl font-black text-neutral-900">₹{totalHistoryRevenue.toFixed(2)}</div>
+              <div className="text-lg font-black text-neutral-900">₹{totalHistoryRevenue.toFixed(2)}</div>
               <div className="text-[10px] font-bold text-stone-500 mt-1">{baseCounterBills.length} Bills Total</div>
             </div>
 
-            <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-xs">
+            <div className="bg-white border border-stone-200 rounded-2xl p-3.5 shadow-xs">
               <div className="flex items-center justify-between text-stone-400 mb-1">
                 <span className="text-[10px] font-black uppercase tracking-wider">Cash Total</span>
                 <Banknote className="w-4 h-4 text-emerald-600" />
               </div>
-              <div className="text-xl font-black text-emerald-800">₹{totalCash.toFixed(2)}</div>
+              <div className="text-lg font-black text-emerald-800">₹{totalCash.toFixed(2)}</div>
               <div className="text-[10px] font-bold text-stone-500 mt-1">Direct Cash Drawer</div>
             </div>
 
-            <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-xs">
+            <div className="bg-white border border-stone-200 rounded-2xl p-3.5 shadow-xs">
               <div className="flex items-center justify-between text-stone-400 mb-1">
                 <span className="text-[10px] font-black uppercase tracking-wider">Online / UPI</span>
                 <Smartphone className="w-4 h-4 text-blue-600" />
               </div>
-              <div className="text-xl font-black text-blue-800">₹{totalOnline.toFixed(2)}</div>
+              <div className="text-lg font-black text-blue-800">₹{totalOnline.toFixed(2)}</div>
               <div className="text-[10px] font-bold text-stone-500 mt-1">QR Phone Payments</div>
             </div>
 
-            <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-xs">
+            <div className="bg-white border border-stone-200 rounded-2xl p-3.5 shadow-xs">
               <div className="flex items-center justify-between text-stone-400 mb-1">
                 <span className="text-[10px] font-black uppercase tracking-wider">Card Total</span>
                 <CreditCard className="w-4 h-4 text-purple-600" />
               </div>
-              <div className="text-xl font-black text-purple-800">₹{totalCard.toFixed(2)}</div>
+              <div className="text-lg font-black text-purple-800">₹{totalCard.toFixed(2)}</div>
               <div className="text-[10px] font-bold text-stone-500 mt-1">POS Card Swipes</div>
             </div>
 
-            <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-xs">
+            <div className="bg-white border border-rose-200 rounded-2xl p-3.5 shadow-xs">
+              <div className="flex items-center justify-between text-rose-400 mb-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-rose-700">Discounts</span>
+                <Tag className="w-4 h-4 text-rose-600" />
+              </div>
+              <div className="text-lg font-black text-rose-700">₹{totalDiscounts.toFixed(2)}</div>
+              <div className="text-[10px] font-bold text-rose-500 mt-1">Total Concessions</div>
+            </div>
+
+            <div className="bg-white border border-amber-200 rounded-2xl p-3.5 shadow-xs">
+              <div className="flex items-center justify-between text-amber-500 mb-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-800">Extra Charges</span>
+                <Layers className="w-4 h-4 text-amber-600" />
+              </div>
+              <div className="text-lg font-black text-amber-800">
+                ₹{(totalDelivery + totalContainer + totalWaiterTips + totalServiceCharges).toFixed(2)}
+              </div>
+              <div className="text-[9px] font-bold text-stone-500 mt-1 truncate" title={`Del: ₹${totalDelivery} | Cont: ₹${totalContainer} | Tip: ₹${totalWaiterTips} | Serv: ₹${totalServiceCharges}`}>
+                Del: ₹{totalDelivery.toFixed(0)} • Cont: ₹{totalContainer.toFixed(0)} • Tip: ₹{totalWaiterTips.toFixed(0)}
+              </div>
+            </div>
+
+            <div className="bg-white border border-stone-200 rounded-2xl p-3.5 shadow-xs">
               <div className="flex items-center justify-between text-stone-400 mb-1">
                 <span className="text-[10px] font-black uppercase tracking-wider">Settled Count</span>
                 <Receipt className="w-4 h-4 text-neutral-800" />
               </div>
-              <div className="text-xl font-black text-neutral-900">{displayedHistoryBills.length}</div>
+              <div className="text-lg font-black text-neutral-900">{displayedHistoryBills.length}</div>
               <div className="text-[10px] font-bold text-stone-500 mt-1">Active Filter View</div>
             </div>
           </div>
@@ -1070,8 +1215,53 @@ export default function OwnerAdmin({
                             <div>{formattedDate}</div>
                             <div className="text-[10px] text-stone-400">{formattedTime}</div>
                           </td>
-                          <td className="py-3 px-4 text-right font-black text-neutral-900">
-                            ₹{(bill.total || 0).toFixed(2)}
+                          <td className="py-3 px-4 text-right">
+                            <div className="font-black text-sm text-neutral-900">
+                              ₹{(bill.total !== undefined ? bill.total : (bill.finalTotal || 0)).toFixed(2)}
+                            </div>
+                            {(() => {
+                              const bDisc = parseFloat(bill.discountAmount) || (typeof bill.discount === 'number' ? bill.discount : (parseFloat(bill.discount?.amount || bill.discount?.value) || 0));
+                              const bDel = parseFloat(bill.deliveryCharge) || 0;
+                              const bCont = parseFloat(bill.containerCharge) || 0;
+                              const bTip = parseFloat(bill.waiterTip) || 0;
+                              const bServ = parseFloat(bill.serviceCharge) || 0;
+                              const hasAny = bDisc > 0 || bDel > 0 || bCont > 0 || bTip > 0 || bServ > 0;
+                              if (!hasAny) return null;
+                              return (
+                                <div className="flex flex-wrap justify-end gap-1 mt-1 max-w-[210px] ml-auto">
+                                  {bDisc > 0 && (
+                                    <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                                      Disc -₹{bDisc.toFixed(2)}
+                                    </span>
+                                  )}
+                                  {bDel > 0 && (
+                                    <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                                      Del +₹{bDel.toFixed(2)}
+                                    </span>
+                                  )}
+                                  {bCont > 0 && (
+                                    <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                                      Cont +₹{bCont.toFixed(2)}
+                                    </span>
+                                  )}
+                                  {bTip > 0 && (
+                                    <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      Tip +₹{bTip.toFixed(2)}
+                                    </span>
+                                  )}
+                                  {bServ > 0 && (
+                                    <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                      Serv +₹{bServ.toFixed(2)}
+                                    </span>
+                                  )}
+                                  {bill.subtotal !== undefined && bill.subtotal !== bill.total && (
+                                    <span className="text-[10px] font-bold text-stone-400 block w-full text-right">
+                                      Subtotal: ₹{Number(bill.subtotal).toFixed(2)}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className="py-3 px-4 text-center">
                             <div className="flex items-center justify-center space-x-1.5">
@@ -1426,8 +1616,15 @@ export default function OwnerAdmin({
                   {dishes.map((dish) => (
                     <tr key={`matrix-d-${dish.id}`} className="hover:bg-blue-50/20">
                       <td className="py-3 px-4 font-mono font-bold">#{dish.srNo || dish.id}</td>
-                      <td className="py-3 px-4 font-extrabold text-slate-900">{dish.name}</td>
-                      <td className="py-3 px-4 font-bold text-blue-600">₹{dish.price}</td>
+                      <td className="py-3 px-4">
+                        <div className="font-extrabold text-slate-900 text-xs sm:text-sm">{dish.name}</div>
+                        {dish.marathiName && (
+                          <div className="text-xs font-black text-blue-900 mt-0.5">
+                            {dish.marathiName}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 font-black text-blue-600">₹{dish.price}</td>
                       {sections.map((sec) => (
                         <td key={`matrix-input-${dish.id}-${sec.id}`} className="py-3 px-4 text-center">
                           <input
@@ -1444,7 +1641,18 @@ export default function OwnerAdmin({
                                 }
                               });
                             }}
-                            className="w-20 bg-slate-50 border border-slate-300 rounded-lg p-1 text-center font-bold outline-none"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const allInputs = Array.from(document.querySelectorAll('.matrix-rate-input'));
+                                const currentIndex = allInputs.indexOf(e.target);
+                                if (currentIndex !== -1 && currentIndex + 1 < allInputs.length) {
+                                  allInputs[currentIndex + 1].focus();
+                                  allInputs[currentIndex + 1].select();
+                                }
+                              }
+                            }}
+                            className="matrix-rate-input w-20 bg-slate-50 border border-slate-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-500 rounded-lg p-1.5 text-center font-black outline-none text-xs transition-all"
                           />
                         </td>
                       ))}
@@ -1520,6 +1728,243 @@ export default function OwnerAdmin({
               </div>
             </div>
           )}
+
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-TAB: STOCK MASTER MODE SELECTION                                     */}
+      {/* ========================================================================= */}
+      {activeAdminSubTab === 'stock_settings' && (
+        <div className="space-y-6 animate-in fade-in duration-150">
+          
+          {/* Toast Notification */}
+          {stockModeSavedToast && (
+            <div className="bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center space-x-2 text-xs font-black animate-in slide-in-from-top-2 duration-200">
+              <CheckCircle className="w-4 h-4 text-white" />
+              <span>
+                ✓ Stock Master mode saved to {selectedStockMode === 'item_wise' ? 'Item-Wise (आयटम व प्रमाण)' : 'Raw Material-Wise (फक्त कच्चा माल)'}! Stock Master tab is now configured.
+              </span>
+            </div>
+          )}
+
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs max-w-4xl space-y-6">
+            
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-3 bg-blue-100 text-blue-700 rounded-2xl">
+                  <Package className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight">
+                    Stock Master Operating Mode (स्टॉक मॅनेजमेंट पद्धत निवड)
+                  </h3>
+                  <p className="text-xs text-slate-500 font-semibold mt-0.5">
+                    Choose which stock tracking logic is used in the <strong>Stock Master</strong> tab. The user will strictly be limited to the mode selected here.
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                  Currently Active
+                </span>
+                <span className={`text-xs font-black px-3 py-1 rounded-full border inline-block mt-0.5 ${
+                  selectedStockMode === 'raw_material_wise'
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                    : 'bg-blue-100 text-blue-800 border-blue-300'
+                }`}>
+                  {selectedStockMode === 'raw_material_wise' ? '📦 Raw Material-Wise Only' : '🍽️ Item & Recipe-Wise'}
+                </span>
+              </div>
+            </div>
+
+            {/* Instruction Warning / Info */}
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center space-x-3 text-xs text-emerald-950 font-semibold">
+              <Lock className="w-5 h-5 text-emerald-600 shrink-0" />
+              <span>
+                <strong>Permanent Stock Mode Retention:</strong> Once set, your chosen stock management method stays active across app reopens, page refreshes, and computer restarts. Stock Master tab operates strictly in this selected mode.
+              </span>
+            </div>
+
+            {/* 2 Mode Selection Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              
+              {/* Card 1: Item-Wise Mode */}
+              <div
+                onClick={() => handleSaveStockMode('item_wise')}
+                className={`border-2 rounded-3xl p-5 cursor-pointer transition-all duration-200 flex flex-col justify-between relative group ${
+                  selectedStockMode === 'item_wise'
+                    ? 'border-blue-600 bg-blue-50/50 shadow-lg ring-2 ring-blue-600/30'
+                    : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50/50 bg-white'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className={`text-xs font-black px-2.5 py-1 rounded-lg border ${
+                      selectedStockMode === 'item_wise'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                        : 'bg-blue-50 text-blue-800 border-blue-200'
+                    }`}>
+                      Option 1 (आयटम व रेसिपी)
+                    </span>
+                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                      selectedStockMode === 'item_wise'
+                        ? 'border-blue-600 bg-blue-600 text-white ring-2 ring-blue-300'
+                        : 'border-slate-300 bg-slate-100'
+                    }`}>
+                      {selectedStockMode === 'item_wise' ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <span className="text-[10px] text-slate-400 font-bold">1</span>}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2.5 mb-2">
+                    <Utensils className="w-5 h-5 text-blue-600" />
+                    <h4 className="font-black text-base text-slate-900">
+                      Item-Wise Stock (आयटम व रेसिपीनुसार)
+                    </h4>
+                  </div>
+                  <p className="text-xs text-slate-500 font-medium leading-relaxed mb-4">
+                    Track stock for finished food items with portion ratios and multi-ingredient recipe deduction.
+                  </p>
+
+                  <ul className="space-y-2 text-xs font-semibold text-slate-700 border-t border-slate-200/60 pt-3">
+                    <li className="flex items-center space-x-2">
+                      <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span>Set measurement base (Kg, Litre, Plate) per dish</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span>Link multiple raw materials per portion</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span>View &amp; adjust remaining dish quantities</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span>Automatically deducts recipe batch on billing</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="mt-5 pt-3 border-t border-slate-200/60 space-y-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSaveStockMode('item_wise');
+                    }}
+                    className={`w-full py-2.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center justify-center space-x-1.5 shadow-sm ${
+                      selectedStockMode === 'item_wise'
+                        ? 'bg-blue-600 text-white shadow-blue-600/30 ring-2 ring-blue-400'
+                        : 'bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700'
+                    }`}
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>{selectedStockMode === 'item_wise' ? '✓ Currently Active (सक्रिय)' : 'Click to Set Option 1'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 2: Raw Material-Wise Mode */}
+              <div
+                onClick={() => handleSaveStockMode('raw_material_wise')}
+                className={`border-2 rounded-3xl p-5 cursor-pointer transition-all duration-200 flex flex-col justify-between relative group ${
+                  selectedStockMode === 'raw_material_wise'
+                    ? 'border-emerald-600 bg-emerald-50/50 shadow-lg ring-2 ring-emerald-600/30'
+                    : 'border-slate-200 hover:border-emerald-300 hover:bg-slate-50/50 bg-white'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className={`text-xs font-black px-2.5 py-1 rounded-lg border ${
+                      selectedStockMode === 'raw_material_wise'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                        : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    }`}>
+                      Option 2 (फक्त कच्चा माल)
+                    </span>
+                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                      selectedStockMode === 'raw_material_wise'
+                        ? 'border-emerald-600 bg-emerald-600 text-white ring-2 ring-emerald-300'
+                        : 'border-slate-300 bg-slate-100'
+                    }`}>
+                      {selectedStockMode === 'raw_material_wise' ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <span className="text-[10px] text-slate-400 font-bold">2</span>}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2.5 mb-2">
+                    <Package className="w-5 h-5 text-emerald-600" />
+                    <h4 className="font-black text-base text-slate-900">
+                      Raw Material-Wise Only (फक्त कच्चा माल)
+                    </h4>
+                  </div>
+                  <p className="text-xs text-slate-500 font-medium leading-relaxed mb-4">
+                    Pure raw material stock management. Enter incoming supplies and add/update remaining stock with visible available quantities.
+                  </p>
+
+                  <ul className="space-y-2 text-xs font-semibold text-slate-700 border-t border-slate-200/60 pt-3">
+                    <li className="flex items-center space-x-2">
+                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Enter incoming raw materials as they arrive (आलेला माल)</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>See current available quantity clearly when adding remaining stock</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Track total received vs available vs consumed</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>No dish recipe configuration needed; direct kitchen stock</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="mt-5 pt-3 border-t border-slate-200/60 space-y-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSaveStockMode('raw_material_wise');
+                    }}
+                    className={`w-full py-2.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center justify-center space-x-1.5 shadow-sm ${
+                      selectedStockMode === 'raw_material_wise'
+                        ? 'bg-emerald-600 text-white shadow-emerald-600/30 ring-2 ring-emerald-400'
+                        : 'bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-700'
+                    }`}
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>{selectedStockMode === 'raw_material_wise' ? '✓ Currently Active (सक्रिय)' : 'Click to Set Option 2'}</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100">
+              <div className="text-xs text-slate-500 font-semibold">
+                Selected Mode:{' '}
+                <strong className="text-slate-900">
+                  {selectedStockMode === 'item_wise' ? 'Item & Recipe-Wise' : 'Raw Material-Wise Only'}
+                </strong>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleSaveStockMode(selectedStockMode)}
+                className="bg-neutral-900 hover:bg-black text-white font-black text-xs px-6 py-3 rounded-2xl shadow-md cursor-pointer transition-all flex items-center space-x-2 hover:scale-102"
+              >
+                <Save className="w-4 h-4 text-emerald-400" />
+                <span>Save Stock Master Mode (स्टॉक पद्धत सेव्ह करा)</span>
+              </button>
+            </div>
+
+          </div>
 
         </div>
       )}

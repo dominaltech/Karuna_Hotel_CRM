@@ -40,7 +40,8 @@ export const DEFAULT_INITIAL_DATA = {
     { id: 1, name: 'Dine In Area', extraCharge: 0, color: 'blue' },
     { id: 2, name: 'First Floor', extraCharge: 0, color: 'emerald' },
     { id: 3, name: 'AC Hall', extraCharge: 0, color: 'purple' },
-    { id: 4, name: 'Parcels', extraCharge: 0, color: 'amber' }
+    { id: 4, name: 'Parcels', extraCharge: 0, color: 'amber' },
+    { id: 5, name: 'Sweets', extraCharge: 0, color: 'rose' }
   ],
   dishes: [
     { id: 1, srNo: 101, name: 'Single Idli Vada', marathiName: 'सिंगल इडली वडा', categoryId: 1, subCategoryId: 1, price: 50, stockQty: 30, hasMultiplePrices: false, variants: [], sectionPrices: { 1: 50, 2: 50, 3: 60, 4: 50 }, counter: 'Breakfast', status: 'In Stock', subItems: [{ name: 'Chutney', qty: '1' }, { name: 'Sambar', qty: '1' }] },
@@ -204,22 +205,17 @@ export const DEFAULT_INITIAL_DATA = {
     { id: 16, name: 'AC2', sectionId: 3, status: 'empty', currentCart: [], currentTokenNo: '1016', isSplit: false, createdAt: null },
     { id: 17, name: 'AC3', sectionId: 3, status: 'empty', currentCart: [], currentTokenNo: '1017', isSplit: false, createdAt: null },
     { id: 18, name: 'AC4', sectionId: 3, status: 'empty', currentCart: [], currentTokenNo: '1018', isSplit: false, createdAt: null },
-    { id: 19, name: 'AC5', sectionId: 3, status: 'empty', currentCart: [], currentTokenNo: '1019', isSplit: false, createdAt: null },
-
-    { id: 20, name: 'P1', sectionId: 4, status: 'empty', currentCart: [], currentTokenNo: '1020', isSplit: false, createdAt: null },
-    { id: 21, name: 'P2', sectionId: 4, status: 'empty', currentCart: [], currentTokenNo: '1021', isSplit: false, createdAt: null },
-    { id: 22, name: 'P3', sectionId: 4, status: 'empty', currentCart: [], currentTokenNo: '1022', isSplit: false, createdAt: null },
-    { id: 23, name: 'P4', sectionId: 4, status: 'empty', currentCart: [], currentTokenNo: '1023', isSplit: false, createdAt: null }
+    { id: 19, name: 'AC5', sectionId: 3, status: 'empty', currentCart: [], currentTokenNo: '1019', isSplit: false, createdAt: null }
   ],
   bills: [],
   billLogs: [],
   rawMaterials: [
-    { id: 1, name: 'Milk', quantity: 50, minThreshold: 10, unit: 'Kg' },
-    { id: 2, name: 'Sugar', quantity: 30, minThreshold: 5, unit: 'Kg' },
-    { id: 3, name: 'Rice Batter', quantity: 20, minThreshold: 5, unit: 'Kg' },
-    { id: 4, name: 'Paneer', quantity: 15, minThreshold: 4, unit: 'Kg' },
-    { id: 5, name: 'Cashew (Kaju)', quantity: 25, minThreshold: 5, unit: 'Kg' },
-    { id: 6, name: 'Mawa / Khoya', quantity: 18, minThreshold: 4, unit: 'Kg' }
+    { id: 1, name: 'Milk', quantity: 50, inwardQty: 50, minThreshold: 10, unit: 'Kg' },
+    { id: 2, name: 'Sugar', quantity: 30, inwardQty: 30, minThreshold: 5, unit: 'Kg' },
+    { id: 3, name: 'Rice Batter', quantity: 20, inwardQty: 20, minThreshold: 5, unit: 'Kg' },
+    { id: 4, name: 'Paneer', quantity: 15, inwardQty: 15, minThreshold: 4, unit: 'Kg' },
+    { id: 5, name: 'Cashew (Kaju)', quantity: 25, inwardQty: 25, minThreshold: 5, unit: 'Kg' },
+    { id: 6, name: 'Mawa / Khoya', quantity: 18, inwardQty: 18, minThreshold: 4, unit: 'Kg' }
   ],
   recipes: [
     { id: 1, dishId: 1, rawMaterialId: 3, qtyRequired: 0.2 },
@@ -232,6 +228,7 @@ export const DEFAULT_INITIAL_DATA = {
     hotelName: 'Karuna Hotel',
     location: 'Solapur',
     phone: '8446091809',
+    stockMode: typeof window !== 'undefined' ? (localStorage.getItem('karuna_stock_mode') || 'raw_material_wise') : 'raw_material_wise',
     lastSyncTime: new Date().toISOString()
   }
 };
@@ -597,12 +594,33 @@ export function initWebSocketSync(forceReconnect = false) {
 // Handle real-time broadcasts from Master Server
 function handleServerBroadcast(msg) {
   if (!msg || typeof msg !== 'object') return;
-  const { type, collection, data, id, bill, rawMaterials, recipes, dishes, updatedTable, deletedTableId } = msg;
+  const {
+    type,
+    collection,
+    data,
+    id,
+    bill,
+    rawMaterials,
+    recipes,
+    dishes,
+    updatedTable,
+    deletedTableId,
+    deletedTableIds,
+    diningTables: syncTables,
+    syncedBills,
+    terminals
+  } = msg;
   const targetId = id !== undefined ? id : (data?.id !== undefined ? data.id : null);
 
   switch (type) {
     case 'INSERT':
-    case 'UPDATE':
+    case 'UPDATE': {
+      if (collection === 'systemSettings' && data) {
+        dbCache.systemSettings = { ...(dbCache.systemSettings || {}), ...data };
+        notifyListeners(type, { collection, data: dbCache.systemSettings });
+        localDb.systemSettings?.put(dbCache.systemSettings).catch(() => {});
+        break;
+      }
       if (dbCache[collection] && data) {
         let idx = dbCache[collection].findIndex((i) => i && String(i.id) === String(data.id));
         if (idx === -1 && collection === 'diningTables' && data.name) {
@@ -620,8 +638,9 @@ function handleServerBroadcast(msg) {
         localDb[collection]?.put(data).catch(() => {});
       }
       break;
+    }
 
-    case 'DELETE':
+    case 'DELETE': {
       if (dbCache[collection] && targetId !== null) {
         dbCache[collection] = dbCache[collection].filter((i) => {
           if (!i) return false;
@@ -633,9 +652,9 @@ function handleServerBroadcast(msg) {
         localDb[collection]?.delete(targetId).catch(() => {});
       }
       break;
+    }
 
-    case 'BILL_SETTLED':
-      const { bill, rawMaterials, recipes, dishes, updatedTable, deletedTableId, deletedTableIds, diningTables: syncTables } = msg;
+    case 'BILL_SETTLED': {
       if (bill && dbCache.bills) {
         const bIdx = dbCache.bills.findIndex((b) => b && String(b.id) === String(bill.id));
         if (bIdx === -1) dbCache.bills.unshift(bill);
@@ -681,18 +700,28 @@ function handleServerBroadcast(msg) {
         dbCache.diningTables = ensureDefaultDiningTables(dbCache.diningTables);
       }
 
-      notifyListeners('BILL_SETTLED', { bill, rawMaterials, recipes: dbCache.recipes, dishes, updatedTable, deletedTableId, deletedTableIds, diningTables: dbCache.diningTables });
+      notifyListeners('BILL_SETTLED', {
+        bill,
+        rawMaterials,
+        recipes: dbCache.recipes,
+        dishes,
+        updatedTable,
+        deletedTableId,
+        deletedTableIds,
+        diningTables: dbCache.diningTables
+      });
       break;
+    }
 
-    case 'OFFLINE_BILLS_SYNCED':
+    case 'OFFLINE_BILLS_SYNCED': {
       if (rawMaterials && dbCache.rawMaterials) dbCache.rawMaterials = rawMaterials;
       if (recipes && dbCache.recipes) {
         dbCache.recipes = cleanAndDeduplicateRecipes(recipes);
         localDb.recipes?.bulkPut(dbCache.recipes).catch(() => {});
       }
       if (dishes && dbCache.dishes) dbCache.dishes = dishes;
-      if (Array.isArray(msg.syncedBills)) {
-        msg.syncedBills.forEach((b) => {
+      if (Array.isArray(syncedBills || msg.syncedBills)) {
+        (syncedBills || msg.syncedBills).forEach((b) => {
           const idx = dbCache.bills.findIndex((x) => String(x.id) === String(b.id));
           if (idx === -1) dbCache.bills.unshift(b);
           localDb.bills.put(b).catch(() => {});
@@ -700,8 +729,9 @@ function handleServerBroadcast(msg) {
       }
       notifyListeners('OFFLINE_BILLS_SYNCED', msg);
       break;
+    }
 
-    case 'RELOAD_COLLECTION':
+    case 'RELOAD_COLLECTION': {
       if (dbCache[collection] && Array.isArray(data)) {
         dbCache[collection] = data;
         if (localDb[collection]) {
@@ -712,8 +742,9 @@ function handleServerBroadcast(msg) {
         notifyListeners('RELOAD_COLLECTION', { collection, data });
       }
       break;
+    }
 
-    case 'FULL_RESTORE':
+    case 'FULL_RESTORE': {
       if (data && typeof data === 'object') {
         const actualData = (data.data && typeof data.data === 'object' && !Array.isArray(data.data))
           ? data.data
@@ -739,10 +770,12 @@ function handleServerBroadcast(msg) {
         notifyListeners('FULL_RESTORE', { data: { ...dbCache } });
       }
       break;
+    }
 
-    case 'TERMINAL_ROSTER_UPDATE':
-      notifyListeners('TERMINAL_ROSTER_UPDATE', msg.terminals);
+    case 'TERMINAL_ROSTER_UPDATE': {
+      notifyListeners('TERMINAL_ROSTER_UPDATE', terminals || msg.terminals);
       break;
+    }
 
     default:
       break;
@@ -773,6 +806,20 @@ export async function fetchAllDataFromServer() {
         }
       });
 
+      // Crucial fix: Also copy systemSettings (object) to dbCache and Dexie, and sync localStorage
+      if (json.data.systemSettings) {
+        dbCache.systemSettings = {
+          ...(dbCache.systemSettings || {}),
+          ...json.data.systemSettings
+        };
+        if (json.data.systemSettings.stockMode) {
+          localStorage.setItem('karuna_stock_mode', json.data.systemSettings.stockMode);
+        }
+        if (localDb.systemSettings) {
+          localDb.systemSettings.put(dbCache.systemSettings).catch(() => {});
+        }
+      }
+
       // Always guarantee default dining tables exist
       dbCache.diningTables = ensureDefaultDiningTables(dbCache.diningTables || []);
 
@@ -794,6 +841,15 @@ async function loadLocalDexieFallback() {
         const items = await localDb[key].toArray();
         if (items && items.length > 0) {
           dbCache[key] = items;
+        }
+      }
+    }
+    if (localDb.systemSettings) {
+      const settings = await localDb.systemSettings.toArray();
+      if (settings && settings.length > 0) {
+        dbCache.systemSettings = settings[0];
+        if (settings[0].stockMode) {
+          localStorage.setItem('karuna_stock_mode', settings[0].stockMode);
         }
       }
     }
@@ -870,15 +926,24 @@ class CollectionClient {
   }
 
   async toArray() {
+    if (this.name === 'systemSettings') {
+      return dbCache.systemSettings ? [dbCache.systemSettings] : [];
+    }
     return dbCache[this.name] ? [...dbCache[this.name]] : [];
   }
 
   async get(id) {
+    if (this.name === 'systemSettings') {
+      return dbCache.systemSettings || null;
+    }
     if (!dbCache[this.name]) return null;
     return dbCache[this.name].find((item) => String(item.id) === String(id)) || null;
   }
 
   async count() {
+    if (this.name === 'systemSettings') {
+      return dbCache.systemSettings ? 1 : 0;
+    }
     return dbCache[this.name] ? dbCache[this.name].length : 0;
   }
 
@@ -974,7 +1039,41 @@ class CollectionClient {
   }
 
   async put(itemData) {
-    if (!itemData || !itemData.id) return null;
+    if (!itemData) return null;
+
+    if (this.name === 'systemSettings') {
+      dbCache.systemSettings = {
+        ...(dbCache.systemSettings || {}),
+        ...itemData
+      };
+      notifyListeners('UPDATE', { collection: 'systemSettings', data: dbCache.systemSettings });
+      localDb.systemSettings?.put(dbCache.systemSettings).catch(() => {});
+
+      if (wsClient && wsClient.readyState === WebSocket.OPEN) {
+        try {
+          wsClient.send(JSON.stringify({
+            type: 'CLIENT_UPDATE',
+            collection: 'systemSettings',
+            id: 1,
+            data: dbCache.systemSettings
+          }));
+        } catch (e) {}
+      }
+
+      try {
+        await fetch(`${getApiBase()}/systemSettings/1`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dbCache.systemSettings)
+        });
+      } catch (err) {
+        console.warn('Local put fallback for systemSettings:', err);
+      }
+
+      return 1;
+    }
+
+    if (!itemData.id) return null;
     if (!dbCache[this.name]) dbCache[this.name] = [];
 
     const idx = dbCache[this.name].findIndex((i) => String(i.id) === String(itemData.id));
@@ -1015,6 +1114,9 @@ class CollectionClient {
   }
 
   async update(id, updatedFields) {
+    if (this.name === 'systemSettings') {
+      return this.put({ id: id || 1, ...updatedFields });
+    }
     if (!dbCache[this.name]) dbCache[this.name] = [];
     let idx = dbCache[this.name].findIndex((i) => i && String(i.id) === String(id));
     if (idx === -1 && this.name === 'diningTables' && updatedFields?.name) {
@@ -1330,7 +1432,8 @@ export const db = {
       if (tIdx !== -1) {
         const t = dbCache.diningTables[tIdx];
         const isParcel = t.sectionId === 4 || (t.name && String(t.name).toUpperCase().startsWith('P')) || t.isParcel;
-        if (isParcel) {
+        const isSweet = t.sectionId === 5 || (t.name && String(t.name).toUpperCase().startsWith('S')) || t.isSweet;
+        if (isParcel || isSweet) {
           dbCache.diningTables.splice(tIdx, 1);
           localDb.diningTables.delete(t.id).catch(() => {});
         } else {
@@ -1635,4 +1738,39 @@ export function getDishPriceForSection(dish, sectionId) {
     }
   }
   return dish.price || 0;
+}
+
+// Helper to calculate sequential numbers for Parcels (P1..P99) and Sweets (S1..S99) cycling back to 1
+export function getNextSequentialNumber(prefix, activeTables = []) {
+  const normPrefix = String(prefix || 'P').toUpperCase();
+  const storageKey = normPrefix === 'P' ? 'karuna_last_parcel_no' : 'karuna_last_sweet_no';
+  let lastNo = 0;
+  try {
+    lastNo = parseInt(localStorage.getItem(storageKey), 10) || 0;
+  } catch (e) {
+    lastNo = 0;
+  }
+
+  const activeNumbers = new Set(
+    (activeTables || [])
+      .filter((t) => t && t.name && String(t.name).toUpperCase().startsWith(normPrefix))
+      .map((t) => {
+        const m = String(t.name).match(/\d+/);
+        return m ? parseInt(m[0], 10) : 0;
+      })
+      .filter((n) => n > 0)
+  );
+
+  let candidate = (lastNo % 99) + 1;
+  let attempts = 0;
+  while (activeNumbers.has(candidate) && attempts < 99) {
+    candidate = (candidate % 99) + 1;
+    attempts++;
+  }
+
+  try {
+    localStorage.setItem(storageKey, String(candidate));
+  } catch (e) {}
+
+  return candidate;
 }
