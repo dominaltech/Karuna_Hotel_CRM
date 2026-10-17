@@ -14,7 +14,8 @@ localDb.version(1).stores({
   rawMaterials: 'id, name',
   recipes: 'id, dishId',
   systemSettings: 'id',
-  offline_queue: 'id, invoiceNo, tokenNo, createdAt, counterId, synced'
+  offline_queue: 'id, invoiceNo, tokenNo, createdAt, counterId, synced',
+  preOrders: 'id, orderNo, customerName, customerPhone, deliveryDate, deliveryTime, status, createdAt'
 });
 
 // Full Default Initial Dataset
@@ -209,6 +210,7 @@ export const DEFAULT_INITIAL_DATA = {
   ],
   bills: [],
   billLogs: [],
+  preOrders: [],
   rawMaterials: [
     { id: 1, name: 'Milk', quantity: 50, inwardQty: 50, minThreshold: 10, unit: 'Kg' },
     { id: 2, name: 'Sugar', quantity: 30, inwardQty: 30, minThreshold: 5, unit: 'Kg' },
@@ -835,7 +837,7 @@ export async function fetchAllDataFromServer() {
 // Load data from local Dexie when offline
 async function loadLocalDexieFallback() {
   try {
-    const collections = ['categories', 'subCategories', 'dishes', 'sections', 'diningTables', 'bills', 'rawMaterials', 'recipes'];
+    const collections = ['categories', 'subCategories', 'dishes', 'sections', 'diningTables', 'bills', 'preOrders', 'rawMaterials', 'recipes'];
     for (const key of collections) {
       if (localDb[key]) {
         const items = await localDb[key].toArray();
@@ -1271,6 +1273,75 @@ export function generateCounterInvoiceNo(counterName) {
   return `INV-${prefix}-${dateStr}-${seq}`;
 }
 
+export function generatePreOrderNumber() {
+  const now = new Date();
+  const dateStr = now.toISOString().slice(2, 10).replace(/-/g, '');
+  const storageKey = `karuna_seq_pre_${dateStr}`;
+  let seq = 1;
+  if (typeof localStorage !== 'undefined') {
+    seq = parseInt(localStorage.getItem(storageKey) || '0', 10) + 1;
+    localStorage.setItem(storageKey, String(seq));
+  } else {
+    seq = Math.floor(1 + Math.random() * 99);
+  }
+  return `PRE-${dateStr}-${String(seq).padStart(3, '0')}`;
+}
+
+export function checkPreOrderAlert(deliveryDateStr) {
+  if (!deliveryDateStr) return { diffDays: 999, isTomorrow: false, isToday: false, isOverdue: false, isUrgent: false };
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const todayStr = `${y}-${m}-${d}`;
+  
+  const [tY, tM, tD] = todayStr.split('-').map(Number);
+  const [dY, dM, dD] = String(deliveryDateStr).split('-').map(Number);
+  
+  const dateToday = new Date(tY, tM - 1, tD);
+  const dateDelivery = new Date(dY, dM - 1, dD);
+  
+  const diffMs = dateDelivery.getTime() - dateToday.getTime();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  
+  return {
+    diffDays,
+    isTomorrow: diffDays === 1,
+    isToday: diffDays === 0,
+    isOverdue: diffDays < 0,
+    isUrgent: diffDays === 1 || diffDays === 0 || diffDays < 0
+  };
+}
+
+export function playAlertChime() {
+  if (typeof window === 'undefined') return;
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+    osc.frequency.setValueAtTime(880.00, ctx.currentTime + 0.14);
+
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.55);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.55);
+  } catch (e) {
+    // audio context silent fallback
+  }
+}
+
 // Master Unified DB Object
 export const db = {
   categories: new CollectionClient('categories'),
@@ -1280,6 +1351,7 @@ export const db = {
   diningTables: new CollectionClient('diningTables'),
   bills: new CollectionClient('bills'),
   billLogs: new CollectionClient('billLogs'),
+  preOrders: new CollectionClient('preOrders'),
   rawMaterials: new CollectionClient('rawMaterials'),
   recipes: new CollectionClient('recipes'),
   systemSettings: new CollectionClient('systemSettings'),

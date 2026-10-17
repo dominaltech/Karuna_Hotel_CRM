@@ -20,8 +20,9 @@ import {
   Receipt
 } from 'lucide-react';
 import TableGrid, { getSectionTheme } from './TableGrid';
-import { printKOTReceipt, printThermalReceipt, formatItemQtyDisplay } from '../utils/receiptUtils';
+import { printKOTReceipt, printThermalReceipt, formatItemQtyDisplay, getPrintDishName } from '../utils/receiptUtils';
 import { db, getDishPriceForSection } from '../db/db';
+import QuantityInputModal from './QuantityInputModal';
 
 const formatTokenNumber = (token, table) => {
   if (token) return String(token).replace(/^#/, '');
@@ -89,6 +90,7 @@ export default function POSBilling({
   const [customKgInput, setCustomKgInput] = useState('');
   const [editingCartItemIndex, setEditingCartItemIndex] = useState(null); // in-place cart edit index
   const [isParcelMode, setIsParcelMode] = useState(false); // Toggle to add items as Parcel from top search bar
+  const [selectedDishForQty, setSelectedDishForQty] = useState(null); // Dish opened in QuantityInputModal
 
   // Cart inline editing state (Requirement 3)
   const [editingCartItemId, setEditingCartItemId] = useState(null); // id of item being edited
@@ -289,24 +291,23 @@ export default function POSBilling({
     return false;
   };
 
-  // Handle Dish Card Click (from Menu Grid)
+  // Handle Dish Card Click (from Menu Grid) - Opens Quantity Modal
   const handleDishCardClick = (dish) => {
     setEditingCartItemIndex(null);
-    if (isSweetsDish(dish)) {
-      setActiveFooterDish(dish);
-    } else {
-      setActiveFooterDish(null);
-    }
-    setCustomKgInput('');
+    setSelectedDishForQty(dish);
+  };
 
-    if (!dish.hasMultiplePrices || !dish.variants || dish.variants.length === 0) {
-      const activePrice = getDishPriceForSection(dish, activeSection?.id);
-      onAddToCart({
-        ...dish,
-        price: activePrice,
-        isParcel: isParcelMode
-      });
-    }
+  // Confirm quantity from QuantityInputModal
+  const handleConfirmQuantity = ({ dish, qty, price, unit, weightKg, isParcel }) => {
+    onAddToCart({
+      ...dish,
+      price,
+      unit,
+      weightKg,
+      qty,
+      isParcel
+    });
+    setSelectedDishForQty(null);
   };
 
   // Handle Option Click from Footer Bar
@@ -345,7 +346,7 @@ export default function POSBilling({
     setCustomKgInput('');
   };
 
-  // Handle Unified Search submit (Pressing Enter in Search box adds matching item or code!)
+  // Handle Unified Search submit (Pressing Enter in Search box opens Quantity Modal for matching item or code!)
   const handleSearchSubmit = (e) => {
     if (e) e.preventDefault();
     const query = searchQuery.trim();
@@ -359,20 +360,7 @@ export default function POSBilling({
 
     if (targetDish) {
       setEditingCartItemIndex(null);
-      if (isSweetsDish(targetDish)) {
-        setActiveFooterDish(targetDish);
-      } else {
-        setActiveFooterDish(null);
-      }
-      setCustomKgInput('');
-      if (!targetDish.hasMultiplePrices || !targetDish.variants || targetDish.variants.length === 0) {
-        const activePrice = getDishPriceForSection(targetDish, activeSection?.id);
-        onAddToCart({
-          ...targetDish,
-          price: activePrice,
-          isParcel: isParcelMode
-        });
-      }
+      setSelectedDishForQty(targetDish);
       setSearchQuery('');
     } else {
       setNoticeToast(`No dish found matching "${query}"`);
@@ -783,13 +771,23 @@ export default function POSBilling({
               const hasMulti = dish.hasMultiplePrices && dish.variants && dish.variants.length > 0;
               const isFooterActive = activeFooterDish?.id === dish.id;
 
+              const cardMarathiName = (
+                dish.marathiName ||
+                allDishes?.find((d) => d.id === dish.id || (d.name && dish.name && d.name.toLowerCase() === dish.name.toLowerCase()))?.marathiName ||
+                getPrintDishName(dish, 'mr') ||
+                ''
+              ).trim();
+              const showCardMarathi = Boolean(cardMarathiName && cardMarathiName.toLowerCase() !== (dish.name || '').trim().toLowerCase());
+
               return (
                 <button
                   type="button"
                   key={`dish-card-${dish.id}-${dishIdx}`}
                   onClick={() => handleDishCardClick(dish)}
-                  className={`bg-white rounded-2xl p-4 text-left border transition-all duration-150 cursor-pointer flex flex-col justify-between h-48 sm:h-52 relative hover:shadow-xl ${
-                    isFooterActive
+                  className={`bg-white rounded-2xl p-3.5 text-left border transition-all duration-150 cursor-pointer flex flex-col justify-between min-h-[200px] sm:min-h-[216px] relative hover:shadow-xl ${
+                    selectedDishForQty?.id === dish.id
+                      ? 'border-emerald-600 ring-4 ring-emerald-300 bg-emerald-50/30 shadow-lg'
+                      : isFooterActive
                       ? 'border-amber-600 ring-2 ring-amber-400 bg-amber-50/20'
                       : inCart
                       ? 'border-neutral-900 ring-2 ring-neutral-200 shadow-md'
@@ -801,18 +799,18 @@ export default function POSBilling({
                     #{dish.srNo || dish.id}
                   </span>
 
-                  {/* Larger Image Box */}
-                  <div className="w-full h-24 sm:h-28 bg-[#F9F6F0] rounded-xl flex items-center justify-center border border-stone-200/80 mb-2 relative shrink-0">
-                    <ImageIcon className="w-10 h-10 text-stone-400" />
+                  {/* Image Box */}
+                  <div className="w-full h-20 sm:h-24 bg-[#F9F6F0] rounded-xl flex items-center justify-center border border-stone-200/80 mb-2 relative shrink-0">
+                    <ImageIcon className="w-9 h-9 text-stone-400" />
                   </div>
 
-                  <div>
-                    <div className="font-black text-base text-neutral-900 line-clamp-2 leading-tight">
+                  <div className="flex-1 flex flex-col justify-start">
+                    <div className="font-black text-sm sm:text-base text-neutral-900 line-clamp-1 leading-tight" title={dish.name}>
                       {dish.name}
                     </div>
-                    {dish.marathiName && (
-                      <div className="text-sm font-black text-blue-950 bg-amber-50/90 border border-amber-200/80 px-2 py-0.5 rounded-md truncate mt-1 shadow-2xs block">
-                        {dish.marathiName}
+                    {showCardMarathi && (
+                      <div className="text-xs sm:text-sm font-bold text-amber-950 bg-amber-50/95 border border-amber-200/80 px-2 py-0.5 rounded-md truncate mt-1 shadow-2xs block text-left leading-snug">
+                        {cardMarathiName}
                       </div>
                     )}
                   </div>
@@ -844,7 +842,7 @@ export default function POSBilling({
       </main>
 
       {/* COLUMN 3: RIGHT SIDE ITEMS CART (Enlarged Items & Controls) */}
-      <aside className="w-88 md:w-[420px] lg:w-[440px] bg-white border-l border-stone-200 flex flex-col shrink-0 shadow-lg select-none">
+      <aside className="w-full sm:w-[380px] md:w-[420px] lg:w-[440px] bg-white border-l border-stone-200 flex flex-col shrink-0 shadow-lg select-none">
         
         {/* Top Dark Header Bar (TABLE, TOKEN, CUSTOMER) */}
         <div className="bg-[#111111] text-white p-3 flex items-center justify-between text-xs font-bold border-b border-stone-800">
@@ -928,11 +926,11 @@ export default function POSBilling({
           </div>
         )}
 
-        {/* Table Column Headers (Requirement 1: Removed PRICE column) */}
-        <div className="bg-slate-100 px-4 py-2 border-b border-slate-200 grid grid-cols-12 text-[10px] font-black text-slate-600 uppercase tracking-wider">
-          <div className="col-span-6">ITEMS</div>
-          <div className="col-span-3 text-center">QTY / UNIT</div>
-          <div className="col-span-3 text-right">AMOUNT</div>
+        {/* Table Column Headers */}
+        <div className="bg-slate-100 px-3 py-2 border-b border-slate-200 grid grid-cols-[1fr_112px_100px] items-center gap-2 text-[10px] font-black text-slate-600 uppercase tracking-wider">
+          <div className="text-left pl-1">ITEMS</div>
+          <div className="text-center">QTY / UNIT</div>
+          <div className="text-right pr-1">AMOUNT</div>
         </div>
 
         {/* Cart Items List */}
@@ -957,32 +955,42 @@ export default function POSBilling({
               return (
                 <div
                   key={`side-cart-item-${item.cartItemId || item.id}-${item.unit || ''}-${itemIdx}`}
-                  onClick={() => handleCartItemClick(item, itemIdx)}
-                  className={`grid grid-cols-12 items-center gap-2 py-3 border-b border-stone-200 text-xs text-neutral-800 rounded-xl px-2.5 cursor-pointer transition-colors ${
+                  onClick={() => {
+                    handleCartItemClick(item, itemIdx);
+                    setEditingCartItemId(targetKey);
+                    setEditingField('qty');
+                    setEditValue(itemQty.toString());
+                  }}
+                  className={`grid grid-cols-[1fr_112px_100px] items-center gap-2 py-2.5 border-b border-stone-200 text-xs text-neutral-800 rounded-xl px-2.5 cursor-pointer transition-colors ${
                     editingCartItemIndex === itemIdx ? 'bg-amber-100/90 border-amber-400 ring-2 ring-amber-400 shadow-xs' : 'hover:bg-stone-50'
                   }`}
                 >
                   {/* Clean Item Name + Parcel Tag */}
-                  <div className="col-span-6 pr-1">
+                  <div className="min-w-0 pr-1">
                     <div className="flex items-center space-x-1.5 flex-wrap">
-                      <span className="font-black text-neutral-900 text-sm leading-snug">
+                      <span className="font-black text-neutral-900 text-sm leading-tight">
                         {item.name}
                       </span>
                       {item.isParcel && (
-                        <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black px-1.5 py-0.2 rounded shadow-2xs">
+                        <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black px-1.5 py-0.2 rounded shadow-2xs shrink-0">
                           📦 Parcel
                         </span>
                       )}
                     </div>
-                    <div className="text-[11px] font-bold text-stone-400 mt-0.5">
-                      Code: {item.srNo || item.id}
+                    <div className="text-[11px] font-semibold text-stone-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                      <span>Code: {item.srNo || item.id}</span>
+                      {item.customNote && (
+                        <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1 rounded truncate max-w-[110px]">
+                          {item.customNote}
+                        </span>
+                      )}
                     </div>
                   </div>
 
                   {/* QTY / Unit Column (Enlarged Stepper Buttons) */}
-                  <div className="col-span-3 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center justify-center w-full" onClick={(e) => e.stopPropagation()}>
                     {isEditingQty ? (
-                      <div className="flex items-center space-x-1">
+                      <div className="flex items-center justify-center space-x-1">
                         <input
                           type="number"
                           step="0.1"
@@ -993,7 +1001,7 @@ export default function POSBilling({
                             if (e.key === 'Enter') handleCommitInlineEdit(item, itemIdx);
                             if (e.key === 'Escape') setEditingCartItemId(null);
                           }}
-                          className="w-16 bg-amber-50 border border-amber-500 text-center text-sm font-black rounded-lg p-1 outline-none"
+                          className="w-14 bg-amber-50 border border-amber-500 text-center text-sm font-black rounded-lg p-1 outline-none"
                         />
                         <button
                           onClick={() => handleCommitInlineEdit(item, itemIdx)}
@@ -1006,20 +1014,20 @@ export default function POSBilling({
                       /* Kg Item: Clean prominent badge */
                       <span
                         onClick={() => handleCartItemClick(item, itemIdx)}
-                        className="font-black text-xs sm:text-sm px-2.5 py-1 bg-blue-50 border border-blue-200 text-blue-900 rounded-lg text-center whitespace-nowrap hover:bg-blue-100 cursor-pointer shadow-2xs"
+                        className="font-black text-xs px-2.5 py-1 bg-blue-50 border border-blue-200 text-blue-900 rounded-lg text-center whitespace-nowrap hover:bg-blue-100 cursor-pointer shadow-2xs max-w-[100px] truncate"
                         title="Click to change portion"
                       >
                         {qtyDisplay}
                       </span>
                     ) : (
-                      /* Regular Item: Enlarged -, + stepper buttons */
-                      <div className="flex items-center space-x-1.5">
+                      /* Regular Item: Stepper buttons with clear spacing */
+                      <div className="flex items-center justify-center space-x-1">
                         <button
                           onClick={() => onUpdateCartQty(targetKey, itemQty - 1, item.unit)}
-                          className="w-8 h-8 rounded-lg bg-stone-100 hover:bg-stone-300 active:scale-95 text-stone-900 flex items-center justify-center font-black cursor-pointer text-sm shadow-2xs transition"
+                          className="w-7.5 h-7.5 rounded-lg bg-stone-100 hover:bg-stone-300 active:scale-95 text-stone-900 flex items-center justify-center font-black cursor-pointer text-sm shadow-2xs transition shrink-0"
                           title="Reduce quantity"
                         >
-                          <Minus className="w-4 h-4 stroke-[3]" />
+                          <Minus className="w-3.5 h-3.5 stroke-[3]" />
                         </button>
                         <span
                           onClick={() => {
@@ -1027,31 +1035,31 @@ export default function POSBilling({
                             setEditingField('qty');
                             setEditValue(itemQty.toString());
                           }}
-                          className="font-black text-sm px-1.5 text-center min-w-[24px] whitespace-nowrap hover:bg-amber-100 hover:text-amber-900 rounded cursor-text"
+                          className="font-black text-sm px-1 text-center min-w-[20px] whitespace-nowrap hover:bg-amber-100 hover:text-amber-900 rounded cursor-text"
                           title="Click to type quantity"
                         >
                           {qtyDisplay}
                         </span>
                         <button
                           onClick={() => onUpdateCartQty(targetKey, itemQty + 1, item.unit)}
-                          className="w-8 h-8 rounded-lg bg-stone-900 hover:bg-black active:scale-95 text-white flex items-center justify-center font-black cursor-pointer text-sm shadow-2xs transition"
+                          className="w-7.5 h-7.5 rounded-lg bg-stone-900 hover:bg-black active:scale-95 text-white flex items-center justify-center font-black cursor-pointer text-sm shadow-2xs transition shrink-0"
                           title="Increase quantity"
                         >
-                          <Plus className="w-4 h-4 stroke-[3]" />
+                          <Plus className="w-3.5 h-3.5 stroke-[3]" />
                         </button>
                       </div>
                     )}
                   </div>
 
-                  {/* Amount Column + Enlarged Delete Button */}
-                  <div className="col-span-3 text-right font-black text-neutral-900 text-sm flex items-center justify-end space-x-2" onClick={(e) => e.stopPropagation()}>
-                    <span>₹{lineAmount.toFixed(2)}</span>
+                  {/* Amount Column + Delete Button (Clean alignment, no overlap with QTY) */}
+                  <div className="flex items-center justify-end space-x-1.5 font-black text-neutral-900 text-sm w-full" onClick={(e) => e.stopPropagation()}>
+                    <span className="whitespace-nowrap font-black">₹{lineAmount.toFixed(2)}</span>
                     <button
                       onClick={() => onRemoveCartItem(targetKey, item.unit)}
-                      className="p-1.5 rounded-lg text-rose-400 hover:text-rose-700 hover:bg-rose-50 cursor-pointer transition shadow-2xs"
+                      className="p-1 rounded-lg text-rose-400 hover:text-rose-700 hover:bg-rose-50 cursor-pointer transition shadow-2xs shrink-0"
                       title="Remove item"
                     >
-                      <Trash2 className="w-4.5 h-4.5 stroke-[2.2]" />
+                      <Trash2 className="w-4 h-4 stroke-[2.2]" />
                     </button>
                   </div>
                 </div>
@@ -1193,6 +1201,19 @@ export default function POSBilling({
           </div>
         </div>
       )}
+
+      {/* Quantity Input Modal */}
+      <QuantityInputModal
+        isOpen={Boolean(selectedDishForQty)}
+        dish={selectedDishForQty}
+        activeSection={activeSection}
+        initialParcelMode={isParcelMode}
+        cartItems={cartItems}
+        allDishes={allDishes || dishes}
+        printLanguage={printLanguage}
+        onClose={() => setSelectedDishForQty(null)}
+        onConfirm={handleConfirmQuantity}
+      />
 
       {/* Notice Toast Message */}
       {noticeToast && (

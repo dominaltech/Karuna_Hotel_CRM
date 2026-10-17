@@ -12,7 +12,7 @@ import {
   Split,
   CreditCard
 } from 'lucide-react';
-import { printThermalReceipt, formatItemQtyDisplay } from '../utils/receiptUtils';
+import { printThermalReceipt, formatItemQtyDisplay, getPrintDishName } from '../utils/receiptUtils';
 
 export default function OrderCartPopup({
   isOpen,
@@ -262,7 +262,7 @@ export default function OrderCartPopup({
                       )}
                     </div>
                     {item.customNote && (
-                      <div className="text-[10px] font-bold text-blue-600">{item.customNote}</div>
+                      <div className="text-[10px] font-bold text-blue-600 mt-0.5">{item.customNote}</div>
                     )}
                     <div className="text-xs font-semibold text-stone-500 mt-0.5">
                       Qty / Unit: <span className="font-black text-neutral-800">{qtyDisplay}</span> • Amount: <span className="font-black text-neutral-900">₹{lineAmount.toFixed(2)}</span>

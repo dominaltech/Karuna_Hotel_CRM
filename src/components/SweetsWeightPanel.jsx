@@ -39,6 +39,7 @@ export default function SweetsWeightPanel({
       id: currentSweet.id,
       srNo: currentSweet.srNo,
       name: cleanName,
+      marathiName: currentSweet.marathiName || '',
       price: portionPrice,
       weightKg: weightVal,
       unit: `${weightVal} Kg`,

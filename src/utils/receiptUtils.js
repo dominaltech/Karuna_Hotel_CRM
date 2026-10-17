@@ -953,3 +953,324 @@ export async function printThermalReceipt(billData, options = {}) {
 
   printHtmlThroughHiddenIframe(html);
 }
+
+/**
+ * Print Formal Thermal Slip / Booking Memo for Bulk Pre-Orders
+ */
+export async function printPreOrderReceipt(preOrder, options = {}) {
+  if (!preOrder) return;
+  const currentLang = options.language || getPrintLanguage();
+
+  const bookingDate = new Date(preOrder.createdAt || Date.now());
+  const bookingDateFormatted = formatReceiptDate(bookingDate);
+  const bookingTimeFormatted = format12HourTime(bookingDate);
+
+  let deliveryDateFormatted = preOrder.deliveryDate || '';
+  if (deliveryDateFormatted && deliveryDateFormatted.includes('-')) {
+    const [y, m, d] = deliveryDateFormatted.split('-');
+    if (y && m && d) {
+      deliveryDateFormatted = `${d}-${m}-${y}`;
+    }
+  }
+
+  const deliveryTimeFormatted = preOrder.deliveryTime || '11:00 AM';
+  const orderNumber = preOrder.orderNo || `PRE-${preOrder.id || '001'}`;
+  const customerName = preOrder.customerName || 'Valued Customer';
+  const customerPhone = preOrder.customerPhone || '-';
+
+  const totalAmount = parseFloat(preOrder.totalAmount || preOrder.total || 0) || 0;
+  const advancePayment = parseFloat(preOrder.advancePayment || 0) || 0;
+  const balanceAmount = parseFloat(preOrder.balanceAmount !== undefined ? preOrder.balanceAmount : (totalAmount - advancePayment)) || 0;
+  const paymentMode = preOrder.advancePaymentMode || preOrder.paymentMode || 'Cash';
+
+  const items = preOrder.items || [];
+  const itemsHtml = items.map((item, idx) => {
+    const dishName = getPrintDishName(item, currentLang);
+    const qty = formatItemQtyDisplay(item);
+    const itemTotal = parseFloat(item.total !== undefined ? item.total : ((parseFloat(item.price) || 0) * (parseFloat(item.qty) || 1))) || 0;
+    const rate = parseFloat(item.price) || 0;
+
+    return `
+      <tr>
+        <td class="col-sr">${idx + 1}</td>
+        <td class="col-item">
+          ${dishName}
+          ${item.unit && item.unit !== '1' ? `<span style="font-size: 10px; color: #475569;"> (${item.unit})</span>` : ''}
+          ${item.notes ? `<div style="font-size: 9.5px; font-style: italic; color: #64748b;">${item.notes}</div>` : ''}
+        </td>
+        <td class="col-qty">${qty}</td>
+        <td class="col-rate">${rate}</td>
+        <td class="col-amt">${itemTotal.toFixed(0)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Pre-Order Memo - ${orderNumber}</title>
+      <meta charset="utf-8">
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400..900;1,400..900&family=Nunito+Sans:ital,opsz,wght@0,6..12,400..1000;1,6..12,400..1000&family=Playfair+Display:ital,wght@0,600..900;1,600..900&family=Zen+Dots&display=swap" rel="stylesheet">
+      <style>
+        @page {
+          size: 72mm auto;
+          margin: 0;
+        }
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+        html, body {
+          width: 100%;
+          margin: 0 auto !important;
+          padding: 0 !important;
+          background: #fff;
+          color: #000;
+          font-family: 'Nunito Sans', 'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Devanagari", sans-serif;
+          font-size: 12px;
+          line-height: 1.35;
+          display: flex;
+          justify-content: center;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        .receipt-container {
+          width: 65mm;
+          max-width: 65mm;
+          margin: 0 auto;
+          padding: 3mm 2mm;
+          box-sizing: border-box;
+        }
+        .hotel-name {
+          font-family: 'Zen Dots', 'Playfair Display', sans-serif;
+          font-size: 17px;
+          font-weight: 900;
+          text-align: center;
+          letter-spacing: 0.5px;
+          color: #000;
+          line-height: 1.15;
+          margin-bottom: 2px;
+        }
+        .hotel-sub {
+          font-family: 'Montserrat', sans-serif;
+          font-size: 10px;
+          font-weight: 700;
+          text-align: center;
+          color: #1e293b;
+          margin-bottom: 3px;
+        }
+        .memo-badge {
+          background: #000;
+          color: #fff;
+          font-size: 10.5px;
+          font-weight: 800;
+          text-align: center;
+          padding: 2.5px 0;
+          margin: 4px 0 6px 0;
+          letter-spacing: 1px;
+          border-radius: 3px;
+        }
+        .meta-box {
+          background: #f8fafc;
+          border: 1px solid #cbd5e1;
+          border-radius: 4px;
+          padding: 4px 6px;
+          margin-bottom: 6px;
+          font-size: 11px;
+        }
+        .meta-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 2px;
+        }
+        .meta-label {
+          font-weight: 700;
+          color: #475569;
+        }
+        .meta-val {
+          font-weight: 800;
+          color: #0f172a;
+          text-align: right;
+        }
+        .event-highlight {
+          background: #fff7ed;
+          border: 1.5px dashed #ea580c;
+          border-radius: 4px;
+          padding: 5px 6px;
+          margin-bottom: 6px;
+          text-align: center;
+        }
+        .event-title {
+          font-size: 9.5px;
+          font-weight: 800;
+          color: #c2410c;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .event-datetime {
+          font-size: 13px;
+          font-weight: 900;
+          color: #000;
+          margin-top: 1px;
+        }
+        .dashed-line {
+          border-top: 1.5px dashed #000;
+          margin: 5px 0;
+          width: 100%;
+        }
+        .items-table {
+          width: 100%;
+          border-collapse: collapse;
+          table-layout: fixed;
+          margin-bottom: 4px;
+        }
+        .items-table th {
+          font-family: 'Montserrat', sans-serif;
+          font-size: 10.5px;
+          font-weight: 800;
+          color: #000;
+          padding: 2px 0;
+          border-bottom: 1px solid #000;
+        }
+        .items-table td {
+          padding: 3px 0;
+          font-size: 11px;
+          font-weight: 700;
+          color: #000;
+          vertical-align: top;
+        }
+        .col-sr { width: 8%; text-align: left; }
+        .col-item { width: 50%; text-align: left; word-break: break-word; }
+        .col-qty { width: 16%; text-align: center; }
+        .col-rate { width: 12%; text-align: right; }
+        .col-amt { width: 14%; text-align: right; }
+        .financial-box {
+          margin-top: 4px;
+          font-size: 11.5px;
+        }
+        .fin-row {
+          display: flex;
+          justify-content: space-between;
+          padding: 2px 0;
+        }
+        .fin-total {
+          font-size: 13px;
+          font-weight: 800;
+          border-top: 1px solid #000;
+          padding-top: 3px;
+        }
+        .fin-advance {
+          font-size: 12px;
+          font-weight: 700;
+          color: #166534;
+        }
+        .fin-balance {
+          font-size: 14px;
+          font-weight: 900;
+          border-top: 1.5px solid #000;
+          border-bottom: 1.5px solid #000;
+          padding: 4px 0;
+          margin-top: 3px;
+          color: #991b1b;
+        }
+        .instructions-box {
+          margin-top: 6px;
+          padding: 4px;
+          background: #f1f5f9;
+          border-radius: 4px;
+          font-size: 10.5px;
+          font-weight: 600;
+        }
+        .footer-note {
+          font-size: 9.5px;
+          font-weight: 700;
+          text-align: center;
+          margin-top: 8px;
+          color: #334155;
+          line-height: 1.3;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="receipt-container">
+        <div class="hotel-name">KARUNA HOTEL</div>
+        <div class="hotel-sub">Solapur • Phone: 8446091809</div>
+        <div class="memo-badge">BULK PRE-ORDER BOOKING</div>
+
+        <div class="meta-box">
+          <div class="meta-row">
+            <span class="meta-label">Booking No:</span>
+            <span class="meta-val">${orderNumber}</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">Booked Date:</span>
+            <span class="meta-val">${bookingDateFormatted} ${bookingTimeFormatted}</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">Customer:</span>
+            <span class="meta-val">${customerName}</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">Contact No:</span>
+            <span class="meta-val">${customerPhone}</span>
+          </div>
+        </div>
+
+        <div class="event-highlight">
+          <div class="event-title">★ SCHEDULED DELIVERY / EVENT DATE ★</div>
+          <div class="event-datetime">${deliveryDateFormatted} • ${deliveryTimeFormatted}</div>
+        </div>
+
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th class="col-sr">#</th>
+              <th class="col-item">Item</th>
+              <th class="col-qty">Qty</th>
+              <th class="col-rate">Rate</th>
+              <th class="col-amt">Amt</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHtml}
+          </tbody>
+        </table>
+
+        <div class="dashed-line"></div>
+
+        <div class="financial-box">
+          <div class="fin-row fin-total">
+            <span>Total Order Amount:</span>
+            <span>₹${totalAmount.toFixed(2)}</span>
+          </div>
+          <div class="fin-row fin-advance">
+            <span>Advance Paid (${paymentMode}):</span>
+            <span>₹${advancePayment.toFixed(2)}</span>
+          </div>
+          <div class="fin-row fin-balance">
+            <span>BALANCE TO PAY:</span>
+            <span>₹${balanceAmount.toFixed(2)}</span>
+          </div>
+        </div>
+
+        ${preOrder.notes ? `
+          <div class="instructions-box">
+            <strong>Notes / Instructions:</strong> ${preOrder.notes}
+          </div>
+        ` : ''}
+
+        <div class="footer-note">
+          Please present this booking slip during pickup / delivery.<br/>
+          Thank you for trusting Karuna Hotel!
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  printHtmlThroughHiddenIframe(html);
+}

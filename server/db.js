@@ -203,6 +203,7 @@ export const DEFAULT_DATABASE_DATA = {
   ],
   bills: [],
   billLogs: [],
+  preOrders: [],
   rawMaterials: [
     { id: 1, name: 'Milk', quantity: 50, inwardQty: 50, minThreshold: 10, unit: 'Kg' },
     { id: 2, name: 'Sugar', quantity: 30, inwardQty: 30, minThreshold: 5, unit: 'Kg' },
@@ -506,6 +507,7 @@ export function loadDatabase() {
   dbState.sections = cleaned.sections;
   dbState.diningTables = ensureDefaultDiningTables(cleaned.diningTables);
   dbState.recipes = cleanAndDeduplicateRecipes(dbState.recipes);
+  dbState.preOrders = Array.isArray(dbState.preOrders) ? dbState.preOrders : [];
   saveDatabaseSync();
 }
 
@@ -757,6 +759,7 @@ export function settleBillTransaction(billData) {
     finalTotal: billData.finalTotal !== undefined ? billData.finalTotal : billTotal,
     grandTotal: billData.grandTotal !== undefined ? billData.grandTotal : billTotal,
     paymentMode: billData.paymentMode || billData.paymentDetails?.mode || 'Cash',
+    invoiceNo: billData.invoiceNo || `INV-M-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${newBillId + 100}`,
     status: 'settled',
     createdAt: billData.createdAt || new Date().toISOString()
   };
@@ -1153,6 +1156,7 @@ export function restoreFullBackup(backupData) {
     'diningTables',
     'bills',
     'billLogs',
+    'preOrders',
     'rawMaterials',
     'recipes'
   ];

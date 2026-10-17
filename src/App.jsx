@@ -20,8 +20,10 @@ import SettledBills from './components/SettledBills';
 import OwnerAdmin from './components/OwnerAdmin';
 import StockManagement from './components/StockManagement';
 import ServerMonitorPanel from './components/ServerMonitorPanel';
-import { formatItemQtyDisplay } from './utils/receiptUtils';
-import { ShieldCheck, Lock, X, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import PreOrderManagement from './components/PreOrderManagement';
+import { formatItemQtyDisplay, getPrintDishName } from './utils/receiptUtils';
+import { checkPreOrderAlert, playAlertChime } from './db/db';
+import { ShieldCheck, Lock, X, Check, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('pos'); // 'pos' | 'settle' | 'stock' | 'server' | 'admin'
@@ -61,6 +63,8 @@ export default function App() {
   const [tables, setTables] = useState(DEFAULT_INITIAL_DATA.diningTables);
   const [bills, setBills] = useState([]);
   const [billLogs, setBillLogs] = useState([]);
+  const [preOrders, setPreOrders] = useState([]);
+  const [dismissedUrgentAlert, setDismissedUrgentAlert] = useState(false);
   const [rawMaterials, setRawMaterials] = useState(DEFAULT_INITIAL_DATA.rawMaterials);
   const [recipes, setRecipes] = useState(DEFAULT_INITIAL_DATA.recipes);
   const [stockMode, setStockMode] = useState(localStorage.getItem('karuna_stock_mode') || 'item_wise');
@@ -157,6 +161,7 @@ export default function App() {
     if (target.diningTables) setTables(deduplicateById(target.diningTables, true));
     if (target.bills) setBills(deduplicateById(target.bills));
     if (target.billLogs) setBillLogs(deduplicateById(target.billLogs));
+    if (target.preOrders) setPreOrders(deduplicateById(target.preOrders));
     if (target.rawMaterials) setRawMaterials(deduplicateById(target.rawMaterials));
     if (target.recipes) setRecipes(cleanAndDeduplicateRecipes(target.recipes));
     if (target.systemSettings?.stockMode) {
@@ -493,6 +498,12 @@ export default function App() {
     });
 
     let updated;
+    const resolvedMarathi = (
+      dishItem.marathiName ||
+      dishes?.find((d) => d.id === dishItem.id || (d.name && dishItem.name && d.name.toLowerCase() === dishItem.name.toLowerCase()))?.marathiName ||
+      getPrintDishName(dishItem, 'mr') ||
+      ''
+    ).trim();
 
     if (existingIndex !== -1) {
       updated = [...cartItems];
@@ -509,7 +520,8 @@ export default function App() {
         qty: newQty,
         unit: cleanUnit,
         price: newPrice,
-        weightKg: newWeight
+        weightKg: newWeight,
+        marathiName: resolvedMarathi || existing.marathiName || ''
       };
       updatedItem.qtyDisplay = formatItemQtyDisplay(updatedItem);
       updated[existingIndex] = updatedItem;
@@ -520,6 +532,7 @@ export default function App() {
       
       const newItem = {
         ...dishItem,
+        marathiName: resolvedMarathi,
         cartItemId,
         qty: initialQty,
         unit: cleanUnit,
@@ -874,6 +887,85 @@ export default function App() {
 
   const pendingCartCount = cartItems.reduce((acc, i) => acc + (parseFloat(i.qty) || 1), 0);
 
+  // Urgent Pre-Orders calculation (Due Tomorrow or Due Today)
+  const urgentOrders = React.useMemo(() => {
+    return preOrders.filter((order) => {
+      if (order.status === 'completed' || order.status === 'cancelled') return false;
+      const alert = checkPreOrderAlert(order.deliveryDate);
+      return alert.isTomorrow || alert.isToday;
+    });
+  }, [preOrders]);
+
+  const urgentOrdersCount = urgentOrders.length;
+
+  const prevUrgentCountRef = useRef(0);
+  useEffect(() => {
+    if (urgentOrdersCount > 0 && urgentOrdersCount > prevUrgentCountRef.current) {
+      playAlertChime();
+    }
+    prevUrgentCountRef.current = urgentOrdersCount;
+  }, [urgentOrdersCount]);
+
+  const handleAddPreOrder = async (orderData) => {
+    return await db.preOrders.add(orderData);
+  };
+
+  const handleUpdatePreOrder = async (orderId, updatedFields) => {
+    return await db.preOrders.update(orderId, updatedFields);
+  };
+
+  const handleDeletePreOrder = async (orderId) => {
+    return await db.preOrders.delete(orderId);
+  };
+
+  const handleSettlePreOrderToBill = async (preOrder, balancePaymentMode = 'Cash') => {
+    if (!preOrder) return;
+    const finalTotal = parseFloat(preOrder.totalAmount || 0);
+    const advance = parseFloat(preOrder.advancePayment || 0);
+    const balance = parseFloat(preOrder.balanceAmount !== undefined ? preOrder.balanceAmount : (finalTotal - advance));
+
+    const billPayload = {
+      tableNo: `Pre-Order: ${preOrder.orderNo || ''}`,
+      customerName: preOrder.customerName,
+      customerPhone: preOrder.customerPhone,
+      pax: 'Bulk',
+      sectionName: 'Pre-Orders',
+      sectionId: 4,
+      items: (preOrder.items || []).map((item) => ({
+        ...item,
+        qty: item.qty || 1,
+        price: item.price || 0,
+        total: (parseFloat(item.price) || 0) * (parseFloat(item.qty) || 1),
+        isParcel: true
+      })),
+      subtotal: finalTotal,
+      total: finalTotal,
+      finalTotal: finalTotal,
+      grandTotal: finalTotal,
+      paymentMode: balancePaymentMode,
+      paymentDetails: {
+        mode: balancePaymentMode,
+        advancePaid: advance,
+        advanceMode: preOrder.advancePaymentMode || 'Cash',
+        balancePaid: balance,
+        balanceMode: balancePaymentMode
+      },
+      notes: `Pre-Order ${preOrder.orderNo}. Advance: ₹${advance} (${preOrder.advancePaymentMode || 'Cash'}), Balance: ₹${balance} (${balancePaymentMode}). Event Date: ${preOrder.deliveryDate} ${preOrder.deliveryTime || ''}`
+    };
+
+    const settledResult = await db.settleBill(billPayload);
+
+    await db.preOrders.update(preOrder.id, {
+      status: 'completed',
+      settledAt: new Date().toISOString(),
+      settledBillInvoiceNo: settledResult?.bill?.invoiceNo || '',
+      balanceCollected: balance,
+      balanceCollectedMode: balancePaymentMode
+    });
+
+    return settledResult;
+  };
+
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-100 overflow-hidden select-none relative">
       
@@ -882,6 +974,7 @@ export default function App() {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           pendingCartCount={pendingCartCount}
+          urgentPreOrdersCount={urgentOrdersCount}
           activeCounter={activeCounter}
           onSelectCounter={handleSelectCounter}
           isServerConnected={isServerConnected}
@@ -897,6 +990,42 @@ export default function App() {
           printLanguage={printLanguage}
           onLanguageChange={handleLanguageChange}
         />
+      )}
+
+      {/* Global Pre-Order Alert Banner for Due Tomorrow / Due Today */}
+      {urgentOrders.length > 0 && !dismissedUrgentAlert && activeTab !== 'preorder' && (
+        <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 text-white px-4 py-2 flex items-center justify-between shadow-lg shrink-0 select-none animate-in slide-in-from-top duration-200">
+          <div className="flex items-center space-x-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping mr-1 inline-block shrink-0" />
+            <AlertTriangle className="w-5 h-5 text-yellow-200 shrink-0" />
+            <div className="text-xs">
+              <span className="font-black tracking-wide mr-2">
+                🚨 PRE-ORDER ALERT:
+              </span>
+              <span className="font-bold">
+                {urgentOrders.length} bulk order{urgentOrders.length > 1 ? 's' : ''} scheduled for tomorrow / today!
+              </span>
+              <span className="hidden md:inline text-amber-100 ml-2">
+                ({urgentOrders[0]?.customerName} - {urgentOrders[0]?.customerPhone}, Delivery: {urgentOrders[0]?.deliveryDate})
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 shrink-0">
+            <button
+              onClick={() => setActiveTab('preorder')}
+              className="px-3 py-1 bg-white text-orange-900 hover:bg-orange-50 font-black text-xs rounded-xl shadow-xs transition cursor-pointer"
+            >
+              Open Pre-Order Tab →
+            </button>
+            <button
+              onClick={() => setDismissedUrgentAlert(true)}
+              className="p-1 hover:bg-black/20 rounded-lg text-white/80 hover:text-white transition cursor-pointer"
+              title="Dismiss alert banner"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Fixed Position Hide/Show Header Toggle Button (Always at fixed top-3 right-3) */}
@@ -963,6 +1092,21 @@ export default function App() {
             onClearCart={() => setCartItems([])}
             onSettleBill={handleSettleBill}
             printLanguage={printLanguage}
+          />
+        )}
+
+        {activeTab === 'preorder' && (
+          <PreOrderManagement
+            preOrders={preOrders}
+            dishes={dishes}
+            categories={categories}
+            subCategories={subCategories}
+            onAddPreOrder={handleAddPreOrder}
+            onUpdatePreOrder={handleUpdatePreOrder}
+            onDeletePreOrder={handleDeletePreOrder}
+            onSettlePreOrderToBill={handleSettlePreOrderToBill}
+            printLanguage={printLanguage}
+            activeCounter={activeCounter}
           />
         )}
 

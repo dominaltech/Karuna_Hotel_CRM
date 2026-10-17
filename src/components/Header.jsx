@@ -18,7 +18,8 @@ import {
   Edit2,
   ZoomIn,
   ZoomOut,
-  Languages
+  Languages,
+  CalendarClock
 } from 'lucide-react';
 import { getServerIp, setServerIp } from '../db/db';
 
@@ -33,6 +34,7 @@ export default function Header({
   activeTab,
   setActiveTab,
   pendingCartCount,
+  urgentPreOrdersCount = 0,
   activeCounter = 'Counter 1 (Breakfast & Snacks)',
   onSelectCounter,
   isServerConnected = true,
@@ -61,6 +63,15 @@ export default function Header({
       activeColor: 'bg-indigo-600 text-white shadow-md shadow-indigo-200',
       inactiveColor: 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100',
       badge: pendingCartCount > 0 ? pendingCartCount : null
+    },
+    {
+      id: 'preorder',
+      label: 'Pre Order',
+      icon: CalendarClock,
+      activeColor: 'bg-orange-600 text-white shadow-md shadow-orange-200',
+      inactiveColor: 'bg-orange-50 text-orange-700 hover:bg-orange-100',
+      badge: urgentPreOrdersCount > 0 ? `${urgentPreOrdersCount} Alert` : null,
+      badgeColor: 'bg-rose-600 animate-pulse font-extrabold'
     },
     {
       id: 'settle',
@@ -139,7 +150,7 @@ export default function Header({
                 <span>{tab.label}</span>
                 {tab.isProtected && <Lock className="w-3 h-3 opacity-60 ml-0.5" />}
                 {tab.badge && (
-                  <span className="ml-1 px-1.5 py-0.5 text-[10px] font-black bg-rose-500 text-white rounded-full">
+                  <span className={`ml-1 px-1.5 py-0.5 text-[10px] font-black text-white rounded-full ${tab.badgeColor || 'bg-rose-500'}`}>
                     {tab.badge}
                   </span>
                 )}
