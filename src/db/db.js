@@ -1557,43 +1557,89 @@ export const db = {
     for (const item of items) {
       const dish = dbCache.dishes.find(d => matchDish(d, item));
       if (dish) {
-        const oldPrice = parseFloat(dish.price) || 0;
-        const newPrice = (item.price !== undefined && !isNaN(parseFloat(item.price))) ? parseFloat(item.price) : oldPrice;
-        const priceDiff = newPrice - oldPrice;
-        dish.price = newPrice;
-
-        // Propagate to sectionPrices so POS Billing & Tables immediately reflect new rates
         if (!dish.sectionPrices || typeof dish.sectionPrices !== 'object') {
           dish.sectionPrices = {};
         }
-        const secKeys = Object.keys(dish.sectionPrices);
-        if (secKeys.length > 0) {
-          for (const secId of secKeys) {
-            const oldSecPrice = parseFloat(dish.sectionPrices[secId]);
-            if (!isNaN(oldSecPrice)) {
-              if (oldSecPrice === oldPrice || secId === '1' || secId === '4') {
-                dish.sectionPrices[secId] = newPrice;
-              } else {
-                dish.sectionPrices[secId] = Math.max(0, Math.round(oldSecPrice + priceDiff));
-              }
-            }
-          }
-        } else {
-          dish.sectionPrices['1'] = newPrice;
+
+        const hasExplicitSectionRates = (
+          (item.diningPrice !== undefined && !isNaN(item.diningPrice)) ||
+          (item.firstFloorPrice !== undefined && !isNaN(item.firstFloorPrice)) ||
+          (item.acPrice !== undefined && !isNaN(item.acPrice)) ||
+          (item.parcelPrice !== undefined && !isNaN(item.parcelPrice))
+        );
+
+        if (item.diningPrice !== undefined && !isNaN(item.diningPrice)) {
+          dish.sectionPrices['1'] = item.diningPrice;
+          dish.price = item.diningPrice;
+        }
+        if (item.firstFloorPrice !== undefined && !isNaN(item.firstFloorPrice)) {
+          dish.sectionPrices['2'] = item.firstFloorPrice;
+        }
+        if (item.acPrice !== undefined && !isNaN(item.acPrice)) {
+          dish.sectionPrices['3'] = item.acPrice;
+        }
+        if (item.parcelPrice !== undefined && !isNaN(item.parcelPrice)) {
+          dish.sectionPrices['4'] = item.parcelPrice;
         }
 
-        // Multi-price sweet items
-        if (item.pricePerKg !== undefined && !isNaN(parseFloat(item.pricePerKg))) {
-          dish.pricePerKg = parseFloat(item.pricePerKg);
-          if (dish.hasMultiplePrices) {
-            dish.variants = [
-              { unit: '250g', weightKg: 0.25, price: Math.round(dish.pricePerKg * 0.25) },
-              { unit: '500g', weightKg: 0.5, price: Math.round(dish.pricePerKg * 0.5) },
-              { unit: '1 Kg', weightKg: 1, price: Math.round(dish.pricePerKg) }
-            ];
-            dish.price = Math.round(dish.pricePerKg * 0.25);
+        // If specific section rates were not provided, propagate item.price
+        if (!hasExplicitSectionRates && item.price !== undefined && !isNaN(parseFloat(item.price))) {
+          const oldPrice = parseFloat(dish.price) || 0;
+          const newPrice = parseFloat(item.price);
+          const priceDiff = newPrice - oldPrice;
+          dish.price = newPrice;
+
+          const secKeys = Object.keys(dish.sectionPrices);
+          if (secKeys.length > 0) {
+            for (const secId of secKeys) {
+              const oldSecPrice = parseFloat(dish.sectionPrices[secId]);
+              if (!isNaN(oldSecPrice)) {
+                if (oldSecPrice === oldPrice || secId === '1' || secId === '4') {
+                  dish.sectionPrices[secId] = newPrice;
+                } else {
+                  dish.sectionPrices[secId] = Math.max(0, Math.round(oldSecPrice + priceDiff));
+                }
+              }
+            }
+          } else {
+            dish.sectionPrices['1'] = newPrice;
           }
-        } else if (dish.hasMultiplePrices && newPrice !== oldPrice && oldPrice > 0) {
+        }
+
+        // Multi-price sweet portion variants (250g, 500g, 1Kg)
+        const hasVariantUpdates = (
+          (item.price250g !== undefined && !isNaN(item.price250g)) ||
+          (item.price500g !== undefined && !isNaN(item.price500g)) ||
+          (item.price1kg !== undefined && !isNaN(item.price1kg)) ||
+          (item.pricePerKg !== undefined && !isNaN(item.pricePerKg))
+        );
+
+        if (hasVariantUpdates) {
+          dish.hasMultiplePrices = true;
+          let p250 = (item.price250g !== undefined && !isNaN(item.price250g)) ? item.price250g : null;
+          let p500 = (item.price500g !== undefined && !isNaN(item.price500g)) ? item.price500g : null;
+          let p1kg = (item.price1kg !== undefined && !isNaN(item.price1kg)) ? item.price1kg : ((item.pricePerKg !== undefined && !isNaN(item.pricePerKg)) ? item.pricePerKg : null);
+
+          if (p1kg === null && p250 !== null) p1kg = p250 * 4;
+          if (p1kg === null && p500 !== null) p1kg = p500 * 2;
+          if (p250 === null && p1kg !== null) p250 = Math.round(p1kg * 0.25);
+          if (p500 === null && p1kg !== null) p500 = Math.round(p1kg * 0.5);
+
+          p250 = p250 || 0;
+          p500 = p500 || (p250 * 2);
+          p1kg = p1kg || (p250 * 4);
+
+          dish.pricePerKg = p1kg;
+          dish.variants = [
+            { unit: '250g', weightKg: 0.25, price: p250 },
+            { unit: '500g', weightKg: 0.5, price: p500 },
+            { unit: '1 Kg', weightKg: 1, price: p1kg }
+          ];
+          if (!hasExplicitSectionRates || dish.price === undefined || dish.price === 0) {
+            dish.price = p250;
+          }
+        } else if (dish.hasMultiplePrices && item.price !== undefined && !isNaN(parseFloat(item.price))) {
+          const newPrice = parseFloat(item.price);
           dish.pricePerKg = Math.round(newPrice * 4);
           dish.variants = [
             { unit: '250g', weightKg: 0.25, price: Math.round(newPrice) },
@@ -1640,28 +1686,51 @@ export const db = {
           if (defaultSub) subCatId = defaultSub.id;
         }
 
-        let hasMultiplePrices = item.pricePerKg !== undefined && !isNaN(parseFloat(item.pricePerKg)) && parseFloat(item.pricePerKg) > 0;
-        let pricePerKg = hasMultiplePrices ? parseFloat(item.pricePerKg) : null;
-        let newPrice = (item.price !== undefined && !isNaN(parseFloat(item.price))) ? parseFloat(item.price) : 0;
-        if (hasMultiplePrices && (!newPrice || newPrice === 0)) {
-          newPrice = Math.round(pricePerKg * 0.25);
-        }
+        const hasVariantUpdates = (
+          (item.price250g !== undefined && !isNaN(item.price250g)) ||
+          (item.price500g !== undefined && !isNaN(item.price500g)) ||
+          (item.price1kg !== undefined && !isNaN(item.price1kg)) ||
+          (item.pricePerKg !== undefined && !isNaN(item.pricePerKg)) ||
+          catId === 2
+        );
+
+        let p250 = (item.price250g !== undefined && !isNaN(item.price250g)) ? item.price250g : null;
+        let p500 = (item.price500g !== undefined && !isNaN(item.price500g)) ? item.price500g : null;
+        let p1kg = (item.price1kg !== undefined && !isNaN(item.price1kg)) ? item.price1kg : ((item.pricePerKg !== undefined && !isNaN(item.pricePerKg)) ? item.pricePerKg : null);
+
+        let newPrice = (item.diningPrice !== undefined && !isNaN(item.diningPrice))
+          ? item.diningPrice
+          : ((item.price !== undefined && !isNaN(parseFloat(item.price))) ? parseFloat(item.price) : (p250 || 0));
 
         let variants = [];
-        if (hasMultiplePrices) {
+        let pricePerKg = null;
+        if (hasVariantUpdates) {
+          if (p1kg === null && p250 !== null) p1kg = p250 * 4;
+          if (p1kg === null && p500 !== null) p1kg = p500 * 2;
+          if (p250 === null && p1kg !== null) p250 = Math.round(p1kg * 0.25);
+          if (p500 === null && p1kg !== null) p500 = Math.round(p1kg * 0.5);
+
+          p250 = p250 || newPrice || 0;
+          p500 = p500 || (p250 * 2);
+          p1kg = p1kg || (p250 * 4);
+
+          pricePerKg = p1kg;
           variants = [
-            { unit: '250g', weightKg: 0.25, price: Math.round(pricePerKg * 0.25) },
-            { unit: '500g', weightKg: 0.5, price: Math.round(pricePerKg * 0.5) },
-            { unit: '1 Kg', weightKg: 1, price: Math.round(pricePerKg) }
+            { unit: '250g', weightKg: 0.25, price: p250 },
+            { unit: '500g', weightKg: 0.5, price: p500 },
+            { unit: '1 Kg', weightKg: 1, price: p1kg }
           ];
+          if (!newPrice) newPrice = p250;
         }
 
-        let counter = item.counter || (catId === 2 || hasMultiplePrices ? 'Sweets' : 'Breakfast');
+        let counter = item.counter || (catId === 2 || hasVariantUpdates ? 'Sweets' : 'Breakfast');
 
         // Initialize sectionPrices
         const sectionPrices = {
-          '1': newPrice,
-          '4': newPrice
+          '1': (item.diningPrice !== undefined && !isNaN(item.diningPrice)) ? item.diningPrice : newPrice,
+          '2': (item.firstFloorPrice !== undefined && !isNaN(item.firstFloorPrice)) ? item.firstFloorPrice : newPrice,
+          '3': (item.acPrice !== undefined && !isNaN(item.acPrice)) ? item.acPrice : (newPrice + 10),
+          '4': (item.parcelPrice !== undefined && !isNaN(item.parcelPrice)) ? item.parcelPrice : newPrice
         };
         if (Array.isArray(dbCache.sections) && dbCache.sections.length > 0) {
           for (const sec of dbCache.sections) {

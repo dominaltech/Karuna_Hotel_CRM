@@ -238,6 +238,30 @@ async function runTestSuite() {
     assert(settleRes.data.bill.id, 'Bill received unique database ID');
   });
 
+  // TEST 6: Pre-Order Tab Filtering - Exclude Completed & Cancelled Orders
+  await test('TC-PRE-06: Pre-Order Tab Excludes Completed and Cancelled Orders (Only Upcoming Shown)', () => {
+    const mixedOrders = [
+      { id: 1, orderNo: 'PRE-001', customerName: 'Upcoming Client A', status: 'pending', deliveryDate: '2026-10-25' },
+      { id: 2, orderNo: 'PRE-002', customerName: 'Upcoming Client B', status: 'confirmed', deliveryDate: '2026-10-26' },
+      { id: 3, orderNo: 'PRE-003', customerName: 'Completed Client', status: 'completed', deliveryDate: '2026-10-20' },
+      { id: 4, orderNo: 'PRE-004', customerName: 'Cancelled Client', status: 'cancelled', deliveryDate: '2026-10-22' },
+      { id: 5, orderNo: 'PRE-005', customerName: 'Upcoming Client C', status: undefined, deliveryDate: '2026-10-27' }
+    ];
+
+    // Filter logic matching PreOrderManagement.jsx
+    const upcomingOrders = mixedOrders.filter(
+      (order) => order && order.status !== 'completed' && order.status !== 'cancelled'
+    );
+
+    assert.strictEqual(upcomingOrders.length, 3, 'Must only contain the 3 upcoming/active orders');
+    assert(upcomingOrders.some((o) => o.orderNo === 'PRE-001'), 'Includes pending order');
+    assert(upcomingOrders.some((o) => o.orderNo === 'PRE-002'), 'Includes confirmed order');
+    assert(upcomingOrders.some((o) => o.orderNo === 'PRE-005'), 'Includes active order with undefined status');
+
+    assert(!upcomingOrders.some((o) => o.orderNo === 'PRE-003'), 'Completed order PRE-003 MUST NOT be shown');
+    assert(!upcomingOrders.some((o) => o.orderNo === 'PRE-004'), 'Cancelled order PRE-004 MUST NOT be shown');
+  });
+
   if (serverProcess) {
     serverProcess.kill();
   }

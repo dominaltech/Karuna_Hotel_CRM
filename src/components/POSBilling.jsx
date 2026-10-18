@@ -22,7 +22,6 @@ import {
 import TableGrid, { getSectionTheme } from './TableGrid';
 import { printKOTReceipt, printThermalReceipt, formatItemQtyDisplay, getPrintDishName } from '../utils/receiptUtils';
 import { db, getDishPriceForSection } from '../db/db';
-import QuantityInputModal from './QuantityInputModal';
 
 const formatTokenNumber = (token, table) => {
   if (token) return String(token).replace(/^#/, '');
@@ -61,7 +60,8 @@ export default function POSBilling({
   onRemoveCartItem,
   onClearCart,
   onSettleBill,
-  printLanguage = 'mr'
+  printLanguage = 'mr',
+  activeCounter = ''
 }) {
   const sortedCategories = [...categories].sort((a, b) => (a.srNo || 0) - (b.srNo || 0));
 
@@ -85,12 +85,10 @@ export default function POSBilling({
   const [shortCodeInput, setShortCodeInput] = useState('');
   
   // Footer bar active dish for multi-price options (Requirement 1)
-  // Footer bar active dish for multi-price options (Requirement 1)
   const [activeFooterDish, setActiveFooterDish] = useState(null);
   const [customKgInput, setCustomKgInput] = useState('');
   const [editingCartItemIndex, setEditingCartItemIndex] = useState(null); // in-place cart edit index
   const [isParcelMode, setIsParcelMode] = useState(false); // Toggle to add items as Parcel from top search bar
-  const [selectedDishForQty, setSelectedDishForQty] = useState(null); // Dish opened in QuantityInputModal
 
   // Cart inline editing state (Requirement 3)
   const [editingCartItemId, setEditingCartItemId] = useState(null); // id of item being edited
@@ -281,43 +279,131 @@ export default function POSBilling({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeTable, cartItems, onSaveTableOrder, handlePrintKOT, onOpenOrderPopupForTable]);
 
-  // Helper to check if a dish belongs to Sweets division / per-Kg sweet options
-  const isSweetsDish = (dish) => {
+  // Helper: ONLY sweet items that are sold in Kg get the bottom portion bar
+  const isSweetKgDish = (dish) => {
     if (!dish) return false;
-    if (dish.categoryId === 2) return true;
-    if (dish.counter && dish.counter.toLowerCase().includes('sweet')) return true;
-    if (dish.hasMultiplePrices) return true;
-    if (dish.categoryName && dish.categoryName.toLowerCase().includes('sweet')) return true;
-    return false;
+    const isSweet = (
+      dish.categoryId === 2 ||
+      (dish.counter && dish.counter.toLowerCase().includes('sweet')) ||
+      (dish.categoryName && dish.categoryName.toLowerCase().includes('sweet'))
+    );
+    if (!isSweet) return false;
+
+    // Must be sold in Kg (per-Kg pricing, multiple portion variants, or Kg/g unit)
+    return Boolean(
+      dish.pricePerKg ||
+      (dish.hasMultiplePrices && dish.variants && dish.variants.length > 0) ||
+      (dish.unit && (dish.unit.toLowerCase().includes('kg') || dish.unit.toLowerCase().includes('g'))) ||
+      (dish.name && (dish.name.toLowerCase().includes('(by kg)') || dish.name.toLowerCase().includes('/kg') || dish.name.toLowerCase().includes(' kg')))
+    );
   };
 
-  // Handle Dish Card Click (from Menu Grid) - Opens Quantity Modal
-  const handleDishCardClick = (dish) => {
+  const isSweetTable = Boolean(
+    activeTable?.isSweet ||
+    (activeTable?.name && String(activeTable.name).toUpperCase().startsWith('S')) ||
+    activeTable?.sectionId === 5
+  );
+
+  // Helper: check if current order is in parcel or sweet section (where Kg portion bar is permitted)
+  const resolvedCounter = activeCounter || (typeof window !== 'undefined' ? (localStorage.getItem('karuna_active_counter') || '') : '');
+  const isParcelOrSweetContext = Boolean(
+    isParcelMode ||
+    activeSection?.id === 4 ||
+    activeSection?.id === 5 ||
+    activeTable?.sectionId === 4 ||
+    activeTable?.sectionId === 5 ||
+    activeTable?.isParcel ||
+    isSweetTable ||
+    (activeTable?.name && String(activeTable.name).toUpperCase().startsWith('P')) ||
+    (activeTable?.name && String(activeTable.name).toUpperCase().startsWith('S')) ||
+    (resolvedCounter && resolvedCounter.toLowerCase().includes('sweet'))
+  );
+
+  // Directly select dish and add to cart with inline quantity prompt
+  const handleSelectDish = (dish) => {
+    if (!dish) return;
     setEditingCartItemIndex(null);
-    setSelectedDishForQty(dish);
-  };
 
-  // Confirm quantity from QuantityInputModal
-  const handleConfirmQuantity = ({ dish, qty, price, unit, weightKg, isParcel }) => {
+    // Commit any active inline edit first
+    if (editingCartItemId && editingField === 'qty') {
+      const curIdx = cartItems.findIndex((ci) => (ci.cartItemId || ci.id) === editingCartItemId);
+      if (curIdx !== -1) {
+        handleCommitInlineEdit(cartItems[curIdx], curIdx);
+      }
+    }
+
+    // 1. Sweets in Parcel or Sweet Section: Show the Kg portion bar
+    if (isSweetKgDish(dish) && isParcelOrSweetContext) {
+      if (activeFooterDish?.id === dish.id) {
+        setActiveFooterDish(null);
+      } else {
+        setActiveFooterDish(dish);
+        setCustomKgInput('');
+      }
+      return;
+    }
+
+    // 2. In dining table (or regular items): DO NOT show kg bar. Directly ask per plate quantity saved in area rate matrix!
+    setActiveFooterDish(null);
+
+    const currentSectionId = activeTable?.sectionId || activeSection?.id || 1;
+    const activePrice = getDishPriceForSection(dish, currentSectionId);
+    const unit = (isSweetKgDish(dish) || !dish.unit || dish.unit.toLowerCase().includes('kg')) ? 'Plate' : dish.unit;
+
+    // Check if matching item is in cart
+    const existingIndex = cartItems.findIndex((ci) => {
+      const matchIdentity = ci.id === dish.id || (ci.name && dish.name && ci.name === dish.name);
+      if (!matchIdentity) return false;
+      const itemUnit = ci.unit || (ci.weightKg ? `${ci.weightKg} Kg` : null);
+      if ((itemUnit || '') !== (unit || '')) return false;
+      if (Boolean(ci.isParcel) !== Boolean(isParcelMode)) return false;
+      return true;
+    });
+
+    const targetKey = existingIndex !== -1
+      ? (cartItems[existingIndex].cartItemId || cartItems[existingIndex].id)
+      : (dish.cartItemId || `${dish.id}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`);
+
+    const currentQty = existingIndex !== -1 ? (parseFloat(cartItems[existingIndex].qty) || 1) : 0;
+    const nextQty = existingIndex !== -1 ? (currentQty + 1).toString() : '1';
+
     onAddToCart({
       ...dish,
-      price,
-      unit,
-      weightKg,
-      qty,
-      isParcel
+      cartItemId: targetKey,
+      price: activePrice,
+      unit: unit,
+      weightKg: null,
+      qty: 1,
+      isParcel: isParcelMode
     });
-    setSelectedDishForQty(null);
+
+    // Directly ask quantity in adding item cart - auto-focused for instant typing and Enter key confirmation
+    setEditingCartItemId(targetKey);
+    setEditingField('qty');
+    setEditValue(nextQty);
+
+    setTimeout(() => {
+      if (cartListRef.current) {
+        cartListRef.current.scrollTop = cartListRef.current.scrollHeight;
+      }
+    }, 60);
+  };
+
+  // Handle Dish Card Click (from Menu Grid)
+  const handleDishCardClick = (dish) => {
+    handleSelectDish(dish);
   };
 
   // Handle Option Click from Footer Bar
   const handleSelectOptionFromFooter = (variant) => {
     if (!activeFooterDish) return;
-    const weightKg = variant.weightKg || (variant.unit.includes('250') ? 0.25 : variant.unit.includes('500') ? 0.5 : 1);
+    const weightKg = variant.weightKg || (variant.unit?.includes('250') ? 0.25 : variant.unit?.includes('500') ? 0.5 : (variant.unit?.includes('1') ? 1 : null));
+    const ratePerKg = activeFooterDish.pricePerKg || activeFooterDish.price || (activeFooterDish.variants?.[0]?.price ? activeFooterDish.variants[0].price * 4 : 300);
+    const price = variant.price !== undefined ? variant.price : (weightKg ? Math.round(weightKg * ratePerKg) : activeFooterDish.price);
 
     onAddToCart({
       ...activeFooterDish,
-      price: variant.price,
+      price: price,
       unit: variant.unit,
       weightKg: weightKg,
       qty: 1,
@@ -346,7 +432,23 @@ export default function POSBilling({
     setCustomKgInput('');
   };
 
-  // Handle Unified Search submit (Pressing Enter in Search box opens Quantity Modal for matching item or code!)
+  // Handle Reducing Custom Kg item from cart
+  const handleReduceCustomKg = () => {
+    if (!activeFooterDish || typeof onReduceFromCart !== 'function') return;
+    const kg = parseFloat(customKgInput);
+    if (kg && !isNaN(kg) && kg > 0) {
+      onReduceFromCart({ ...activeFooterDish, unit: `${kg} Kg` });
+    } else {
+      const match = cartItems.slice().reverse().find((i) => (i.id === activeFooterDish.id || i.name === activeFooterDish.name) && i.weightKg);
+      if (match) {
+        onReduceFromCart({ ...activeFooterDish, unit: match.unit });
+      } else {
+        onReduceFromCart(activeFooterDish);
+      }
+    }
+  };
+
+  // Handle Unified Search submit (Enter in Search box adds dish and directly asks quantity in cart)
   const handleSearchSubmit = (e) => {
     if (e) e.preventDefault();
     const query = searchQuery.trim();
@@ -359,8 +461,7 @@ export default function POSBilling({
     const targetDish = foundDish || (filteredDishes.length === 1 ? filteredDishes[0] : null);
 
     if (targetDish) {
-      setEditingCartItemIndex(null);
-      setSelectedDishForQty(targetDish);
+      handleSelectDish(targetDish);
       setSearchQuery('');
     } else {
       setNoticeToast(`No dish found matching "${query}"`);
@@ -368,10 +469,10 @@ export default function POSBilling({
     }
   };
 
-  // Handle clicking cart item (opens footer bar with -,+ controls ONLY for sweets)
+  // Handle clicking cart item (opens bottom bar with -,+ controls ONLY for sweet kg items in parcel/sweet section)
   const handleCartItemClick = (item, itemIdx) => {
     const originalDish = dishes.find((d) => d.id === item.id || d.name === item.name) || item;
-    if (isSweetsDish(originalDish)) {
+    if (isSweetKgDish(originalDish) && isParcelOrSweetContext) {
       setActiveFooterDish(originalDish);
       setEditingCartItemIndex(itemIdx);
     } else {
@@ -385,10 +486,11 @@ export default function POSBilling({
     if (editingField === 'qty') {
       const val = parseFloat(editValue);
       if (!isNaN(val) && val > 0) {
+        const isKgItem = Boolean(item.weightKg || (item.unit && (item.unit.includes('g') || item.unit.toLowerCase().includes('kg'))));
         const originalDish = dishes.find((d) => d.id === item.id || d.name === item.name);
-        if (originalDish && originalDish.pricePerKg) {
+        if (isKgItem && originalDish && originalDish.pricePerKg) {
           onUpdateCartItem(itemIdx, {
-            qty: val,
+            qty: 1,
             price: Math.round(val * originalDish.pricePerKg),
             unit: `${val} Kg`,
             weightKg: val,
@@ -403,12 +505,6 @@ export default function POSBilling({
     setEditingField(null);
     setEditValue('');
   };
-
-  const isSweetTable = Boolean(
-    activeTable?.isSweet ||
-    (activeTable?.name && String(activeTable.name).toUpperCase().startsWith('S')) ||
-    activeTable?.sectionId === 5
-  );
 
   // Filter Categories: If sweet table, only show sweets division
   const displayedCategories = isSweetTable
@@ -604,154 +700,11 @@ export default function POSBilling({
 
         </div>
 
-        {/* REPOSITIONED UPWARD SWEETS QUANTITY / PORTIONS BAR (Larger & with Aligned Custom Kg Box) */}
-        {activeFooterDish && isSweetsDish(activeFooterDish) && (
-          <div className="bg-white border-2 border-blue-600 rounded-2xl shadow-lg p-3.5 px-5 z-20 mx-4 mt-3 flex flex-wrap items-center justify-between gap-3 animate-in slide-in-from-top-2 duration-150 shrink-0">
-            {/* Dish Info */}
-            <div className="flex items-center space-x-2 shrink-0">
-              <h4 className="font-black text-sm sm:text-base text-slate-900 leading-none flex items-center gap-2">
-                <span>{activeFooterDish.name}</span>
-                <span className="text-xs font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200 shadow-2xs">
-                  Rate: ₹{activeFooterDish.pricePerKg || activeFooterDish.price}{activeFooterDish.pricePerKg ? '/Kg' : ''}
-                </span>
-              </h4>
-            </div>
 
-            {/* Quantity & Portion Option Controls with (-) on Left & (+) on Right */}
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              {activeFooterDish.hasMultiplePrices && activeFooterDish.variants && activeFooterDish.variants.length > 0 ? (
-                <>
-                  {activeFooterDish.variants.map((v, vIdx) => (
-                    <div
-                      key={`opt-btn-${v.unit}-${vIdx}`}
-                      className="bg-slate-50 border border-slate-300 hover:border-blue-600 rounded-xl p-1 shadow-2xs flex items-center space-x-1.5 transition-all"
-                    >
-                      {/* (-) Minus Button on Left */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (typeof onReduceFromCart === 'function') {
-                            onReduceFromCart({ ...activeFooterDish, unit: v.unit });
-                          }
-                        }}
-                        className="w-8 h-8 rounded-lg bg-white hover:bg-slate-200 text-slate-900 border border-slate-300 font-black flex items-center justify-center cursor-pointer transition text-sm shadow-2xs"
-                        title="Reduce from cart"
-                      >
-                        <Minus className="w-4 h-4 stroke-[3]" />
-                      </button>
-
-                      {/* Center Option Label */}
-                      <button
-                        type="button"
-                        onClick={() => handleSelectOptionFromFooter(v)}
-                        className="px-2.5 py-1 cursor-pointer flex items-center space-x-1.5 text-slate-900"
-                      >
-                        <span className="font-black text-xs sm:text-sm">{v.unit}</span>
-                        <span className="text-blue-600 font-black text-xs sm:text-sm">₹{v.price}</span>
-                      </button>
-
-                      {/* (+) Plus Button on Right */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectOptionFromFooter(v);
-                        }}
-                        className="w-8 h-8 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black flex items-center justify-center cursor-pointer transition text-sm shadow-2xs"
-                        title="Add to cart"
-                      >
-                        <Plus className="w-4 h-4 stroke-[3]" />
-                      </button>
-                    </div>
-                  ))}
-
-                  {/* Custom Weight Entry (Strictly in Kg, Fixed Alignment) */}
-                  <form onSubmit={handleAddCustomKg} className="flex items-center gap-1.5 bg-white border-2 border-stone-300 focus-within:border-blue-600 rounded-xl p-1 shadow-xs h-10">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (typeof onReduceFromCart === 'function') {
-                          onReduceFromCart(activeFooterDish);
-                        }
-                      }}
-                      className="w-8 h-8 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-900 font-black flex items-center justify-center cursor-pointer transition text-sm"
-                      title="Reduce custom quantity"
-                    >
-                      <Minus className="w-4 h-4 stroke-[3]" />
-                    </button>
-
-                    <input
-                      type="number"
-                      step="0.05"
-                      min="0.05"
-                      placeholder="Custom Kg"
-                      value={customKgInput}
-                      onChange={(e) => setCustomKgInput(e.target.value)}
-                      className="w-24 text-center text-sm font-black text-neutral-900 outline-none placeholder:text-stone-400 placeholder:font-normal"
-                    />
-                    <span className="text-xs font-black text-stone-500 pr-1 select-none">Kg</span>
-
-                    <button
-                      type="submit"
-                      disabled={!customKgInput}
-                      className="h-8 bg-neutral-900 hover:bg-black text-white font-black text-xs px-3.5 rounded-lg cursor-pointer disabled:opacity-40 shadow-xs flex items-center space-x-1"
-                    >
-                      <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                      <span>Add</span>
-                    </button>
-                  </form>
-                </>
-              ) : (
-                /* Standard Single Price Dish */
-                <div className="bg-white border border-stone-300 rounded-xl p-1 shadow-2xs flex items-center space-x-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (typeof onReduceFromCart === 'function') {
-                        onReduceFromCart(activeFooterDish);
-                      }
-                    }}
-                    className="w-8 h-8 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-900 font-black flex items-center justify-center cursor-pointer text-sm transition"
-                    title="Reduce from cart"
-                  >
-                    <Minus className="w-4 h-4 stroke-[3]" />
-                  </button>
-
-                  <div className="px-2 py-0.5 text-center">
-                    <span className="font-black text-xs sm:text-sm text-neutral-900 block">{activeFooterDish.name}</span>
-                    <span className="font-black text-xs text-amber-700">₹{(getDishPriceForSection(activeFooterDish, activeSection?.id) || activeFooterDish.price || 0).toFixed(2)}</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const activePrice = getDishPriceForSection(activeFooterDish, activeSection?.id);
-                      onAddToCart({ ...activeFooterDish, price: activePrice });
-                    }}
-                    className="w-8 h-8 rounded-lg bg-neutral-900 hover:bg-black text-white font-black flex items-center justify-center cursor-pointer text-sm transition"
-                    title="Add to cart"
-                  >
-                    <Plus className="w-4 h-4 stroke-[3]" />
-                  </button>
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setActiveFooterDish(null)}
-                className="p-1.5 rounded-xl text-stone-400 hover:text-stone-900 hover:bg-stone-100 transition-colors cursor-pointer ml-1"
-                title="Close options"
-              >
-                <X className="w-4.5 h-4.5" />
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Dishes Grid (Larger Cards with Clear Images & Bold Text - Exactly 5 per row) */}
         <div className="flex-1 p-4 overflow-y-auto min-h-0">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-4 pb-24">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-4 pb-4">
             {filteredDishes.map((dish, dishIdx) => {
               const dishActivePrice = getDishPriceForSection(dish, activeSection?.id);
               const matchingCartItems = cartItems.filter((ci) => ci.id === dish.id || ci.name === dish.name);
@@ -785,9 +738,7 @@ export default function POSBilling({
                   key={`dish-card-${dish.id}-${dishIdx}`}
                   onClick={() => handleDishCardClick(dish)}
                   className={`bg-white rounded-2xl p-3.5 text-left border transition-all duration-150 cursor-pointer flex flex-col justify-between min-h-[200px] sm:min-h-[216px] relative hover:shadow-xl ${
-                    selectedDishForQty?.id === dish.id
-                      ? 'border-emerald-600 ring-4 ring-emerald-300 bg-emerald-50/30 shadow-lg'
-                      : isFooterActive
+                    isFooterActive && isParcelOrSweetContext
                       ? 'border-amber-600 ring-2 ring-amber-400 bg-amber-50/20'
                       : inCart
                       ? 'border-neutral-900 ring-2 ring-neutral-200 shadow-md'
@@ -817,7 +768,7 @@ export default function POSBilling({
 
                   {/* Price Badge */}
                   <div className="flex items-center justify-between mt-auto pt-1 w-full">
-                    {hasMulti ? (
+                    {hasMulti && isParcelOrSweetContext ? (
                       <span className="bg-blue-50 text-blue-800 border border-blue-200 text-xs font-black px-2.5 py-1 rounded-lg truncate w-full text-center">
                         ₹{dish.pricePerKg ? `${dish.pricePerKg}/Kg` : `${dish.variants[0]?.price} (Opts)`}
                       </span>
@@ -838,6 +789,153 @@ export default function POSBilling({
             })}
           </div>
         </div>
+
+        {/* DOCKED BOTTOM BAR FOR SWEET KG ITEMS (Only in Parcel or Sweet section) */}
+        {activeFooterDish && isSweetKgDish(activeFooterDish) && isParcelOrSweetContext && (() => {
+          const defaultRate = activeFooterDish.pricePerKg || activeFooterDish.price || (activeFooterDish.variants?.[0]?.price ? activeFooterDish.variants[0].price * 4 : 320);
+          const variants = (activeFooterDish.variants && activeFooterDish.variants.length > 0)
+            ? activeFooterDish.variants
+            : [
+                { unit: '250g', weightKg: 0.25, price: Math.round(defaultRate * 0.25) },
+                { unit: '500g', weightKg: 0.5, price: Math.round(defaultRate * 0.5) },
+                { unit: '1Kg', weightKg: 1, price: Math.round(defaultRate) }
+              ];
+          const rateDisplay = activeFooterDish.variants?.[0]?.price || activeFooterDish.price || Math.round(defaultRate * 0.25);
+          
+          // Match cart items for this dish to determine if it has already been added
+          const matchingCartItems = cartItems.filter(
+            (ci) => ci.id === activeFooterDish.id || ci.name === activeFooterDish.name
+          );
+          const matchingCustomKgItem = matchingCartItems.find(
+            (ci) => ci.weightKg && !['250g', '500g', '1Kg'].includes(ci.unit)
+          );
+          const canDecrementCustom = Boolean(matchingCustomKgItem && matchingCustomKgItem.qty > 0);
+
+          return (
+            <div className="shrink-0 px-3 pb-3 pt-0 bg-slate-100 z-30 animate-in slide-in-from-bottom-2 duration-150">
+              <div className="bg-white border-2 border-blue-600 rounded-2xl shadow-xl p-3 sm:p-3.5 px-4 sm:px-6 space-y-2.5">
+                {/* Top Row: Dish Name & Rate Badge (No "X" button) */}
+                <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
+                  <div className="flex items-center space-x-2.5 min-w-0">
+                    <h4 className="font-black text-base sm:text-lg text-slate-900 leading-tight flex items-center gap-2 truncate">
+                      <span>{activeFooterDish.name}</span>
+                      {activeFooterDish.marathiName && activeFooterDish.marathiName !== activeFooterDish.name && (
+                        <span className="text-xs font-bold text-slate-500 hidden sm:inline">
+                          ({activeFooterDish.marathiName})
+                        </span>
+                      )}
+                    </h4>
+                    <span className="text-xs sm:text-sm font-extrabold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200 shrink-0">
+                      #{activeFooterDish.srNo || activeFooterDish.id} • Rate: ₹{rateDisplay} {activeFooterDish.pricePerKg ? `(₹${activeFooterDish.pricePerKg}/Kg)` : ''}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Bottom Row: Large Portion Buttons & Custom Kg Entry */}
+                <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2.5">
+                  {/* Portion Variants (250g, 500g, 1Kg) */}
+                  <div className="flex items-center gap-2 sm:gap-2.5 flex-1 min-w-0">
+                    {variants.map((v, vIdx) => {
+                      const matchingVariantItem = matchingCartItems.find((ci) => ci.unit === v.unit);
+                      const variantQty = matchingVariantItem ? matchingVariantItem.qty : 0;
+                      const canDecrement = variantQty > 0;
+
+                      return (
+                        <div
+                          key={`opt-btn-${v.unit}-${vIdx}`}
+                          className="flex-1 bg-slate-50 border-2 border-slate-200 hover:border-blue-600 rounded-2xl p-1 shadow-xs flex items-center justify-between transition-all min-w-[110px]"
+                        >
+                          {/* (-) Minus Button on Left: Only visible if item/variant is already in cart */}
+                          {canDecrement && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (typeof onReduceFromCart === 'function') {
+                                  onReduceFromCart({ ...activeFooterDish, unit: v.unit });
+                                }
+                              }}
+                              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white hover:bg-slate-200 text-slate-900 border border-slate-300 font-black flex items-center justify-center cursor-pointer transition text-base shadow-xs shrink-0"
+                              title="Reduce from cart"
+                            >
+                              <Minus className="w-5 h-5 stroke-[3]" />
+                            </button>
+                          )}
+
+                          {/* Center Option Label */}
+                          <button
+                            type="button"
+                            onClick={() => handleSelectOptionFromFooter(v)}
+                            className="flex-1 px-1.5 py-1 cursor-pointer flex flex-col items-center justify-center text-slate-900 text-center leading-tight"
+                          >
+                            <span className="font-black text-xs sm:text-sm">{v.unit}</span>
+                            <span className="text-blue-600 font-black text-xs sm:text-sm">₹{v.price}</span>
+                            {variantQty > 0 && (
+                              <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-1.5 rounded-full mt-0.5">
+                                {variantQty} in cart
+                              </span>
+                            )}
+                          </button>
+
+                          {/* (+) Plus Button on Right */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectOptionFromFooter(v);
+                            }}
+                            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black flex items-center justify-center cursor-pointer transition text-base shadow-xs shrink-0"
+                            title="Add to cart"
+                          >
+                            <Plus className="w-5 h-5 stroke-[3]" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Custom Weight Entry (Strictly in Kg) */}
+                  <form
+                    onSubmit={handleAddCustomKg}
+                    className="flex items-center gap-1.5 bg-white border-2 border-stone-300 focus-within:border-blue-600 rounded-2xl p-1 shadow-xs shrink-0 h-12 sm:h-13"
+                  >
+                    {/* (-) Minus button for custom kg only if already in cart */}
+                    {canDecrementCustom && (
+                      <button
+                        type="button"
+                        onClick={handleReduceCustomKg}
+                        className="w-10 h-10 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-900 font-black flex items-center justify-center cursor-pointer transition text-base shrink-0"
+                        title="Reduce custom quantity"
+                      >
+                        <Minus className="w-5 h-5 stroke-[3]" />
+                      </button>
+                    )}
+
+                    <input
+                      type="number"
+                      step="0.05"
+                      min="0.05"
+                      placeholder="Kg (e.g. 0.75)"
+                      value={customKgInput}
+                      onChange={(e) => setCustomKgInput(e.target.value)}
+                      className="w-24 sm:w-28 text-center text-xs sm:text-sm font-black text-neutral-900 outline-none placeholder:text-stone-400 placeholder:font-normal"
+                    />
+                    <span className="text-xs font-black text-stone-500 pr-1 select-none">Kg</span>
+
+                    <button
+                      type="submit"
+                      disabled={!customKgInput}
+                      className="h-10 bg-neutral-900 hover:bg-black text-white font-black text-xs sm:text-sm px-4 rounded-xl cursor-pointer disabled:opacity-40 shadow-xs flex items-center space-x-1.5 shrink-0"
+                    >
+                      <Plus className="w-4 h-4 stroke-[3]" />
+                      <span>Add</span>
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
       </main>
 
@@ -945,7 +1043,7 @@ export default function POSBilling({
           ) : (
             cartItems.map((item, itemIdx) => {
               const itemQty = parseFloat(item.qty) || 1;
-              const isKgItem = item.weightKg !== undefined || (item.unit && (item.unit.includes('g') || item.unit.toLowerCase().includes('kg'))) || item.hasMultiplePrices;
+              const isKgItem = Boolean(item.weightKg || (item.unit && (item.unit.includes('g') || item.unit.toLowerCase().includes('kg'))));
               const qtyDisplay = formatItemQtyDisplay(item);
 
               const lineAmount = (item.price || 0) * itemQty;
@@ -962,7 +1060,11 @@ export default function POSBilling({
                     setEditValue(itemQty.toString());
                   }}
                   className={`grid grid-cols-[1fr_112px_100px] items-center gap-2 py-2.5 border-b border-stone-200 text-xs text-neutral-800 rounded-xl px-2.5 cursor-pointer transition-colors ${
-                    editingCartItemIndex === itemIdx ? 'bg-amber-100/90 border-amber-400 ring-2 ring-amber-400 shadow-xs' : 'hover:bg-stone-50'
+                    isEditingQty
+                      ? 'bg-amber-100/90 border-amber-400 ring-2 ring-amber-400 shadow-xs'
+                      : editingCartItemIndex === itemIdx
+                      ? 'bg-amber-100/90 border-amber-400 ring-2 ring-amber-400 shadow-xs'
+                      : 'hover:bg-stone-50'
                   }`}
                 >
                   {/* Clean Item Name + Parcel Tag */}
@@ -987,27 +1089,45 @@ export default function POSBilling({
                     </div>
                   </div>
 
-                  {/* QTY / Unit Column (Enlarged Stepper Buttons) */}
+                  {/* QTY / Unit Column (Direct Inline Quantity Input on Enter) */}
                   <div className="flex items-center justify-center w-full" onClick={(e) => e.stopPropagation()}>
                     {isEditingQty ? (
-                      <div className="flex items-center justify-center space-x-1">
+                      <div className="flex items-center justify-center space-x-1 animate-in zoom-in-95 duration-100">
                         <input
+                          ref={(el) => {
+                            if (el) {
+                              el.focus();
+                              el.select();
+                            }
+                          }}
                           type="number"
-                          step="0.1"
+                          step={item.unit && item.unit.includes('Kg') ? '0.1' : '1'}
+                          min="0.1"
                           autoFocus
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
+                          onFocus={(e) => e.target.select()}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleCommitInlineEdit(item, itemIdx);
-                            if (e.key === 'Escape') setEditingCartItemId(null);
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleCommitInlineEdit(item, itemIdx);
+                            }
+                            if (e.key === 'Escape') {
+                              setEditingCartItemId(null);
+                            }
                           }}
-                          className="w-14 bg-amber-50 border border-amber-500 text-center text-sm font-black rounded-lg p-1 outline-none"
+                          onBlur={() => {
+                            handleCommitInlineEdit(item, itemIdx);
+                          }}
+                          className="w-16 bg-amber-50 border-2 border-amber-500 text-center text-sm font-black rounded-lg p-1 outline-none ring-2 ring-amber-300"
                         />
                         <button
+                          type="button"
                           onClick={() => handleCommitInlineEdit(item, itemIdx)}
-                          className="text-emerald-700 font-black text-sm px-1 cursor-pointer"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-1.5 py-1 rounded-md cursor-pointer shadow-xs"
+                          title="Confirm quantity (Enter ↵)"
                         >
-                          ✓
+                          ↵
                         </button>
                       </div>
                     ) : isKgItem ? (
@@ -1202,18 +1322,9 @@ export default function POSBilling({
         </div>
       )}
 
-      {/* Quantity Input Modal */}
-      <QuantityInputModal
-        isOpen={Boolean(selectedDishForQty)}
-        dish={selectedDishForQty}
-        activeSection={activeSection}
-        initialParcelMode={isParcelMode}
-        cartItems={cartItems}
-        allDishes={allDishes || dishes}
-        printLanguage={printLanguage}
-        onClose={() => setSelectedDishForQty(null)}
-        onConfirm={handleConfirmQuantity}
-      />
+
+
+
 
       {/* Notice Toast Message */}
       {noticeToast && (

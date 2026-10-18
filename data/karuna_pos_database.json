@@ -178,7 +178,7 @@
         "4": 45
       },
       "subItems": [],
-      "stockQty": 8,
+      "stockQty": 3,
       "status": "In Stock",
       "stockUnit": "kg",
       "recipeBaseQty": 0.2,
@@ -746,7 +746,10 @@
         }
       ],
       "sectionPrices": {
-        "1": 110
+        "1": 110,
+        "2": 300,
+        "3": 320,
+        "4": 110
       },
       "subItems": [],
       "pricePerKg": 440,
@@ -776,10 +779,10 @@
       ],
       "sectionPrices": {},
       "subItems": [],
-      "stockQty": 5,
+      "stockQty": 0.5,
       "status": "In Stock",
       "stockUnit": "kg",
-      "recipeBaseQty": 1,
+      "recipeBaseQty": 0.5,
       "accumulatedSold": 0
     },
     {
@@ -1177,7 +1180,7 @@
       "isSplit": false,
       "parentTable": null,
       "customerName": "",
-      "createdAt": "2026-10-17T13:44:36.301Z",
+      "createdAt": null,
       "id": 9,
       "baseName": null,
       "baseTableId": null,
@@ -1271,7 +1274,7 @@
       "currentCart": [],
       "currentTokenNo": "",
       "isSplit": false,
-      "createdAt": null,
+      "createdAt": "2026-10-18T10:20:27.438Z",
       "parentTable": null,
       "baseName": null,
       "baseTableId": null,
@@ -1290,7 +1293,7 @@
       "currentCart": [],
       "currentTokenNo": "",
       "isSplit": false,
-      "createdAt": null,
+      "createdAt": "2026-10-18T12:23:41.306Z",
       "parentTable": null,
       "baseName": null,
       "baseTableId": null,
@@ -31920,6 +31923,4201 @@
       "invoiceNo": "INV-M-261017-1792244529739",
       "status": "settled",
       "createdAt": "2026-10-17T13:42:12.319Z"
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1792244529640,
+      "finalTotal": 100,
+      "grandTotal": 100,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792244529740",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:30:15.668Z"
+    },
+    {
+      "id": 1792312215689,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792312215688",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-18T08:30:15.691Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312215690,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312215790",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:30:16.509Z"
+    },
+    {
+      "tableId": 1792312217505,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312215691,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312215791",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:30:16.524Z"
+    },
+    {
+      "tableId": 1792312218543,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312215692,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312215792",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:30:16.547Z"
+    },
+    {
+      "tableId": 1792312218544,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312215693,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312215793",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:30:16.568Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312215694,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312215794",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:30:16.988Z"
+    },
+    {
+      "tableNo": "Pre-Order: PRE-SETTLE-001",
+      "customerName": "Anil Kulkarni",
+      "customerPhone": "9890011223",
+      "sectionName": "Pre-Orders",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "unit": "1"
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "finalTotal": 100,
+      "paymentMode": "Cash",
+      "notes": "Pre-Order PRE-SETTLE-001 Balance Paid on Delivery",
+      "id": 1792312215695,
+      "grandTotal": 100,
+      "invoiceNo": "INV-M-261018-1792312215795",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:30:27.101Z"
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1792312215696,
+      "finalTotal": 100,
+      "grandTotal": 100,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312215796",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:33:37.921Z"
+    },
+    {
+      "id": 1792312417942,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792312417941",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-18T08:33:37.939Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312417943,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312418043",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:33:38.711Z"
+    },
+    {
+      "tableId": 1792312419710,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312417944,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312418044",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:33:38.727Z"
+    },
+    {
+      "tableId": 1792312420752,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312417945,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312418045",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:33:38.752Z"
+    },
+    {
+      "tableId": 1792312420753,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312417946,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312418046",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:33:38.766Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312417947,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312418047",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:33:39.190Z"
+    },
+    {
+      "tableNo": "Pre-Order: PRE-SETTLE-001",
+      "customerName": "Anil Kulkarni",
+      "customerPhone": "9890011223",
+      "sectionName": "Pre-Orders",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "unit": "1"
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "finalTotal": 100,
+      "paymentMode": "Cash",
+      "notes": "Pre-Order PRE-SETTLE-001 Balance Paid on Delivery",
+      "id": 1792312417948,
+      "grandTotal": 100,
+      "invoiceNo": "INV-M-261018-1792312418048",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:33:51.743Z"
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1792312417949,
+      "finalTotal": 100,
+      "grandTotal": 100,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312418049",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:34:51.911Z"
+    },
+    {
+      "id": 1792312491925,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792312491924",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-18T08:34:51.929Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312491926,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312492026",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:34:52.710Z"
+    },
+    {
+      "tableId": 1792312493704,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312491927,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312492027",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:34:52.723Z"
+    },
+    {
+      "tableId": 1792312494738,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312491928,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312492028",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:34:52.744Z"
+    },
+    {
+      "tableId": 1792312494739,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312491929,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312492029",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:34:52.757Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312491930,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312492030",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:34:53.185Z"
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1792312491931,
+      "finalTotal": 100,
+      "grandTotal": 100,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312492031",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:35:23.198Z"
+    },
+    {
+      "id": 1792312523220,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792312523219",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-18T08:35:23.216Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312523221,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312523321",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:35:23.981Z"
+    },
+    {
+      "tableId": 1792312524983,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312523222,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312523322",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:35:23.994Z"
+    },
+    {
+      "tableId": 1792312526015,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312523223,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312523323",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:35:24.015Z"
+    },
+    {
+      "tableId": 1792312526016,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312523224,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312523324",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:35:24.030Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792312523225,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312523325",
+      "status": "settled",
+      "createdAt": "2026-10-18T08:35:24.461Z"
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1792312523226,
+      "finalTotal": 100,
+      "grandTotal": 100,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792312523326",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:06:16.799Z"
+    },
+    {
+      "id": 1792314376816,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792314376815",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-18T09:06:16.818Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792314376817,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792314376917",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:06:17.574Z"
+    },
+    {
+      "tableId": 1792314378571,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792314376818,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792314376918",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:06:17.591Z"
+    },
+    {
+      "tableId": 1792314379604,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792314376819,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792314376919",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:06:17.606Z"
+    },
+    {
+      "tableId": 1792314379605,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792314376820,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792314376920",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:06:17.617Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792314376821,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792314376921",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:06:18.038Z"
+    },
+    {
+      "tokenNo": "TC20-CHG-01",
+      "tableNo": "QA-CHG-TBL",
+      "tableName": "QA-CHG-TBL",
+      "counter": "Counter 1",
+      "items": [
+        {
+          "id": 9999,
+          "name": "QA Test Thali",
+          "price": 250,
+          "qty": 2
+        }
+      ],
+      "subtotal": 500,
+      "discount": 50,
+      "discountAmount": 50,
+      "discountType": "₹",
+      "discountValue": 50,
+      "deliveryCharge": 40,
+      "containerCharge": 20,
+      "waiterTip": 30,
+      "serviceCharge": 25,
+      "serviceChargeType": "₹",
+      "serviceChargeValue": 25,
+      "total": 565,
+      "finalTotal": 565,
+      "grandTotal": 565,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cashGiven": 600,
+        "returnChange": 35
+      },
+      "id": 1792314376822,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792314376922",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:06:19.498Z"
+    },
+    {
+      "tableNo": "Pre-Order: PRE-SETTLE-001",
+      "customerName": "Anil Kulkarni",
+      "customerPhone": "9890011223",
+      "sectionName": "Pre-Orders",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "unit": "1"
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "finalTotal": 100,
+      "paymentMode": "Cash",
+      "notes": "Pre-Order PRE-SETTLE-001 Balance Paid on Delivery",
+      "id": 1792314376823,
+      "grandTotal": 100,
+      "invoiceNo": "INV-M-261018-1792314376923",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:06:29.880Z"
+    },
+    {
+      "id": 1792314376824,
+      "invoiceNo": "TEST-INV-99991",
+      "total": 450,
+      "items": [
+        {
+          "id": 34,
+          "name": "Kaju Katli",
+          "qty": 1,
+          "unit": "500g",
+          "weightKg": 0.5,
+          "price": 450
+        }
+      ],
+      "finalTotal": 450,
+      "grandTotal": 450,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:06:36.079Z"
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1792314376825,
+      "finalTotal": 100,
+      "grandTotal": 100,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792314376925",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:07:19.608Z"
+    },
+    {
+      "id": 1792314439626,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792314439625",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-18T09:07:19.625Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792314439627,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792314439727",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:07:20.386Z"
+    },
+    {
+      "tableId": 1792314441385,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792314439628,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792314439728",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:07:20.401Z"
+    },
+    {
+      "tableId": 1792314442416,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792314439629,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792314439729",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:07:20.416Z"
+    },
+    {
+      "tableId": 1792314442417,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792314439630,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792314439730",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:07:20.425Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792314439631,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792314439731",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:07:20.840Z"
+    },
+    {
+      "tokenNo": "TC20-CHG-01",
+      "tableNo": "QA-CHG-TBL",
+      "tableName": "QA-CHG-TBL",
+      "counter": "Counter 1",
+      "items": [
+        {
+          "id": 9999,
+          "name": "QA Test Thali",
+          "price": 250,
+          "qty": 2
+        }
+      ],
+      "subtotal": 500,
+      "discount": 50,
+      "discountAmount": 50,
+      "discountType": "₹",
+      "discountValue": 50,
+      "deliveryCharge": 40,
+      "containerCharge": 20,
+      "waiterTip": 30,
+      "serviceCharge": 25,
+      "serviceChargeType": "₹",
+      "serviceChargeValue": 25,
+      "total": 565,
+      "finalTotal": 565,
+      "grandTotal": 565,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cashGiven": 600,
+        "returnChange": 35
+      },
+      "id": 1792314439632,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792314439732",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:07:22.308Z"
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1792314439633,
+      "finalTotal": 100,
+      "grandTotal": 100,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792314439733",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:22:56.581Z"
+    },
+    {
+      "id": 1792315376595,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792315376594",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-18T09:22:56.598Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792315376596,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792315376696",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:22:57.345Z"
+    },
+    {
+      "tableId": 1792315378342,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792315376597,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792315376697",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:22:57.361Z"
+    },
+    {
+      "tableId": 1792315379373,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792315376598,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792315376698",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:22:57.376Z"
+    },
+    {
+      "tableId": 1792315379374,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792315376599,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792315376699",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:22:57.390Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792315376600,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792315376700",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:22:57.809Z"
+    },
+    {
+      "tokenNo": "TC20-CHG-01",
+      "tableNo": "QA-CHG-TBL",
+      "tableName": "QA-CHG-TBL",
+      "counter": "Counter 1",
+      "items": [
+        {
+          "id": 9999,
+          "name": "QA Test Thali",
+          "price": 250,
+          "qty": 2
+        }
+      ],
+      "subtotal": 500,
+      "discount": 50,
+      "discountAmount": 50,
+      "discountType": "₹",
+      "discountValue": 50,
+      "deliveryCharge": 40,
+      "containerCharge": 20,
+      "waiterTip": 30,
+      "serviceCharge": 25,
+      "serviceChargeType": "₹",
+      "serviceChargeValue": 25,
+      "total": 565,
+      "finalTotal": 565,
+      "grandTotal": 565,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cashGiven": 600,
+        "returnChange": 35
+      },
+      "id": 1792315376601,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792315376701",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:22:59.288Z"
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1792315376602,
+      "finalTotal": 100,
+      "grandTotal": 100,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792315376702",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:32:13.888Z"
+    },
+    {
+      "id": 1792315933903,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792315933902",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-18T09:32:13.905Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792315933904,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792315934004",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:32:14.715Z"
+    },
+    {
+      "tableId": 1792315935712,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792315933905,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792315934005",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:32:14.729Z"
+    },
+    {
+      "tableId": 1792315936741,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792315933906,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792315934006",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:32:14.744Z"
+    },
+    {
+      "tableId": 1792315936742,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792315933907,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792315934007",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:32:14.754Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792315933908,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792315934008",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:32:15.178Z"
+    },
+    {
+      "tokenNo": "TC20-CHG-01",
+      "tableNo": "QA-CHG-TBL",
+      "tableName": "QA-CHG-TBL",
+      "counter": "Counter 1",
+      "items": [
+        {
+          "id": 9999,
+          "name": "QA Test Thali",
+          "price": 250,
+          "qty": 2
+        }
+      ],
+      "subtotal": 500,
+      "discount": 50,
+      "discountAmount": 50,
+      "discountType": "₹",
+      "discountValue": 50,
+      "deliveryCharge": 40,
+      "containerCharge": 20,
+      "waiterTip": 30,
+      "serviceCharge": 25,
+      "serviceChargeType": "₹",
+      "serviceChargeValue": 25,
+      "total": 565,
+      "finalTotal": 565,
+      "grandTotal": 565,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cashGiven": 600,
+        "returnChange": 35
+      },
+      "id": 1792315933909,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792315934009",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:32:16.647Z"
+    },
+    {
+      "tableNo": "Pre-Order: PRE-SETTLE-001",
+      "customerName": "Anil Kulkarni",
+      "customerPhone": "9890011223",
+      "sectionName": "Pre-Orders",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "unit": "1"
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "finalTotal": 100,
+      "paymentMode": "Cash",
+      "notes": "Pre-Order PRE-SETTLE-001 Balance Paid on Delivery",
+      "id": 1792315933910,
+      "grandTotal": 100,
+      "invoiceNo": "INV-M-261018-1792315934010",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:32:23.547Z"
+    },
+    {
+      "id": 1792315933911,
+      "invoiceNo": "TEST-INV-99991",
+      "total": 450,
+      "items": [
+        {
+          "id": 34,
+          "name": "Kaju Katli",
+          "qty": 1,
+          "unit": "500g",
+          "weightKg": 0.5,
+          "price": 450
+        }
+      ],
+      "finalTotal": 450,
+      "grandTotal": 450,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:32:29.486Z"
+    },
+    {
+      "tokenNo": "3",
+      "tableNo": "AC3",
+      "tableId": 17,
+      "items": [
+        {
+          "id": 5,
+          "srNo": 105,
+          "name": "Puri Bhaji",
+          "categoryId": 1,
+          "subCategoryId": 1,
+          "price": 75,
+          "hasMultiplePrices": false,
+          "variants": [],
+          "sectionPrices": {
+            "1": 75,
+            "2": 75,
+            "3": 85,
+            "4": 75
+          },
+          "subItems": [
+            {
+              "name": "4 Puris",
+              "qty": "1 portion"
+            },
+            {
+              "name": "Potato Bhaji",
+              "qty": "1 bowl"
+            }
+          ],
+          "isParcel": false,
+          "marathiName": "पुरी भाजी",
+          "cartItemId": "5_1792314498212_i2o1",
+          "qty": 1,
+          "unit": null,
+          "qtyDisplay": "1"
+        }
+      ],
+      "subtotal": 75,
+      "discount": 0,
+      "discountAmount": 0,
+      "discountType": "₹",
+      "discountValue": 0,
+      "deliveryCharge": 0,
+      "containerCharge": 0,
+      "waiterTip": 0,
+      "serviceCharge": 0,
+      "serviceChargeType": "₹",
+      "serviceChargeValue": 0,
+      "sectionName": "ac",
+      "sectionExtraCharge": 0,
+      "total": 75,
+      "finalTotal": 75,
+      "grandTotal": 75,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 75,
+        "online": 0,
+        "card": 0
+      },
+      "createdAt": "2026-10-18T09:33:16.750Z",
+      "isPrinted": false,
+      "paymentMode": "Cash",
+      "counter": "Counter 1 (Breakfast & Snacks)",
+      "status": "settled",
+      "counterId": "C1",
+      "counterName": "Counter 1 (Breakfast & Snacks)",
+      "invoiceNo": "INV-C1-261018-101",
+      "id": 1792315933912
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1792315933913,
+      "finalTotal": 100,
+      "grandTotal": 100,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792315934013",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:52:38.203Z"
+    },
+    {
+      "id": 1792317158212,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792317158211",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-18T09:52:38.226Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792317158213,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792317158313",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:52:39.022Z"
+    },
+    {
+      "tableId": 1792317160007,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792317158214,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792317158314",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:52:39.037Z"
+    },
+    {
+      "tableId": 1792317161045,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792317158215,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792317158315",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:52:39.061Z"
+    },
+    {
+      "tableId": 1792317161046,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792317158216,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792317158316",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:52:39.078Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792317158217,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792317158317",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:52:39.503Z"
+    },
+    {
+      "tableNo": "Pre-Order: PRE-SETTLE-001",
+      "customerName": "Anil Kulkarni",
+      "customerPhone": "9890011223",
+      "sectionName": "Pre-Orders",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "unit": "1"
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "finalTotal": 100,
+      "paymentMode": "Cash",
+      "notes": "Pre-Order PRE-SETTLE-001 Balance Paid on Delivery",
+      "id": 1792317158218,
+      "grandTotal": 100,
+      "invoiceNo": "INV-M-261018-1792317158318",
+      "status": "settled",
+      "createdAt": "2026-10-18T09:52:47.110Z"
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1792317158219,
+      "finalTotal": 100,
+      "grandTotal": 100,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792317158319",
+      "status": "settled",
+      "createdAt": "2026-10-18T10:18:45.090Z"
+    },
+    {
+      "id": 1792318725113,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792318725112",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-18T10:18:45.114Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792318725114,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792318725214",
+      "status": "settled",
+      "createdAt": "2026-10-18T10:18:45.904Z"
+    },
+    {
+      "tableId": 1792318726902,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792318725115,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792318725215",
+      "status": "settled",
+      "createdAt": "2026-10-18T10:18:45.920Z"
+    },
+    {
+      "tableId": 1792318727936,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792318725116,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792318725216",
+      "status": "settled",
+      "createdAt": "2026-10-18T10:18:45.938Z"
+    },
+    {
+      "tableId": 1792318727937,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792318725117,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792318725217",
+      "status": "settled",
+      "createdAt": "2026-10-18T10:18:45.953Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792318725118,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792318725218",
+      "status": "settled",
+      "createdAt": "2026-10-18T10:18:46.375Z"
+    },
+    {
+      "tableNo": "Pre-Order: PRE-SETTLE-001",
+      "customerName": "Anil Kulkarni",
+      "customerPhone": "9890011223",
+      "sectionName": "Pre-Orders",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "unit": "1"
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "finalTotal": 100,
+      "paymentMode": "Cash",
+      "notes": "Pre-Order PRE-SETTLE-001 Balance Paid on Delivery",
+      "id": 1792318725119,
+      "grandTotal": 100,
+      "invoiceNo": "INV-M-261018-1792318725219",
+      "status": "settled",
+      "createdAt": "2026-10-18T10:19:25.786Z"
+    },
+    {
+      "tokenNo": "7",
+      "tableNo": "F7",
+      "tableId": 1791304819587,
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "categoryId": 1,
+          "subCategoryId": 1,
+          "price": 50,
+          "hasMultiplePrices": false,
+          "variants": [],
+          "sectionPrices": {
+            "1": 50,
+            "2": 50,
+            "3": 60,
+            "4": 50
+          },
+          "subItems": [],
+          "pricePerKg": null,
+          "stockQty": 18,
+          "status": "In Stock",
+          "marathiName": "उप्पीट",
+          "stockUnit": "per plate",
+          "recipeBaseQty": 1,
+          "accumulatedSold": 0,
+          "unit": "Plate",
+          "weightKg": null,
+          "qty": 4,
+          "isParcel": false,
+          "cartItemId": "2_1792318044082_vm0y",
+          "qtyDisplay": "4xPlate"
+        }
+      ],
+      "subtotal": 200,
+      "discount": 0,
+      "discountAmount": 0,
+      "discountType": "₹",
+      "discountValue": 0,
+      "deliveryCharge": 0,
+      "containerCharge": 0,
+      "waiterTip": 0,
+      "serviceCharge": 0,
+      "serviceChargeType": "₹",
+      "serviceChargeValue": 0,
+      "sectionName": "First Floor",
+      "sectionExtraCharge": 0,
+      "total": 200,
+      "finalTotal": 200,
+      "grandTotal": 200,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 200,
+        "online": 0,
+        "card": 0
+      },
+      "createdAt": "2026-10-18T10:24:33.324Z",
+      "isPrinted": false,
+      "paymentMode": "Cash",
+      "counter": "Counter 1 (Breakfast & Snacks)",
+      "status": "settled",
+      "counterId": "C1",
+      "counterName": "Counter 1 (Breakfast & Snacks)",
+      "invoiceNo": "INV-C1-261018-101",
+      "id": 1792318725120
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1792318725121,
+      "finalTotal": 100,
+      "grandTotal": 100,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792318725221",
+      "status": "settled",
+      "createdAt": "2026-10-18T11:09:18.851Z"
+    },
+    {
+      "id": 1792321758870,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792321758869",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-18T11:09:18.871Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792321758871,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792321758971",
+      "status": "settled",
+      "createdAt": "2026-10-18T11:09:19.647Z"
+    },
+    {
+      "tableId": 1792321760644,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792321758872,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792321758972",
+      "status": "settled",
+      "createdAt": "2026-10-18T11:09:19.661Z"
+    },
+    {
+      "tableId": 1792321761674,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792321758873,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792321758973",
+      "status": "settled",
+      "createdAt": "2026-10-18T11:09:19.677Z"
+    },
+    {
+      "tableId": 1792321761675,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792321758874,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792321758974",
+      "status": "settled",
+      "createdAt": "2026-10-18T11:09:19.688Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792321758875,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792321758975",
+      "status": "settled",
+      "createdAt": "2026-10-18T11:09:20.111Z"
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 55,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 110,
+      "total": 110,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 110,
+        "online": 0
+      },
+      "id": 1792321758876,
+      "finalTotal": 110,
+      "grandTotal": 110,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792321758976",
+      "status": "settled",
+      "createdAt": "2026-10-18T11:12:11.714Z"
+    },
+    {
+      "id": 1792321931729,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792321931728",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-18T11:12:11.735Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792321931730,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792321931830",
+      "status": "settled",
+      "createdAt": "2026-10-18T11:12:12.516Z"
+    },
+    {
+      "tableId": 1792321933509,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792321931731,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792321931831",
+      "status": "settled",
+      "createdAt": "2026-10-18T11:12:12.532Z"
+    },
+    {
+      "tableId": 1792321934543,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792321931732,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792321931832",
+      "status": "settled",
+      "createdAt": "2026-10-18T11:12:12.549Z"
+    },
+    {
+      "tableId": 1792321934544,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792321931733,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792321931833",
+      "status": "settled",
+      "createdAt": "2026-10-18T11:12:12.560Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792321931734,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792321931834",
+      "status": "settled",
+      "createdAt": "2026-10-18T11:12:12.979Z"
+    },
+    {
+      "tableNo": "Pre-Order: PRE-SETTLE-001",
+      "customerName": "Anil Kulkarni",
+      "customerPhone": "9890011223",
+      "sectionName": "Pre-Orders",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "unit": "1"
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "finalTotal": 100,
+      "paymentMode": "Cash",
+      "notes": "Pre-Order PRE-SETTLE-001 Balance Paid on Delivery",
+      "id": 1792321931735,
+      "grandTotal": 100,
+      "invoiceNo": "INV-M-261018-1792321931835",
+      "status": "settled",
+      "createdAt": "2026-10-18T12:05:33.782Z"
+    },
+    {
+      "tableNo": "Pre-Order: PRE-SETTLE-001",
+      "customerName": "Anil Kulkarni",
+      "customerPhone": "9890011223",
+      "sectionName": "Pre-Orders",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "unit": "1"
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "finalTotal": 100,
+      "paymentMode": "Cash",
+      "notes": "Pre-Order PRE-SETTLE-001 Balance Paid on Delivery",
+      "id": 1792321931736,
+      "grandTotal": 100,
+      "invoiceNo": "INV-M-261018-1792321931836",
+      "status": "settled",
+      "createdAt": "2026-10-18T12:07:23.638Z"
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1792321931737,
+      "finalTotal": 100,
+      "grandTotal": 100,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792321931837",
+      "status": "settled",
+      "createdAt": "2026-10-18T12:07:30.046Z"
+    },
+    {
+      "id": 1792325250061,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792325250060",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-18T12:07:30.067Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792325250062,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792325250162",
+      "status": "settled",
+      "createdAt": "2026-10-18T12:07:30.839Z"
+    },
+    {
+      "tableId": 1792325251833,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792325250063,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792325250163",
+      "status": "settled",
+      "createdAt": "2026-10-18T12:07:30.855Z"
+    },
+    {
+      "tableId": 1792325252865,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792325250064,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792325250164",
+      "status": "settled",
+      "createdAt": "2026-10-18T12:07:30.871Z"
+    },
+    {
+      "tableId": 1792325252866,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792325250065,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792325250165",
+      "status": "settled",
+      "createdAt": "2026-10-18T12:07:30.881Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792325250066,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792325250166",
+      "status": "settled",
+      "createdAt": "2026-10-18T12:07:31.305Z"
+    },
+    {
+      "tableNo": "Pre-Order: PRE-261018-001",
+      "customerName": "Aman Tuljapure",
+      "customerPhone": "9999999999",
+      "pax": "Bulk",
+      "sectionName": "Pre-Orders",
+      "sectionId": 4,
+      "items": [
+        {
+          "id": 12,
+          "name": "Batata Vada",
+          "price": 40,
+          "unit": "Plate",
+          "weightKg": null,
+          "qty": 4,
+          "categoryId": 1,
+          "total": 160,
+          "isParcel": true
+        },
+        {
+          "id": 13,
+          "name": "Samosa",
+          "price": 40,
+          "unit": "Plate",
+          "weightKg": null,
+          "qty": 999,
+          "categoryId": 1,
+          "total": 39960,
+          "isParcel": true
+        }
+      ],
+      "subtotal": 40120,
+      "total": 40120,
+      "finalTotal": 40120,
+      "grandTotal": 40120,
+      "paymentMode": "Cash",
+      "paymentDetails": {
+        "mode": "Cash",
+        "advancePaid": 5000,
+        "advanceMode": "Cash",
+        "balancePaid": 35120,
+        "balanceMode": "Cash"
+      },
+      "notes": "Pre-Order PRE-261018-001. Advance: ₹5000 (Cash), Balance: ₹35120 (Cash). Event Date: 2026-10-19 11:00",
+      "counterId": "C1",
+      "counterName": "Counter 1 (Breakfast & Snacks)",
+      "invoiceNo": "INV-C1-261018-102",
+      "createdAt": "2026-10-18T12:08:36.605Z",
+      "id": 1792325250067,
+      "status": "settled"
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1792325250068,
+      "finalTotal": 100,
+      "grandTotal": 100,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792325250168",
+      "status": "settled",
+      "createdAt": "2026-10-18T12:44:00.308Z"
+    },
+    {
+      "id": 1792327440328,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792327440327",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-18T12:44:00.324Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792327440329,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792327440429",
+      "status": "settled",
+      "createdAt": "2026-10-18T12:44:01.069Z"
+    },
+    {
+      "tableId": 1792327442071,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792327440330,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792327440430",
+      "status": "settled",
+      "createdAt": "2026-10-18T12:44:01.082Z"
+    },
+    {
+      "tableId": 1792327443100,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792327440331,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792327440431",
+      "status": "settled",
+      "createdAt": "2026-10-18T12:44:01.098Z"
+    },
+    {
+      "tableId": 1792327443101,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792327440332,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792327440432",
+      "status": "settled",
+      "createdAt": "2026-10-18T12:44:01.110Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792327440333,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792327440433",
+      "status": "settled",
+      "createdAt": "2026-10-18T12:44:01.531Z"
+    },
+    {
+      "tableNo": "Pre-Order: PRE-SETTLE-001",
+      "customerName": "Anil Kulkarni",
+      "customerPhone": "9890011223",
+      "sectionName": "Pre-Orders",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "unit": "1"
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "finalTotal": 100,
+      "paymentMode": "Cash",
+      "notes": "Pre-Order PRE-SETTLE-001 Balance Paid on Delivery",
+      "id": 1792327440334,
+      "grandTotal": 100,
+      "invoiceNo": "INV-M-261018-1792327440434",
+      "status": "settled",
+      "createdAt": "2026-10-18T12:44:06.734Z"
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1792327440335,
+      "finalTotal": 100,
+      "grandTotal": 100,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792327440435",
+      "status": "settled",
+      "createdAt": "2026-10-18T13:01:20.195Z"
+    },
+    {
+      "id": 1792328480213,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792328480211",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-18T13:01:20.211Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792328480214,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792328480314",
+      "status": "settled",
+      "createdAt": "2026-10-18T13:01:20.978Z"
+    },
+    {
+      "tableId": 1792328481974,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792328480215,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792328480315",
+      "status": "settled",
+      "createdAt": "2026-10-18T13:01:20.991Z"
+    },
+    {
+      "tableId": 1792328483009,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792328480216,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792328480316",
+      "status": "settled",
+      "createdAt": "2026-10-18T13:01:21.009Z"
+    },
+    {
+      "tableId": 1792328483010,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792328480217,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792328480317",
+      "status": "settled",
+      "createdAt": "2026-10-18T13:01:21.022Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792328480218,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792328480318",
+      "status": "settled",
+      "createdAt": "2026-10-18T13:01:21.450Z"
+    },
+    {
+      "tokenNo": "2",
+      "tableNo": "F2",
+      "tableId": 10,
+      "items": [
+        {
+          "id": 10,
+          "srNo": 110,
+          "name": "Shabu Khichdi",
+          "categoryId": 1,
+          "subCategoryId": 1,
+          "price": 60,
+          "hasMultiplePrices": false,
+          "variants": [],
+          "sectionPrices": {
+            "1": 60,
+            "2": 60,
+            "3": 70,
+            "4": 60
+          },
+          "subItems": [
+            {
+              "name": "Curd",
+              "qty": "1 bowl"
+            }
+          ],
+          "cartItemId": "10_1792328850425_32gc",
+          "unit": "Plate",
+          "weightKg": null,
+          "qty": 7,
+          "isParcel": false,
+          "marathiName": "शाबू खिचडी",
+          "qtyDisplay": "7xPlate"
+        },
+        {
+          "id": 4,
+          "srNo": 104,
+          "name": "Sheera",
+          "categoryId": 1,
+          "subCategoryId": 1,
+          "price": 45,
+          "hasMultiplePrices": false,
+          "variants": [],
+          "sectionPrices": {
+            "1": "34",
+            "2": 45,
+            "3": 55,
+            "4": 45
+          },
+          "subItems": [],
+          "stockQty": 8,
+          "status": "In Stock",
+          "stockUnit": "kg",
+          "recipeBaseQty": 0.2,
+          "accumulatedSold": 0,
+          "cartItemId": "4_1792328864766_wu1q",
+          "unit": "Plate",
+          "weightKg": null,
+          "qty": 5,
+          "isParcel": false,
+          "marathiName": "शिरा",
+          "qtyDisplay": "5xPlate"
+        },
+        {
+          "id": 8,
+          "srNo": 108,
+          "name": "Idli Vada",
+          "categoryId": 1,
+          "subCategoryId": 1,
+          "price": 60,
+          "hasMultiplePrices": false,
+          "variants": [],
+          "sectionPrices": {
+            "1": 60,
+            "2": 60,
+            "3": 70,
+            "4": 60
+          },
+          "subItems": [
+            {
+              "name": "1 Idli 1 Vada",
+              "qty": "1 plate"
+            }
+          ],
+          "cartItemId": "8_1792328870015_a685",
+          "unit": "Plate",
+          "weightKg": null,
+          "qty": 5,
+          "isParcel": false,
+          "marathiName": "इडली वडा मिक्स",
+          "qtyDisplay": "5xPlate"
+        },
+        {
+          "id": 33,
+          "srNo": 201,
+          "name": "Gulab Jamun",
+          "categoryId": 2,
+          "subCategoryId": 8,
+          "price": 240,
+          "hasMultiplePrices": true,
+          "variants": [
+            {
+              "unit": "250g",
+              "weightKg": 0.25,
+              "price": 110
+            },
+            {
+              "unit": "500g",
+              "weightKg": 0.5,
+              "price": 220
+            },
+            {
+              "unit": "1 Kg",
+              "weightKg": 1,
+              "price": 440
+            }
+          ],
+          "sectionPrices": {
+            "1": 110,
+            "2": 240,
+            "3": 260,
+            "4": 110
+          },
+          "subItems": [],
+          "pricePerKg": 440,
+          "marathiName": "गुलाब जामुन",
+          "cartItemId": "33_1792328907483_i2my",
+          "unit": "Plate",
+          "weightKg": null,
+          "qty": 2,
+          "isParcel": false,
+          "qtyDisplay": "2xPlate"
+        }
+      ],
+      "subtotal": 1425,
+      "discount": 0,
+      "discountAmount": 0,
+      "discountType": "₹",
+      "discountValue": 0,
+      "deliveryCharge": 0,
+      "containerCharge": 0,
+      "waiterTip": 0,
+      "serviceCharge": 0,
+      "serviceChargeType": "₹",
+      "serviceChargeValue": 0,
+      "sectionName": "First Floor",
+      "sectionExtraCharge": 0,
+      "total": 1425,
+      "finalTotal": 1425,
+      "grandTotal": 1425,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 1425,
+        "online": 0,
+        "card": 0
+      },
+      "createdAt": "2026-10-18T13:09:27.423Z",
+      "isPrinted": true,
+      "paymentMode": "Cash",
+      "counter": "Counter 1 (Breakfast & Snacks)",
+      "status": "settled",
+      "counterId": "C1",
+      "counterName": "Counter 1 (Breakfast & Snacks)",
+      "invoiceNo": "INV-C1-261018-103",
+      "id": 1792328480219
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1792328480220,
+      "finalTotal": 100,
+      "grandTotal": 100,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792328480320",
+      "status": "settled",
+      "createdAt": "2026-10-18T13:19:04.495Z"
+    },
+    {
+      "id": 1792329544511,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792329544510",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-18T13:19:04.513Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792329544512,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792329544612",
+      "status": "settled",
+      "createdAt": "2026-10-18T13:19:05.227Z"
+    },
+    {
+      "tableId": 1792329546223,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792329544513,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792329544613",
+      "status": "settled",
+      "createdAt": "2026-10-18T13:19:05.237Z"
+    },
+    {
+      "tableId": 1792329547245,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792329544514,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792329544614",
+      "status": "settled",
+      "createdAt": "2026-10-18T13:19:05.249Z"
+    },
+    {
+      "tableId": 1792329547246,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792329544515,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792329544615",
+      "status": "settled",
+      "createdAt": "2026-10-18T13:19:05.258Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792329544516,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792329544616",
+      "status": "settled",
+      "createdAt": "2026-10-18T13:19:05.675Z"
+    },
+    {
+      "tokenNo": "5",
+      "tableNo": "AC5",
+      "tableId": 19,
+      "items": [
+        {
+          "id": 5,
+          "srNo": 105,
+          "name": "Puri Bhaji",
+          "categoryId": 1,
+          "subCategoryId": 1,
+          "price": 75,
+          "hasMultiplePrices": false,
+          "variants": [],
+          "sectionPrices": {
+            "1": 75,
+            "2": 75,
+            "3": 85,
+            "4": 75
+          },
+          "subItems": [
+            {
+              "name": "4 Puris",
+              "qty": "1 portion"
+            },
+            {
+              "name": "Potato Bhaji",
+              "qty": "1 bowl"
+            }
+          ],
+          "cartItemId": "5_1792329609093_d7p2",
+          "unit": "Plate",
+          "weightKg": null,
+          "qty": 7,
+          "isParcel": false,
+          "marathiName": "पुरी भाजी",
+          "qtyDisplay": "7 x Plate"
+        }
+      ],
+      "subtotal": 525,
+      "discount": 0,
+      "discountAmount": 0,
+      "discountType": "₹",
+      "discountValue": 0,
+      "deliveryCharge": 0,
+      "containerCharge": 0,
+      "waiterTip": 0,
+      "serviceCharge": 0,
+      "serviceChargeType": "₹",
+      "serviceChargeValue": 0,
+      "sectionName": "ac",
+      "sectionExtraCharge": 0,
+      "total": 525,
+      "finalTotal": 525,
+      "grandTotal": 525,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 525,
+        "online": 0,
+        "card": 0
+      },
+      "createdAt": "2026-10-18T13:20:13.922Z",
+      "isPrinted": true,
+      "paymentMode": "Cash",
+      "counter": "Counter 1 (Breakfast & Snacks)",
+      "status": "settled",
+      "counterId": "C1",
+      "counterName": "Counter 1 (Breakfast & Snacks)",
+      "invoiceNo": "INV-C1-261018-104",
+      "id": 1792329544517
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1792329544518,
+      "finalTotal": 100,
+      "grandTotal": 100,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792329544618",
+      "status": "settled",
+      "createdAt": "2026-10-18T13:22:38.522Z"
+    },
+    {
+      "id": 1792329758532,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792329758531",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-18T13:22:38.538Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792329758533,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792329758633",
+      "status": "settled",
+      "createdAt": "2026-10-18T13:22:39.265Z"
+    },
+    {
+      "tableId": 1792329760256,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792329758534,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792329758634",
+      "status": "settled",
+      "createdAt": "2026-10-18T13:22:39.275Z"
+    },
+    {
+      "tableId": 1792329761280,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792329758535,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792329758635",
+      "status": "settled",
+      "createdAt": "2026-10-18T13:22:39.287Z"
+    },
+    {
+      "tableId": 1792329761281,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792329758536,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792329758636",
+      "status": "settled",
+      "createdAt": "2026-10-18T13:22:39.295Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792329758537,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261018-1792329758637",
+      "status": "settled",
+      "createdAt": "2026-10-18T13:22:39.710Z"
+    },
+    {
+      "tokenNo": "5",
+      "tableNo": "AC5",
+      "tableId": 19,
+      "items": [
+        {
+          "id": 5,
+          "srNo": 105,
+          "name": "Puri Bhaji",
+          "categoryId": 1,
+          "subCategoryId": 1,
+          "price": 75,
+          "hasMultiplePrices": false,
+          "variants": [],
+          "sectionPrices": {
+            "1": 75,
+            "2": 75,
+            "3": 85,
+            "4": 75
+          },
+          "subItems": [
+            {
+              "name": "4 Puris",
+              "qty": "1 portion"
+            },
+            {
+              "name": "Potato Bhaji",
+              "qty": "1 bowl"
+            }
+          ],
+          "cartItemId": "5_1792329864156_kqog",
+          "unit": "Plate",
+          "weightKg": null,
+          "qty": 6,
+          "isParcel": false,
+          "marathiName": "पुरी भाजी",
+          "qtyDisplay": "6"
+        }
+      ],
+      "subtotal": 450,
+      "discount": 0,
+      "discountAmount": 0,
+      "discountType": "₹",
+      "discountValue": 0,
+      "deliveryCharge": 0,
+      "containerCharge": 0,
+      "waiterTip": 0,
+      "serviceCharge": 0,
+      "serviceChargeType": "₹",
+      "serviceChargeValue": 0,
+      "sectionName": "ac",
+      "sectionExtraCharge": 0,
+      "total": 450,
+      "finalTotal": 450,
+      "grandTotal": 450,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 450,
+        "online": 0,
+        "card": 0
+      },
+      "createdAt": "2026-10-18T13:24:36.071Z",
+      "isPrinted": true,
+      "paymentMode": "Cash",
+      "counter": "Counter 1 (Breakfast & Snacks)",
+      "status": "settled",
+      "counterId": "C1",
+      "counterName": "Counter 1 (Breakfast & Snacks)",
+      "invoiceNo": "INV-C1-261018-105",
+      "id": 1792329758538
     }
   ],
   "billLogs": [
@@ -32054,6 +36252,47 @@
       "updatedAt": "2026-10-17T06:20:54.401Z",
       "createdAt": "2026-10-17T06:20:54.401Z",
       "id": 1792218054409
+    },
+    {
+      "orderNo": "PRE-261018-001",
+      "customerName": "Aman Tuljapure",
+      "customerPhone": "9999999999",
+      "deliveryDate": "2026-10-19",
+      "deliveryTime": "11:00",
+      "items": [
+        {
+          "id": 12,
+          "name": "Batata Vada",
+          "price": 40,
+          "unit": "Plate",
+          "weightKg": null,
+          "qty": 4,
+          "categoryId": 1
+        },
+        {
+          "id": 13,
+          "name": "Samosa",
+          "price": 40,
+          "unit": "Plate",
+          "weightKg": null,
+          "qty": 999,
+          "categoryId": 1
+        }
+      ],
+      "totalAmount": 40120,
+      "advancePayment": 5000,
+      "advancePaymentMode": "Cash",
+      "balanceAmount": 35120,
+      "notes": "",
+      "status": "completed",
+      "bookedByCounter": "Counter 1 (Breakfast & Snacks)",
+      "updatedAt": "2026-10-18T11:27:44.995Z",
+      "createdAt": "2026-10-18T11:27:44.995Z",
+      "id": 1792322865628,
+      "settledAt": "2026-10-18T12:08:36.714Z",
+      "settledBillInvoiceNo": "INV-C1-261018-102",
+      "balanceCollected": 35120,
+      "balanceCollectedMode": "Cash"
     }
   ],
   "rawMaterials": [
@@ -32068,7 +36307,7 @@
     },
     {
       "name": "kaju",
-      "quantity": 0,
+      "quantity": 0.6,
       "minThreshold": 5,
       "unit": "Kg",
       "id": 1788782933377,
@@ -32139,7 +36378,7 @@
     },
     {
       "name": "sugar",
-      "quantity": 0,
+      "quantity": 0.3,
       "minThreshold": 2,
       "unit": "Kg",
       "id": 1791126298858,
@@ -32289,16 +36528,6 @@
       "id": 1791309048905
     },
     {
-      "dishId": 34,
-      "rawMaterialId": 1791227297376,
-      "rawMaterialName": "suger",
-      "qtyRequired": 0.6,
-      "baseQty": 1,
-      "unit": "Kg",
-      "currentStock": 1.8,
-      "id": 1791309059557
-    },
-    {
       "dishId": 35,
       "rawMaterialId": 1788782933377,
       "rawMaterialName": "kaju",
@@ -32327,6 +36556,24 @@
       "unit": "Kg",
       "currentStock": 0,
       "id": 1791454502794
+    },
+    {
+      "id": 101,
+      "dishId": 34,
+      "rawMaterialId": 1791126298858,
+      "qtyRequired": 0.2,
+      "baseQty": 0.5,
+      "unit": "Kg",
+      "currentStock": 9.8
+    },
+    {
+      "id": 102,
+      "dishId": 34,
+      "rawMaterialId": 1788782933377,
+      "qtyRequired": 0.4,
+      "baseQty": 0.5,
+      "unit": "Kg",
+      "currentStock": 9.6
     }
   ],
   "systemSettings": {
@@ -32337,7 +36584,7 @@
     "location": "Solapur",
     "phone": "8446091809",
     "stockMode": "raw_material_wise",
-    "lastSyncTime": "2026-10-15T08:29:31.586Z",
+    "lastSyncTime": "2026-10-18T08:10:29.819Z",
     "id": 1
   },
   "settledBills": [

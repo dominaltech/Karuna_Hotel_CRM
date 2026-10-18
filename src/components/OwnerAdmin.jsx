@@ -46,7 +46,12 @@ import {
   Sliders
 } from 'lucide-react';
 import { db, getDishPriceForSection } from '../db/db';
-import { exportFoodItemsToCSV, parseCSVAndValidateRates } from '../utils/excelUtils';
+import { 
+  exportBreakfastItemsToCSV, 
+  exportSweetsItemsToCSV, 
+  exportFoodItemsToCSV, 
+  parseCSVAndValidateRates 
+} from '../utils/excelUtils';
 import { printThermalReceipt } from '../utils/receiptUtils';
 import { generateRevenuePDFReport } from '../utils/pdfUtils';
 import { AVAILABLE_COUNTERS } from './Header';
@@ -2091,21 +2096,33 @@ export default function OwnerAdmin({
                 </div>
               )}
 
-              <div className="flex flex-wrap items-center gap-3 pt-1">
-                {/* Export Button */}
+              <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                {/* Export Breakfast Button */}
                 <button
                   type="button"
-                  onClick={() => exportFoodItemsToCSV(dishes, categories, subCategories)}
-                  className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-4 py-2.5 rounded-xl cursor-pointer flex items-center space-x-1.5 shadow-xs transition-colors"
+                  onClick={() => exportBreakfastItemsToCSV(dishes, categories, subCategories)}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-black text-xs px-3.5 py-2.5 rounded-xl cursor-pointer flex items-center space-x-1.5 shadow-xs transition-colors"
+                  title="Download Breakfast Excel (with Dining, First Floor, AC, Parcel columns)"
                 >
                   <Download className="w-4 h-4" />
-                  <span>1. Export Dishes CSV</span>
+                  <span>Download Breakfast Excel</span>
+                </button>
+
+                {/* Export Sweets Button */}
+                <button
+                  type="button"
+                  onClick={() => exportSweetsItemsToCSV(dishes, categories, subCategories)}
+                  className="bg-purple-700 hover:bg-purple-800 text-white font-black text-xs px-3.5 py-2.5 rounded-xl cursor-pointer flex items-center space-x-1.5 shadow-xs transition-colors"
+                  title="Download Sweets Excel (with Dining, First Floor, AC, Parcel, 250g, 500g, 1Kg columns)"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download Sweets Excel</span>
                 </button>
 
                 {/* Import Button */}
-                <label className="bg-neutral-900 hover:bg-black text-white font-bold text-xs px-4 py-2.5 rounded-xl cursor-pointer flex items-center space-x-1.5 shadow-xs transition-colors">
+                <label className="bg-neutral-900 hover:bg-black text-white font-black text-xs px-4 py-2.5 rounded-xl cursor-pointer flex items-center space-x-1.5 shadow-xs transition-colors">
                   <Upload className="w-4 h-4 text-amber-300" />
-                  <span>2. Import Excel / CSV File</span>
+                  <span>Import Excel / CSV File</span>
                   <input
                     type="file"
                     accept=".csv, .txt, .xlsx"

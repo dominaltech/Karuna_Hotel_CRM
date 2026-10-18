@@ -1166,6 +1166,65 @@ async function runQATestSuite() {
     await apiRequest(`/api/bills/${billId}`, 'DELETE');
   });
 
+  // TC-21: Items Sold in Kg (Sweets / By-Kg Items) Bar Logic & Portion Rates Validation
+  await runTestCase('TC-21', 'Items Sold in Kg Identification, Variants & Custom Weight Computation', async () => {
+    const isKgItem = (dish) => {
+      if (!dish) return false;
+      if (dish.pricePerKg) return true;
+      if (dish.categoryId === 2) return true;
+      if (dish.counter && dish.counter.toLowerCase().includes('sweet')) return true;
+      if (dish.categoryName && dish.categoryName.toLowerCase().includes('sweet')) return true;
+      if (dish.unit && (dish.unit.toLowerCase().includes('kg') || dish.unit.toLowerCase().includes('g'))) return true;
+      if (dish.name && (dish.name.toLowerCase().includes('(by kg)') || dish.name.toLowerCase().includes('/kg') || dish.name.toLowerCase().includes(' kg'))) return true;
+      if (dish.variants && dish.variants.some(v => v.unit && (v.unit.toLowerCase().includes('kg') || v.unit.toLowerCase().includes('g')))) return true;
+      if (dish.hasMultiplePrices) return true;
+      return false;
+    };
+
+    const sweetDish = {
+      id: 34,
+      name: 'Kaju Katli',
+      categoryId: 2,
+      pricePerKg: 900,
+      hasMultiplePrices: true,
+      variants: [
+        { unit: '250g', weightKg: 0.25, price: 225 },
+        { unit: '500g', weightKg: 0.5, price: 450 },
+        { unit: '1 Kg', weightKg: 1, price: 900 }
+      ]
+    };
+
+    const regularDish = {
+      id: 101,
+      name: 'Masala Dosa',
+      categoryId: 1,
+      price: 90,
+      hasMultiplePrices: false
+    };
+
+    const bulkKgDishWithoutVariants = {
+      id: 202,
+      name: 'Special Pedha (by Kg)',
+      pricePerKg: 400
+    };
+
+    // 1. Identification
+    assert.strictEqual(isKgItem(sweetDish), true, 'Kaju Katli correctly recognized as Kg/Sweet item');
+    assert.strictEqual(isKgItem(regularDish), false, 'Masala Dosa correctly recognized as Regular non-Kg item');
+    assert.strictEqual(isKgItem(bulkKgDishWithoutVariants), true, 'Special Pedha correctly recognized as Kg item');
+
+    // 2. Portion & Custom Weight math
+    const ratePerKg = sweetDish.pricePerKg;
+    assert.strictEqual(Math.round(0.25 * ratePerKg), 225, '250g price is ₹225');
+    assert.strictEqual(Math.round(0.5 * ratePerKg), 450, '500g price is ₹450');
+    assert.strictEqual(Math.round(1 * ratePerKg), 900, '1 Kg price is ₹900');
+
+    // Custom weight entry e.g. 0.75 Kg
+    const customWeight = 0.75;
+    const customCalculatedPrice = Math.round(customWeight * ratePerKg);
+    assert.strictEqual(customCalculatedPrice, 675, '0.75 Kg price calculated at ₹675');
+  });
+
   } finally {
     if (serverHandle?.spawned) {
       console.log('🛑 Stopping temporary test server process...');

@@ -223,11 +223,7 @@ export function formatReceiptDate(dateVal = new Date()) {
 export function formatItemQtyDisplay(item) {
   if (!item) return '1';
   const itemQty = parseFloat(item.qty) || 1;
-  const isKgItem = item.weightKg !== undefined || (item.unit && (item.unit.includes('g') || item.unit.toLowerCase().includes('kg'))) || item.hasMultiplePrices;
-
-  if (!isKgItem) {
-    return `${itemQty}`;
-  }
+  const isKgItem = Boolean(item.weightKg) || (item.unit && (item.unit.includes('g') || item.unit.toLowerCase().includes('kg'))) || item.hasMultiplePrices;
 
   let cleanUnit = (item.unit || '').trim();
   const itemPrice = parseFloat(item.price) || 0;
@@ -235,6 +231,15 @@ export function formatItemQtyDisplay(item) {
     cleanUnit = cleanUnit.replace(new RegExp(`^₹?\\s*${itemPrice}\\s*`, 'i'), '').trim();
   }
   cleanUnit = cleanUnit.replace(/^\d+\s*[xX×]\s*/, '').trim();
+
+  // If unit is Plate (or includes Plate), remove 'x' and 'Plate' and display pure quantity count
+  if (cleanUnit && cleanUnit.toLowerCase().includes('plate')) {
+    return `${itemQty}`;
+  }
+
+  if (!isKgItem && !item.unit) {
+    return `${itemQty}`;
+  }
 
   if (!cleanUnit) {
     cleanUnit = item.weightKg ? `${item.weightKg} Kg` : 'Kg';
@@ -594,7 +599,13 @@ export async function printThermalReceipt(billData, options = {}) {
     const itemQty = parseFloat(item.qty) || 1;
     const itemPrice = parseFloat(item.price) || 0;
     const lineAmount = Math.round((itemPrice * itemQty) * 100) / 100;
-    const qtyDisplay = formatItemQtyDisplay(item);
+    let qtyDisplay = formatItemQtyDisplay(item);
+    if (qtyDisplay) {
+      qtyDisplay = qtyDisplay.replace(/\s*[xX×]\s*plate\b/gi, '').replace(/\bplate\b/gi, '').trim();
+      if (!qtyDisplay) {
+        qtyDisplay = `${itemQty}`;
+      }
+    }
     const isParcel = item.isParcel || (item.customNote && item.customNote.toLowerCase().includes('parcel'));
     const displayName = `${dishName}${isParcel ? ' (Parcel)' : ''}`;
 
@@ -730,33 +741,35 @@ export async function printThermalReceipt(billData, options = {}) {
           vertical-align: top;
         }
         .col-item {
-          width: 38%;
+          width: 35%;
           text-align: left;
           word-break: break-word;
           padding-right: 4px;
         }
         .col-price {
-          width: 18%;
-          text-align: right;
+          width: 14%;
+          text-align: left;
           font-family: 'Montserrat', sans-serif;
           font-weight: 700;
-          padding-right: 8px;
+          padding-left: 2px;
+          padding-right: 2px;
           white-space: nowrap;
         }
         .col-qty {
-          width: 22%;
+          width: 30%;
           text-align: center;
           font-family: 'Montserrat', sans-serif;
           font-weight: 700;
-          padding: 0 4px;
+          padding: 0 2px;
           white-space: nowrap;
         }
         .col-amount {
-          width: 22%;
+          width: 21%;
           text-align: right;
           font-family: 'Montserrat', sans-serif;
           font-weight: 800;
           white-space: nowrap;
+          padding-right: 1px;
         }
         .bottom-section {
           display: flex;

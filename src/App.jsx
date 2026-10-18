@@ -528,7 +528,7 @@ export default function App() {
     } else {
       const rawUnit = unitKey;
       const cleanUnit = rawUnit ? rawUnit.replace(/^\d+\s*[xX×]\s*/, '').trim() : null;
-      const cartItemId = `${dishItem.id}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const cartItemId = dishItem.cartItemId || `${dishItem.id}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       
       const newItem = {
         ...dishItem,
@@ -617,7 +617,12 @@ export default function App() {
     } else {
       updated = cartItems.map((i) => {
         const matches = i.cartItemId ? i.cartItemId === targetKey : (i.id === targetKey && (!unit || i.unit === unit));
-        return matches ? { ...i, qty: newQty } : i;
+        if (matches) {
+          const updatedItem = { ...i, qty: newQty };
+          updatedItem.qtyDisplay = formatItemQtyDisplay(updatedItem);
+          return updatedItem;
+        }
+        return i;
       });
     }
     setCartItems(updated);
@@ -1065,6 +1070,7 @@ export default function App() {
             settledBills={bills}
             allDishes={dishes}
             billLogs={billLogs}
+            activeCounter={activeCounter}
             onUpdateSettledBill={handleUpdateSettledBill}
             onSelectTable={handleSelectTable}
             onSaveTableOrder={handleSaveTableOrder}

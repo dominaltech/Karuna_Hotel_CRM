@@ -44,7 +44,7 @@ export default function PreOrderManagement({
   activeCounter = 'Counter 1'
 }) {
   const [currentView, setCurrentView] = useState('list'); // 'list' | 'create' | 'edit'
-  const [selectedFilter, setSelectedFilter] = useState('all'); // 'all' | 'tomorrow' | 'today' | 'upcoming' | 'completed' | 'cancelled'
+  const [selectedFilter, setSelectedFilter] = useState('all'); // 'all' | 'tomorrow' | 'today' | 'upcoming'
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [activeTabCatId, setActiveTabCatId] = useState('all');
@@ -128,25 +128,25 @@ export default function PreOrderManagement({
     });
   }, [dishes, activeTabCatId, dishSearchQuery]);
 
-  // Enriched Pre-Orders with Alert Status & Stats
-  const enrichedPreOrders = useMemo(() => {
-    return preOrders.map((order) => {
-      const alertInfo = checkPreOrderAlert(order.deliveryDate);
-      return {
-        ...order,
-        alertInfo
-      };
-    }).sort((a, b) => {
-      // Sort upcoming / urgent orders first, then by delivery date
-      if (a.status === 'completed' && b.status !== 'completed') return 1;
-      if (a.status !== 'completed' && b.status === 'completed') return -1;
-      const dateA = new Date(`${a.deliveryDate || '2099-01-01'}T${a.deliveryTime || '00:00'}`);
-      const dateB = new Date(`${b.deliveryDate || '2099-01-01'}T${b.deliveryTime || '00:00'}`);
-      return dateA - dateB;
-    });
+  // Enriched Pre-Orders with Alert Status & Stats (Strictly Upcoming - Excludes Completed & Cancelled)
+  const upcomingPreOrders = useMemo(() => {
+    return (preOrders || [])
+      .filter((order) => order && order.status !== 'completed' && order.status !== 'cancelled')
+      .map((order) => {
+        const alertInfo = checkPreOrderAlert(order.deliveryDate);
+        return {
+          ...order,
+          alertInfo
+        };
+      })
+      .sort((a, b) => {
+        const dateA = new Date(`${a.deliveryDate || '2099-01-01'}T${a.deliveryTime || '00:00'}`);
+        const dateB = new Date(`${b.deliveryDate || '2099-01-01'}T${b.deliveryTime || '00:00'}`);
+        return dateA - dateB;
+      });
   }, [preOrders]);
 
-  // Overall Statistics
+  // Overall Statistics for Upcoming Pre-Orders
   const stats = useMemo(() => {
     let dueTomorrowCount = 0;
     let dueTodayCount = 0;
@@ -154,44 +154,35 @@ export default function PreOrderManagement({
     let totalAdvance = 0;
     let totalBalance = 0;
 
-    enrichedPreOrders.forEach((o) => {
-      if (o.status !== 'completed' && o.status !== 'cancelled') {
-        if (o.alertInfo?.isTomorrow) dueTomorrowCount++;
-        else if (o.alertInfo?.isToday) dueTodayCount++;
-        else upcomingCount++;
+    upcomingPreOrders.forEach((o) => {
+      if (o.alertInfo?.isTomorrow) dueTomorrowCount++;
+      else if (o.alertInfo?.isToday) dueTodayCount++;
+      else upcomingCount++;
 
-        totalAdvance += (parseFloat(o.advancePayment) || 0);
-        totalBalance += (parseFloat(o.balanceAmount !== undefined ? o.balanceAmount : (o.totalAmount - o.advancePayment)) || 0);
-      }
+      totalAdvance += (parseFloat(o.advancePayment) || 0);
+      totalBalance += (parseFloat(o.balanceAmount !== undefined ? o.balanceAmount : (o.totalAmount - o.advancePayment)) || 0);
     });
 
     return {
       dueTomorrowCount,
       dueTodayCount,
       upcomingCount,
-      totalActive: dueTomorrowCount + dueTodayCount + upcomingCount,
+      totalActive: upcomingPreOrders.length,
       totalAdvance,
       totalBalance
     };
-  }, [enrichedPreOrders]);
+  }, [upcomingPreOrders]);
 
-  // Filtered Pre-Orders List
+  // Filtered Upcoming Pre-Orders List (strictly upcoming orders, no completed or cancelled)
   const displayedOrders = useMemo(() => {
-    return enrichedPreOrders.filter((order) => {
+    return upcomingPreOrders.filter((order) => {
       // Status filter
       if (selectedFilter === 'tomorrow') {
-        if (order.status === 'completed' || order.status === 'cancelled') return false;
         if (!order.alertInfo?.isTomorrow) return false;
       } else if (selectedFilter === 'today') {
-        if (order.status === 'completed' || order.status === 'cancelled') return false;
         if (!order.alertInfo?.isToday) return false;
       } else if (selectedFilter === 'upcoming') {
-        if (order.status === 'completed' || order.status === 'cancelled') return false;
         if (order.alertInfo?.isTomorrow || order.alertInfo?.isToday || order.alertInfo?.isOverdue) return false;
-      } else if (selectedFilter === 'completed') {
-        if (order.status !== 'completed') return false;
-      } else if (selectedFilter === 'cancelled') {
-        if (order.status !== 'cancelled') return false;
       }
 
       // Date picker filter
@@ -211,15 +202,19 @@ export default function PreOrderManagement({
 
       return true;
     });
-  }, [enrichedPreOrders, selectedFilter, dateFilter, searchQuery]);
+  }, [upcomingPreOrders, selectedFilter, dateFilter, searchQuery]);
 
   // Helper: check if dish is sweet / kg
   const isSweetsDish = (dish) => {
     if (!dish) return false;
+    if (dish.pricePerKg) return true;
     if (dish.categoryId === 2) return true;
     if (dish.counter && dish.counter.toLowerCase().includes('sweet')) return true;
+    if (dish.categoryName && dish.categoryName.toLowerCase().includes('sweet')) return true;
+    if (dish.unit && (dish.unit.toLowerCase().includes('kg') || dish.unit.toLowerCase().includes('g'))) return true;
+    if (dish.name && (dish.name.toLowerCase().includes('(by kg)') || dish.name.toLowerCase().includes('/kg') || dish.name.toLowerCase().includes(' kg'))) return true;
+    if (dish.variants && dish.variants.some(v => v.unit && (v.unit.toLowerCase().includes('kg') || v.unit.toLowerCase().includes('g')))) return true;
     if (dish.hasMultiplePrices) return true;
-    if (dish.pricePerKg) return true;
     return false;
   };
 
@@ -607,9 +602,20 @@ export default function PreOrderManagement({
                 return (
                   <div
                     key={`pre-dish-${dish.id}`}
-                    onClick={() => setSelectedDishForQty(dish)}
+                    onClick={() => {
+                      if (isSweet) {
+                        setSelectedSweetDish(dish);
+                        setSelectedDishForQty(null);
+                        setCustomKgInput('');
+                      } else {
+                        setSelectedSweetDish(null);
+                        setSelectedDishForQty(dish);
+                      }
+                    }}
                     className={`bg-white border rounded-2xl p-3 flex flex-col justify-between transition-all cursor-pointer group active:scale-98 select-none ${
-                      selectedDishForQty?.id === dish.id
+                      selectedSweetDish?.id === dish.id
+                        ? 'border-pink-500 ring-2 ring-pink-300 shadow-md bg-pink-50/20'
+                        : selectedDishForQty?.id === dish.id
                         ? 'border-orange-500 ring-2 ring-orange-300 shadow-md bg-orange-50/20'
                         : 'border-slate-200 hover:border-orange-400 hover:shadow-md'
                     }`}
@@ -1249,12 +1255,10 @@ export default function PreOrderManagement({
             {/* Filter Pills */}
             <div className="flex items-center space-x-1.5 overflow-x-auto text-xs">
               {[
-                { id: 'all', label: `All Orders (${enrichedPreOrders.length})` },
+                { id: 'all', label: `All Upcoming (${upcomingPreOrders.length})` },
                 { id: 'tomorrow', label: `🚨 Due Tomorrow (${stats.dueTomorrowCount})`, alert: stats.dueTomorrowCount > 0 },
                 { id: 'today', label: `⏰ Due Today (${stats.dueTodayCount})`, urgent: stats.dueTodayCount > 0 },
-                { id: 'upcoming', label: `📅 Future Upcoming (${stats.upcomingCount})` },
-                { id: 'completed', label: `✅ Completed` },
-                { id: 'cancelled', label: `❌ Cancelled` }
+                { id: 'upcoming', label: `📅 Future Upcoming (${stats.upcomingCount})` }
               ].map((f) => (
                 <button
                   key={f.id}
@@ -1312,11 +1316,15 @@ export default function PreOrderManagement({
             {displayedOrders.length === 0 ? (
               <div className="py-16 text-center text-slate-400">
                 <CalendarClock className="w-12 h-12 mx-auto mb-2 text-slate-300" />
-                <h3 className="text-sm font-bold text-slate-700">No Pre-Orders found</h3>
+                <h3 className="text-sm font-bold text-slate-700">No Upcoming Pre-Orders</h3>
                 <p className="text-xs text-slate-400 mt-0.5">
                   {selectedFilter === 'tomorrow'
-                    ? 'No orders are scheduled for tomorrow.'
-                    : 'Click "+ Take Bulk Pre-Order" to create your first advanced booking.'}
+                    ? 'No upcoming orders are scheduled for tomorrow.'
+                    : selectedFilter === 'today'
+                    ? 'No upcoming orders are scheduled for today.'
+                    : selectedFilter === 'upcoming'
+                    ? 'No future upcoming orders are scheduled.'
+                    : 'Click "+ Take Bulk Pre-Order" to create a new booking.'}
                 </p>
               </div>
             ) : (
