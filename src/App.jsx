@@ -67,7 +67,7 @@ export default function App() {
   const [dismissedUrgentAlert, setDismissedUrgentAlert] = useState(false);
   const [rawMaterials, setRawMaterials] = useState(DEFAULT_INITIAL_DATA.rawMaterials);
   const [recipes, setRecipes] = useState(DEFAULT_INITIAL_DATA.recipes);
-  const [stockMode, setStockMode] = useState(localStorage.getItem('karuna_stock_mode') || 'item_wise');
+  const [stockMode, setStockMode] = useState('raw_material_wise');
 
   // Cart State & Active Table State
   const [cartItems, setCartItems] = useState([]);
@@ -1162,8 +1162,6 @@ export default function App() {
             tables={tables}
             bills={bills}
             billLogs={billLogs}
-            stockMode={stockMode}
-            onUpdateStockMode={handleUpdateStockMode}
             onAddDish={handleAddDish}
             onUpdateDish={handleUpdateDish}
             onDeleteDish={handleDeleteDish}

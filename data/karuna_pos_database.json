@@ -147,10 +147,12 @@
       "hasMultiplePrices": false,
       "variants": [],
       "sectionPrices": {
-        "1": 35,
-        "2": "350",
+        "1": 22,
+        "2": 22,
         "3": 45,
-        "4": 35
+        "4": 22,
+        "5": 11,
+        "1791304843141": 22
       },
       "subItems": [
         {
@@ -172,10 +174,12 @@
       "hasMultiplePrices": false,
       "variants": [],
       "sectionPrices": {
-        "1": "34",
-        "2": 45,
+        "1": 2,
+        "2": 22,
         "3": 55,
-        "4": 45
+        "4": 1,
+        "5": 2,
+        "1791304843141": 1
       },
       "subItems": [],
       "stockQty": 3,
@@ -194,10 +198,12 @@
       "hasMultiplePrices": false,
       "variants": [],
       "sectionPrices": {
-        "1": 75,
-        "2": 75,
+        "1": 1,
+        "2": 1,
         "3": 85,
-        "4": 75
+        "4": 2,
+        "5": 1,
+        "1791304843141": 2
       },
       "subItems": [
         {
@@ -220,10 +226,12 @@
       "hasMultiplePrices": false,
       "variants": [],
       "sectionPrices": {
-        "1": 50,
-        "2": 50,
+        "1": 2,
+        "2": 2,
         "3": 60,
-        "4": 50
+        "4": 1,
+        "5": 2,
+        "1791304843141": 1
       },
       "subItems": [
         {
@@ -246,10 +254,11 @@
       "hasMultiplePrices": false,
       "variants": [],
       "sectionPrices": {
-        "1": 60,
-        "2": 60,
+        "1": 1,
+        "2": 1,
         "3": 70,
-        "4": 60
+        "4": 2,
+        "1791304843141": 2
       },
       "subItems": [
         {
@@ -268,10 +277,12 @@
       "hasMultiplePrices": false,
       "variants": [],
       "sectionPrices": {
-        "1": 60,
-        "2": 60,
+        "1": 1,
+        "2": 1,
         "3": 70,
-        "4": 60
+        "4": 2,
+        "5": 1,
+        "1791304843141": 2
       },
       "subItems": [
         {
@@ -290,10 +301,12 @@
       "hasMultiplePrices": false,
       "variants": [],
       "sectionPrices": {
-        "1": 70,
+        "1": 1,
         "2": 70,
         "3": 80,
-        "4": 70
+        "4": 2,
+        "5": 1,
+        "1791304843141": 2
       },
       "subItems": [],
       "stockQty": 0,
@@ -310,9 +323,11 @@
       "variants": [],
       "sectionPrices": {
         "1": 60,
-        "2": 60,
+        "2": 2,
         "3": 70,
-        "4": 60
+        "4": 2,
+        "5": 1,
+        "1791304843141": 1
       },
       "subItems": [
         {
@@ -332,9 +347,11 @@
       "variants": [],
       "sectionPrices": {
         "1": 70,
-        "2": 70,
+        "2": 2,
         "3": 80,
-        "4": 70
+        "4": 2,
+        "5": 1,
+        "1791304843141": 1
       },
       "subItems": []
     },
@@ -349,9 +366,11 @@
       "variants": [],
       "sectionPrices": {
         "1": 40,
-        "2": 40,
+        "2": 2,
         "3": 50,
-        "4": 40
+        "4": 2,
+        "5": 1,
+        "1791304843141": 1
       },
       "subItems": []
     },
@@ -368,7 +387,8 @@
         "1": 40,
         "2": 40,
         "3": 50,
-        "4": 40
+        "4": 40,
+        "1791304843141": 19
       },
       "subItems": []
     },
@@ -534,10 +554,12 @@
       "hasMultiplePrices": false,
       "variants": [],
       "sectionPrices": {
-        "1": 95,
+        "1": 1,
         "2": 95,
         "3": 105,
-        "4": 95
+        "4": 1,
+        "5": 1,
+        "1791304843141": 11
       },
       "subItems": []
     },
@@ -551,10 +573,12 @@
       "hasMultiplePrices": false,
       "variants": [],
       "sectionPrices": {
-        "1": 75,
-        "2": 75,
+        "1": 1,
+        "2": 1,
         "3": 85,
-        "4": 75
+        "4": 1,
+        "5": 1,
+        "1791304843141": 1
       },
       "subItems": []
     },
@@ -568,10 +592,12 @@
       "hasMultiplePrices": false,
       "variants": [],
       "sectionPrices": {
-        "1": 80,
-        "2": 80,
+        "1": 1,
+        "2": 1,
         "3": 90,
-        "4": 80
+        "4": 1,
+        "5": 1,
+        "1791304843141": 1
       },
       "subItems": []
     },
@@ -585,10 +611,11 @@
       "hasMultiplePrices": false,
       "variants": [],
       "sectionPrices": {
-        "1": 90,
-        "2": 90,
+        "1": 1,
+        "2": 1,
         "3": 100,
-        "4": 90
+        "4": 1,
+        "1791304843141": 1
       },
       "subItems": [
         {
@@ -611,10 +638,12 @@
       "hasMultiplePrices": false,
       "variants": [],
       "sectionPrices": {
-        "1": 110,
-        "2": 110,
+        "1": 1,
+        "2": 1,
         "3": 125,
-        "4": 110
+        "4": 1,
+        "5": 1,
+        "1791304843141": 1
       },
       "subItems": []
     },
@@ -628,10 +657,12 @@
       "hasMultiplePrices": false,
       "variants": [],
       "sectionPrices": {
-        "1": 25,
-        "2": 25,
+        "1": 1,
+        "2": 1,
         "3": 30,
-        "4": 25
+        "4": 1,
+        "5": 1,
+        "1791304843141": 1
       },
       "subItems": []
     },
@@ -646,9 +677,11 @@
       "variants": [],
       "sectionPrices": {
         "1": 140,
-        "2": 140,
+        "2": 1,
         "3": 160,
-        "4": 140
+        "4": 1,
+        "5": 1,
+        "1791304843141": 1
       },
       "subItems": []
     },
@@ -662,10 +695,12 @@
       "hasMultiplePrices": false,
       "variants": [],
       "sectionPrices": {
-        "1": 20,
-        "2": 20,
+        "1": 1,
+        "2": 1,
         "3": 25,
-        "4": 20
+        "4": 1,
+        "5": 1,
+        "1791304843141": 1
       },
       "subItems": []
     },
@@ -679,10 +714,12 @@
       "hasMultiplePrices": false,
       "variants": [],
       "sectionPrices": {
-        "1": 30,
+        "1": 1,
         "2": 30,
         "3": 35,
-        "4": 30
+        "4": 30,
+        "5": 1,
+        "1791304843141": 1
       },
       "subItems": []
     },
@@ -696,10 +733,11 @@
       "hasMultiplePrices": false,
       "variants": [],
       "sectionPrices": {
-        "1": 40,
-        "2": 40,
+        "1": 1,
+        "2": 11,
         "3": 45,
-        "4": 40
+        "4": 1,
+        "5": 1
       },
       "subItems": []
     },
@@ -713,10 +751,12 @@
       "hasMultiplePrices": false,
       "variants": [],
       "sectionPrices": {
-        "1": 20,
-        "2": 20,
+        "1": 1,
+        "2": 1,
         "3": 20,
-        "4": 20
+        "4": 1,
+        "5": 1,
+        "1791304843141": 1
       },
       "subItems": []
     },
@@ -747,9 +787,11 @@
       ],
       "sectionPrices": {
         "1": 110,
-        "2": 300,
-        "3": 320,
-        "4": 110
+        "2": 61,
+        "3": 410,
+        "4": 110,
+        "5": 61,
+        "1791304843141": 61
       },
       "subItems": [],
       "pricePerKg": 440,
@@ -777,7 +819,13 @@
           "price": 900
         }
       ],
-      "sectionPrices": {},
+      "sectionPrices": {
+        "1": 1,
+        "2": 1,
+        "4": 1,
+        "5": 1,
+        "1791304843141": 1
+      },
       "subItems": [],
       "stockQty": 0.5,
       "status": "In Stock",
@@ -807,7 +855,12 @@
           "price": 350
         }
       ],
-      "sectionPrices": {},
+      "sectionPrices": {
+        "1": 1,
+        "2": 1,
+        "5": 1,
+        "1791304843141": 1
+      },
       "subItems": [],
       "stockUnit": "kg",
       "stockQty": 8,
@@ -837,7 +890,13 @@
           "price": 300
         }
       ],
-      "sectionPrices": {},
+      "sectionPrices": {
+        "1": 1,
+        "2": 1,
+        "4": 1,
+        "5": 1,
+        "1791304843141": 1
+      },
       "subItems": []
     },
     {
@@ -862,7 +921,11 @@
           "price": 420
         }
       ],
-      "sectionPrices": {},
+      "sectionPrices": {
+        "2": 1,
+        "4": 1,
+        "1791304843141": 1
+      },
       "subItems": []
     },
     {
@@ -887,7 +950,13 @@
           "price": 1040
         }
       ],
-      "sectionPrices": {},
+      "sectionPrices": {
+        "1": 1,
+        "2": 1,
+        "4": 1,
+        "5": 1,
+        "1791304843141": 1
+      },
       "subItems": [],
       "status": "In Stock",
       "stockQty": 5
@@ -914,7 +983,12 @@
           "price": 340
         }
       ],
-      "sectionPrices": {},
+      "sectionPrices": {
+        "1": 1,
+        "4": 1,
+        "5": 1111,
+        "1791304843141": 1
+      },
       "subItems": []
     }
   ],
@@ -36118,6 +36192,623 @@
       "counterName": "Counter 1 (Breakfast & Snacks)",
       "invoiceNo": "INV-C1-261018-105",
       "id": 1792329758538
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1792329758539,
+      "finalTotal": 100,
+      "grandTotal": 100,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261019-1792329758639",
+      "status": "settled",
+      "createdAt": "2026-10-19T09:04:58.594Z"
+    },
+    {
+      "id": 1792400698605,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792400698604",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-19T09:04:58.610Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792400698606,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261019-1792400698706",
+      "status": "settled",
+      "createdAt": "2026-10-19T09:04:59.370Z"
+    },
+    {
+      "tableId": 1792400700362,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792400698607,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261019-1792400698707",
+      "status": "settled",
+      "createdAt": "2026-10-19T09:04:59.384Z"
+    },
+    {
+      "tableId": 1792400701392,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792400698608,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261019-1792400698708",
+      "status": "settled",
+      "createdAt": "2026-10-19T09:04:59.399Z"
+    },
+    {
+      "tableId": 1792400701393,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792400698609,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261019-1792400698709",
+      "status": "settled",
+      "createdAt": "2026-10-19T09:04:59.410Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792400698610,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261019-1792400698710",
+      "status": "settled",
+      "createdAt": "2026-10-19T09:04:59.833Z"
+    },
+    {
+      "tokenNo": "TC20-CHG-01",
+      "tableNo": "QA-CHG-TBL",
+      "tableName": "QA-CHG-TBL",
+      "counter": "Counter 1",
+      "items": [
+        {
+          "id": 9999,
+          "name": "QA Test Thali",
+          "price": 250,
+          "qty": 2
+        }
+      ],
+      "subtotal": 500,
+      "discount": 50,
+      "discountAmount": 50,
+      "discountType": "₹",
+      "discountValue": 50,
+      "deliveryCharge": 40,
+      "containerCharge": 20,
+      "waiterTip": 30,
+      "serviceCharge": 25,
+      "serviceChargeType": "₹",
+      "serviceChargeValue": 25,
+      "total": 565,
+      "finalTotal": 565,
+      "grandTotal": 565,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cashGiven": 600,
+        "returnChange": 35
+      },
+      "id": 1792400698611,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261019-1792400698711",
+      "status": "settled",
+      "createdAt": "2026-10-19T09:05:01.304Z"
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1792400698612,
+      "finalTotal": 100,
+      "grandTotal": 100,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261019-1792400698712",
+      "status": "settled",
+      "createdAt": "2026-10-19T09:46:09.325Z"
+    },
+    {
+      "id": 1792403169349,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792403169348",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-19T09:46:09.346Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792403169350,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261019-1792403169450",
+      "status": "settled",
+      "createdAt": "2026-10-19T09:46:10.137Z"
+    },
+    {
+      "tableId": 1792403171139,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792403169351,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261019-1792403169451",
+      "status": "settled",
+      "createdAt": "2026-10-19T09:46:10.151Z"
+    },
+    {
+      "tableId": 1792403172170,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792403169352,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261019-1792403169452",
+      "status": "settled",
+      "createdAt": "2026-10-19T09:46:10.166Z"
+    },
+    {
+      "tableId": 1792403172171,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792403169353,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261019-1792403169453",
+      "status": "settled",
+      "createdAt": "2026-10-19T09:46:10.180Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792403169354,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261019-1792403169454",
+      "status": "settled",
+      "createdAt": "2026-10-19T09:46:10.619Z"
+    },
+    {
+      "tableId": 1792003145934,
+      "tokenNo": "5501",
+      "tableNo": "QA-D1",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 2,
+          "weightKg": 1
+        }
+      ],
+      "subtotal": 100,
+      "total": 100,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 100,
+        "online": 0
+      },
+      "id": 1792403169355,
+      "finalTotal": 100,
+      "grandTotal": 100,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261019-1792403169455",
+      "status": "settled",
+      "createdAt": "2026-10-19T10:18:48.544Z"
+    },
+    {
+      "id": 1792405128570,
+      "tokenNo": "1001",
+      "invoiceNo": "INV-TEST-OFFLINE-1792405128569",
+      "counterId": "C1",
+      "total": 80,
+      "items": [
+        {
+          "id": 33,
+          "name": "Gulab Jamun",
+          "price": 80,
+          "qty": 1,
+          "weightKg": 0.25
+        }
+      ],
+      "finalTotal": 80,
+      "grandTotal": 80,
+      "paymentMode": "Cash",
+      "status": "settled",
+      "syncedAt": "2026-10-19T10:18:48.568Z",
+      "wasOffline": true
+    },
+    {
+      "tableId": 9,
+      "tokenNo": "9901",
+      "tableNo": "F1-A",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792405128571,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261019-1792405128671",
+      "status": "settled",
+      "createdAt": "2026-10-19T10:18:49.345Z"
+    },
+    {
+      "tableId": 1792405130345,
+      "tokenNo": "9902",
+      "tableNo": "F1-B",
+      "sectionName": "First Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792405128572,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261019-1792405128672",
+      "status": "settled",
+      "createdAt": "2026-10-19T10:18:49.361Z"
+    },
+    {
+      "tableId": 1792405131378,
+      "tokenNo": "8801",
+      "tableNo": "C1-A",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 1,
+          "name": "Single Idli Vada",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792405128573,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261019-1792405128673",
+      "status": "settled",
+      "createdAt": "2026-10-19T10:18:49.377Z"
+    },
+    {
+      "tableId": 1792405131379,
+      "tokenNo": "8802",
+      "tableNo": "C1-B",
+      "sectionName": "Ground Floor",
+      "items": [
+        {
+          "id": 2,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792405128574,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261019-1792405128674",
+      "status": "settled",
+      "createdAt": "2026-10-19T10:18:49.390Z"
+    },
+    {
+      "tableId": 5,
+      "tokenNo": "7701",
+      "tableNo": "D5",
+      "sectionName": "Dine In Area",
+      "items": [
+        {
+          "id": 2,
+          "srNo": 102,
+          "name": "Uppit",
+          "price": 50,
+          "qty": 1
+        }
+      ],
+      "subtotal": 50,
+      "total": 50,
+      "paymentDetails": {
+        "mode": "Cash",
+        "cash": 50,
+        "online": 0
+      },
+      "id": 1792405128575,
+      "finalTotal": 50,
+      "grandTotal": 50,
+      "paymentMode": "Cash",
+      "invoiceNo": "INV-M-261019-1792405128675",
+      "status": "settled",
+      "createdAt": "2026-10-19T10:18:49.811Z"
     }
   ],
   "billLogs": [

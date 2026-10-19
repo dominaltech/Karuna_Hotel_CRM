@@ -76,9 +76,7 @@ export default function OwnerAdmin({
   onDeleteTable,
   onBulkUpdatePrices,
   onUpdateSettledBill,
-  printLanguage = 'mr',
-  stockMode: propStockMode,
-  onUpdateStockMode
+  printLanguage = 'mr'
 }) {
   const sortSectionsWithParcelsLast = (secArray) => {
     if (!Array.isArray(secArray)) return [];
@@ -110,7 +108,6 @@ export default function OwnerAdmin({
   const [newDishCatId, setNewDishCatId] = useState(1);
   const [newDishSubCatId, setNewDishSubCatId] = useState(subCategories[0]?.id || 1);
   const [newDishCounter, setNewDishCounter] = useState('Breakfast');
-  const [newDishStockQty, setNewDishStockQty] = useState('20');
   const [newDishHasMultiplePrices, setNewDishHasMultiplePrices] = useState(false);
   const [newDishVariants, setNewDishVariants] = useState([
     { unit: '250g', weightKg: 0.25, price: '' },
@@ -120,47 +117,10 @@ export default function OwnerAdmin({
 
   // Edit Dish Modal State
   const [editingDish, setEditingDish] = useState(null);
-
   // UPI Setting State
   const [upiId, setUpiId] = useState(localStorage.getItem('karuna_upi_id') || '8446091809@ybl');
   const [payeeName, setPayeeName] = useState(localStorage.getItem('karuna_payee_name') || 'Karuna Hotel');
   const [upiSavedToast, setUpiSavedToast] = useState(false);
-
-  // Stock Master Operating Mode State
-  const [selectedStockMode, setSelectedStockMode] = useState(
-    propStockMode || localStorage.getItem('karuna_stock_mode') || 'item_wise'
-  );
-  const [stockModeSavedToast, setStockModeSavedToast] = useState(false);
-
-  useEffect(() => {
-    if (propStockMode) {
-      setSelectedStockMode(propStockMode);
-    }
-  }, [propStockMode]);
-
-  const handleSaveStockMode = async (modeToSave) => {
-    const finalMode = modeToSave || selectedStockMode;
-    if (selectedStockMode && modeToSave && modeToSave !== selectedStockMode) {
-      const modeLabel = modeToSave === 'item_wise' ? 'Option 1 (Item & Recipe-Wise)' : 'Option 2 (Raw Material-Wise Only)';
-      if (!window.confirm(`Are you sure you want to change the Stock Master Operating Mode to ${modeLabel}? Once saved, this mode is permanently remembered.`)) {
-        return;
-      }
-    }
-    setSelectedStockMode(finalMode);
-    localStorage.setItem('karuna_stock_mode', finalMode);
-    if (typeof onUpdateStockMode === 'function') {
-      await onUpdateStockMode(finalMode);
-    }
-    try {
-      await db.systemSettings.put({
-        id: 1,
-        stockMode: finalMode,
-        lastSyncTime: new Date().toISOString()
-      });
-    } catch (e) {}
-    setStockModeSavedToast(true);
-    setTimeout(() => setStockModeSavedToast(false), 3500);
-  };
 
   // Backup & Import Feedback State
   const [bulkRatesMessage, setBulkRatesMessage] = useState(null);
@@ -235,16 +195,57 @@ export default function OwnerAdmin({
     }
   };
 
-  // Sync section rates matrix from dishes
+  // Sync section rates matrix from dishes without wiping active local edits
   useEffect(() => {
     if (dishes && dishes.length > 0) {
-      const ratesMap = {};
-      dishes.forEach((d) => {
-        ratesMap[d.id] = { ...(d.sectionPrices || {}) };
+      setDishSectionRates((prev) => {
+        const next = { ...prev };
+        dishes.forEach((d) => {
+          next[d.id] = {
+            ...(d.sectionPrices || {}),
+            ...(prev[d.id] || {})
+          };
+        });
+        return next;
       });
-      setDishSectionRates(ratesMap);
     }
   }, [dishes]);
+
+  // Instantly save area rate when user leaves box or presses Enter
+  const handleSaveSingleRate = async (dishId, secId, rawVal) => {
+    const val = rawVal !== undefined ? rawVal : (dishSectionRates[dishId]?.[secId] || '');
+    const num = parseFloat(val);
+    const dish = dishes.find((d) => d.id === dishId);
+    if (!dish) return;
+
+    const currentRates = {
+      ...(dish.sectionPrices || {}),
+      ...(dishSectionRates[dishId] || {})
+    };
+
+    if (!isNaN(num) && num > 0) {
+      currentRates[secId] = num;
+    } else {
+      delete currentRates[secId];
+    }
+
+    setDishSectionRates((prev) => ({
+      ...prev,
+      [dishId]: {
+        ...(prev[dishId] || {}),
+        [secId]: !isNaN(num) && num > 0 ? num.toString() : ''
+      }
+    }));
+
+    try {
+      await db.dishes.update(dishId, { sectionPrices: currentRates });
+      if (typeof onUpdateDish === 'function') {
+        onUpdateDish(dishId, { ...dish, sectionPrices: currentRates });
+      }
+    } catch (err) {
+      console.warn('Auto-save matrix rate error:', err);
+    }
+  };
 
   // Handle Save New Dish
   const handleSaveNewDish = () => {
@@ -274,7 +275,7 @@ export default function OwnerAdmin({
       subCategoryId: parseInt(newDishSubCatId) || 1,
       price: finalPrice,
       pricePerKg: parseFloat(newDishPricePerKg) || (newDishHasMultiplePrices ? finalPrice * 4 : null),
-      stockQty: parseFloat(newDishStockQty) || 20,
+      stockQty: 9999,
       counter: newDishCounter,
       status: 'In Stock',
       hasMultiplePrices: newDishHasMultiplePrices,
@@ -300,7 +301,7 @@ export default function OwnerAdmin({
       ...editingDish,
       price: parseFloat(editingDish.price) || 0,
       pricePerKg: parseFloat(editingDish.pricePerKg) || null,
-      stockQty: parseFloat(editingDish.stockQty) || 0
+      stockQty: editingDish.stockQty !== undefined ? (parseFloat(editingDish.stockQty) || 9999) : 9999
     });
     setEditingDish(null);
   };
@@ -579,18 +580,6 @@ export default function OwnerAdmin({
           </button>
 
           <button
-            onClick={() => setActiveAdminSubTab('stock_settings')}
-            className={`px-3.5 py-2 rounded-lg font-black text-xs transition-all cursor-pointer flex items-center space-x-1.5 ${
-              activeAdminSubTab === 'stock_settings'
-                ? 'bg-neutral-900 text-white shadow-xs'
-                : 'text-stone-600 hover:bg-stone-100'
-            }`}
-          >
-            <Package className="w-3.5 h-3.5 text-amber-500" />
-            <span>Stock Master Mode</span>
-          </button>
-
-          <button
             onClick={() => setActiveAdminSubTab('upi')}
             className={`px-3.5 py-2 rounded-lg font-black text-xs transition-all cursor-pointer flex items-center space-x-1.5 ${
               activeAdminSubTab === 'upi'
@@ -809,14 +798,13 @@ export default function OwnerAdmin({
                     <th className="py-3 px-4">Sub-Category</th>
                     <th className="py-3 px-4 text-right">Price (₹)</th>
                     <th className="py-3 px-4 text-center">Counter</th>
-                    <th className="py-3 px-4 text-center">Status</th>
                     <th className="py-3 px-4 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredDishes.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-12 text-center text-slate-400 font-semibold">
+                      <td colSpan={8} className="py-12 text-center text-slate-400 font-semibold">
                         No dishes found matching the current division or search query.
                       </td>
                     </tr>
@@ -879,17 +867,6 @@ export default function OwnerAdmin({
                           <td className="py-3 px-4 text-center">
                             <span className="bg-stone-100 text-stone-800 text-[10px] font-black px-2 py-0.5 rounded-md border border-stone-200">
                               {dish.counter || 'Breakfast'}
-                            </span>
-                          </td>
-
-                          {/* Status */}
-                          <td className="py-3 px-4 text-center">
-                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
-                              (dish.stockQty || 0) <= 0
-                                ? 'bg-rose-100 text-rose-800'
-                                : 'bg-stone-100 text-stone-800 border border-stone-200'
-                            }`}>
-                              {dish.status || 'In Stock'}
                             </span>
                           </td>
 
@@ -1573,23 +1550,30 @@ export default function OwnerAdmin({
           </div>
 
           {/* SECTION 2: DINING AREA PRICE MATRIX */}
-          <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-xs flex justify-between items-center">
+          <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-xs flex flex-wrap justify-between items-center gap-3">
             <div>
               <h3 className="text-base font-black text-neutral-900">
                 Dining Area Price Matrix
               </h3>
               <p className="text-xs text-stone-500 font-semibold mt-0.5">
-                Set custom prices per dish for different sections (e.g. AC Hall higher rate)
+                Set custom prices per dish for different sections (e.g. First Floor, AC Hall, Parcels, Sweets)
               </p>
             </div>
 
             <button
               onClick={async () => {
-                // Save section rates
                 for (const d of dishes) {
-                  const rates = dishSectionRates[d.id];
-                  if (rates) {
-                    await db.dishes.update(d.id, { sectionPrices: rates });
+                  const rates = dishSectionRates[d.id] || d.sectionPrices || {};
+                  const cleanRates = {};
+                  Object.entries(rates).forEach(([secId, rateVal]) => {
+                    const num = parseFloat(rateVal);
+                    if (!isNaN(num) && num > 0) {
+                      cleanRates[secId] = num;
+                    }
+                  });
+                  await db.dishes.update(d.id, { sectionPrices: cleanRates });
+                  if (typeof onUpdateDish === 'function') {
+                    onUpdateDish(d.id, { ...d, sectionPrices: cleanRates });
                   }
                 }
                 setRatesSavedFeedback(true);
@@ -1602,14 +1586,68 @@ export default function OwnerAdmin({
             </button>
           </div>
 
+          {/* Search & Category Filter for Matrix */}
+          <div className="bg-white border border-stone-200 rounded-2xl p-3 shadow-xs flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setMatrixFilterCat('all')}
+                className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer ${
+                  matrixFilterCat === 'all'
+                    ? 'bg-neutral-900 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                All Items ({dishes.length})
+              </button>
+              {categories.map((cat) => {
+                const isSelected = matrixFilterCat === cat.id.toString() || matrixFilterCat === cat.id;
+                const count = dishes.filter((d) => d.categoryId === cat.id).length;
+                return (
+                  <button
+                    key={`matrix-cat-filter-${cat.id}`}
+                    type="button"
+                    onClick={() => setMatrixFilterCat(cat.id.toString())}
+                    className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-neutral-900 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {cat.name} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search dish name or code..."
+                value={matrixSearchQuery}
+                onChange={(e) => setMatrixSearchQuery(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-7 py-1.5 text-xs font-bold text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500 transition-all"
+              />
+              {matrixSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setMatrixSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
           <div className="bg-white border border-stone-200 rounded-2xl shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-100 border-b border-slate-200 text-slate-800 font-extrabold text-[11px] uppercase tracking-wider">
-                    <th className="py-3 px-4">Code</th>
-                    <th className="py-3 px-4">Dish Name</th>
-                    <th className="py-3 px-4">Standard Rate (₹)</th>
+                    <th className="py-3 px-4 w-20">Code</th>
+                    <th className="py-3 px-4 min-w-[200px]">Dish Name</th>
                     {sections.map((sec) => (
                       <th key={`sec-rate-th-${sec.id}`} className="py-3 px-4 text-center">
                         {sec.name} (₹)
@@ -1618,51 +1656,86 @@ export default function OwnerAdmin({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {dishes.map((dish) => (
-                    <tr key={`matrix-d-${dish.id}`} className="hover:bg-blue-50/20">
-                      <td className="py-3 px-4 font-mono font-bold">#{dish.srNo || dish.id}</td>
-                      <td className="py-3 px-4">
-                        <div className="font-extrabold text-slate-900 text-xs sm:text-sm">{dish.name}</div>
-                        {dish.marathiName && (
-                          <div className="text-xs font-black text-blue-900 mt-0.5">
-                            {dish.marathiName}
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 font-black text-blue-600">₹{dish.price}</td>
-                      {sections.map((sec) => (
-                        <td key={`matrix-input-${dish.id}-${sec.id}`} className="py-3 px-4 text-center">
-                          <input
-                            type="number"
-                            placeholder={dish.price.toString()}
-                            value={dishSectionRates[dish.id]?.[sec.id] || ''}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setDishSectionRates({
-                                ...dishSectionRates,
-                                [dish.id]: {
-                                  ...(dishSectionRates[dish.id] || {}),
-                                  [sec.id]: val
-                                }
-                              });
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                const allInputs = Array.from(document.querySelectorAll('.matrix-rate-input'));
-                                const currentIndex = allInputs.indexOf(e.target);
-                                if (currentIndex !== -1 && currentIndex + 1 < allInputs.length) {
-                                  allInputs[currentIndex + 1].focus();
-                                  allInputs[currentIndex + 1].select();
-                                }
-                              }
-                            }}
-                            className="matrix-rate-input w-20 bg-slate-50 border border-slate-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-500 rounded-lg p-1.5 text-center font-black outline-none text-xs transition-all"
-                          />
+                  {(() => {
+                    const matrixFilteredDishes = dishes.filter((dish) => {
+                      if (matrixFilterCat !== 'all' && String(dish.categoryId) !== String(matrixFilterCat)) {
+                        return false;
+                      }
+                      if (matrixSearchQuery.trim()) {
+                        const q = matrixSearchQuery.toLowerCase().trim();
+                        const matchName = dish.name?.toLowerCase().includes(q);
+                        const matchMarathi = dish.marathiName?.toLowerCase().includes(q);
+                        const matchCode = dish.srNo?.toString().includes(q) || dish.id?.toString().includes(q);
+                        return matchName || matchMarathi || matchCode;
+                      }
+                      return true;
+                    });
+
+                    if (matrixFilteredDishes.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={sections.length + 2} className="py-8 text-center text-stone-400 font-semibold">
+                            No dishes found matching filter.
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return matrixFilteredDishes.map((dish) => (
+                      <tr key={`matrix-d-${dish.id}`} className="hover:bg-blue-50/20">
+                        <td className="py-3 px-4 font-mono font-bold text-slate-600">#{dish.srNo || dish.id}</td>
+                        <td className="py-3 px-4">
+                          <div className="font-extrabold text-slate-900 text-xs sm:text-sm">{dish.name}</div>
+                          {dish.marathiName && (
+                            <div className="text-xs font-black text-blue-900 mt-0.5">
+                              {dish.marathiName}
+                            </div>
+                          )}
                         </td>
-                      ))}
-                    </tr>
-                  ))}
+                        {sections.map((sec) => {
+                          const currentVal = dishSectionRates[dish.id]?.[sec.id] !== undefined
+                            ? dishSectionRates[dish.id][sec.id]
+                            : (dish.sectionPrices?.[sec.id] !== undefined ? dish.sectionPrices[sec.id] : '');
+
+                          return (
+                            <td key={`matrix-input-${dish.id}-${sec.id}`} className="py-3 px-4 text-center">
+                              <input
+                                type="number"
+                                placeholder={dish.price ? dish.price.toString() : '0'}
+                                value={currentVal}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setDishSectionRates((prev) => ({
+                                    ...prev,
+                                    [dish.id]: {
+                                      ...(prev[dish.id] || {}),
+                                      [sec.id]: val
+                                    }
+                                  }));
+                                }}
+                                onBlur={(e) => {
+                                  handleSaveSingleRate(dish.id, sec.id, e.target.value);
+                                }}
+                                onKeyDown={async (e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    await handleSaveSingleRate(dish.id, sec.id, e.target.value);
+                                    const allInputs = Array.from(document.querySelectorAll('.matrix-rate-input'));
+                                    const currentIndex = allInputs.indexOf(e.target);
+                                    if (currentIndex !== -1 && currentIndex + 1 < allInputs.length) {
+                                      allInputs[currentIndex + 1].focus();
+                                      allInputs[currentIndex + 1].select();
+                                    }
+                                  }
+                                }}
+                                className="matrix-rate-input w-24 bg-slate-50 border border-slate-300 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500 rounded-lg p-1.5 text-center font-black outline-none text-xs transition-all"
+                              />
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ));
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -1737,242 +1810,7 @@ export default function OwnerAdmin({
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* SUB-TAB: STOCK MASTER MODE SELECTION                                     */}
-      {/* ========================================================================= */}
-      {activeAdminSubTab === 'stock_settings' && (
-        <div className="space-y-6 animate-in fade-in duration-150">
-          
-          {/* Toast Notification */}
-          {stockModeSavedToast && (
-            <div className="bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center space-x-2 text-xs font-black animate-in slide-in-from-top-2 duration-200">
-              <CheckCircle className="w-4 h-4 text-white" />
-              <span>
-                ✓ Stock Master mode saved to {selectedStockMode === 'item_wise' ? 'Item-Wise (आयटम व प्रमाण)' : 'Raw Material-Wise (फक्त कच्चा माल)'}! Stock Master tab is now configured.
-              </span>
-            </div>
-          )}
 
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs max-w-4xl space-y-6">
-            
-            {/* Header */}
-            <div className="flex items-start justify-between border-b border-slate-100 pb-4">
-              <div className="flex items-center space-x-3">
-                <div className="p-3 bg-blue-100 text-blue-700 rounded-2xl">
-                  <Package className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-slate-900 tracking-tight">
-                    Stock Master Operating Mode (स्टॉक मॅनेजमेंट पद्धत निवड)
-                  </h3>
-                  <p className="text-xs text-slate-500 font-semibold mt-0.5">
-                    Choose which stock tracking logic is used in the <strong>Stock Master</strong> tab. The user will strictly be limited to the mode selected here.
-                  </p>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-                  Currently Active
-                </span>
-                <span className={`text-xs font-black px-3 py-1 rounded-full border inline-block mt-0.5 ${
-                  selectedStockMode === 'raw_material_wise'
-                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                    : 'bg-blue-100 text-blue-800 border-blue-300'
-                }`}>
-                  {selectedStockMode === 'raw_material_wise' ? '📦 Raw Material-Wise Only' : '🍽️ Item & Recipe-Wise'}
-                </span>
-              </div>
-            </div>
-
-            {/* Instruction Warning / Info */}
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center space-x-3 text-xs text-emerald-950 font-semibold">
-              <Lock className="w-5 h-5 text-emerald-600 shrink-0" />
-              <span>
-                <strong>Permanent Stock Mode Retention:</strong> Once set, your chosen stock management method stays active across app reopens, page refreshes, and computer restarts. Stock Master tab operates strictly in this selected mode.
-              </span>
-            </div>
-
-            {/* 2 Mode Selection Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              
-              {/* Card 1: Item-Wise Mode */}
-              <div
-                onClick={() => handleSaveStockMode('item_wise')}
-                className={`border-2 rounded-3xl p-5 cursor-pointer transition-all duration-200 flex flex-col justify-between relative group ${
-                  selectedStockMode === 'item_wise'
-                    ? 'border-blue-600 bg-blue-50/50 shadow-lg ring-2 ring-blue-600/30'
-                    : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50/50 bg-white'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className={`text-xs font-black px-2.5 py-1 rounded-lg border ${
-                      selectedStockMode === 'item_wise'
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                        : 'bg-blue-50 text-blue-800 border-blue-200'
-                    }`}>
-                      Option 1 (आयटम व रेसिपी)
-                    </span>
-                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                      selectedStockMode === 'item_wise'
-                        ? 'border-blue-600 bg-blue-600 text-white ring-2 ring-blue-300'
-                        : 'border-slate-300 bg-slate-100'
-                    }`}>
-                      {selectedStockMode === 'item_wise' ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <span className="text-[10px] text-slate-400 font-bold">1</span>}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2.5 mb-2">
-                    <Utensils className="w-5 h-5 text-blue-600" />
-                    <h4 className="font-black text-base text-slate-900">
-                      Item-Wise Stock (आयटम व रेसिपीनुसार)
-                    </h4>
-                  </div>
-                  <p className="text-xs text-slate-500 font-medium leading-relaxed mb-4">
-                    Track stock for finished food items with portion ratios and multi-ingredient recipe deduction.
-                  </p>
-
-                  <ul className="space-y-2 text-xs font-semibold text-slate-700 border-t border-slate-200/60 pt-3">
-                    <li className="flex items-center space-x-2">
-                      <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                      <span>Set measurement base (Kg, Litre, Plate) per dish</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                      <span>Link multiple raw materials per portion</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                      <span>View &amp; adjust remaining dish quantities</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                      <span>Automatically deducts recipe batch on billing</span>
-                    </li>
-                  </ul>
-                </div>
-
-                <div className="mt-5 pt-3 border-t border-slate-200/60 space-y-2">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSaveStockMode('item_wise');
-                    }}
-                    className={`w-full py-2.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center justify-center space-x-1.5 shadow-sm ${
-                      selectedStockMode === 'item_wise'
-                        ? 'bg-blue-600 text-white shadow-blue-600/30 ring-2 ring-blue-400'
-                        : 'bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700'
-                    }`}
-                  >
-                    <Check className="w-4 h-4" />
-                    <span>{selectedStockMode === 'item_wise' ? '✓ Currently Active (सक्रिय)' : 'Click to Set Option 1'}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Card 2: Raw Material-Wise Mode */}
-              <div
-                onClick={() => handleSaveStockMode('raw_material_wise')}
-                className={`border-2 rounded-3xl p-5 cursor-pointer transition-all duration-200 flex flex-col justify-between relative group ${
-                  selectedStockMode === 'raw_material_wise'
-                    ? 'border-emerald-600 bg-emerald-50/50 shadow-lg ring-2 ring-emerald-600/30'
-                    : 'border-slate-200 hover:border-emerald-300 hover:bg-slate-50/50 bg-white'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className={`text-xs font-black px-2.5 py-1 rounded-lg border ${
-                      selectedStockMode === 'raw_material_wise'
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                        : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                    }`}>
-                      Option 2 (फक्त कच्चा माल)
-                    </span>
-                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                      selectedStockMode === 'raw_material_wise'
-                        ? 'border-emerald-600 bg-emerald-600 text-white ring-2 ring-emerald-300'
-                        : 'border-slate-300 bg-slate-100'
-                    }`}>
-                      {selectedStockMode === 'raw_material_wise' ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <span className="text-[10px] text-slate-400 font-bold">2</span>}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2.5 mb-2">
-                    <Package className="w-5 h-5 text-emerald-600" />
-                    <h4 className="font-black text-base text-slate-900">
-                      Raw Material-Wise Only (फक्त कच्चा माल)
-                    </h4>
-                  </div>
-                  <p className="text-xs text-slate-500 font-medium leading-relaxed mb-4">
-                    Pure raw material stock management. Enter incoming supplies and add/update remaining stock with visible available quantities.
-                  </p>
-
-                  <ul className="space-y-2 text-xs font-semibold text-slate-700 border-t border-slate-200/60 pt-3">
-                    <li className="flex items-center space-x-2">
-                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>Enter incoming raw materials as they arrive (आलेला माल)</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>See current available quantity clearly when adding remaining stock</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>Track total received vs available vs consumed</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>No dish recipe configuration needed; direct kitchen stock</span>
-                    </li>
-                  </ul>
-                </div>
-
-                <div className="mt-5 pt-3 border-t border-slate-200/60 space-y-2">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSaveStockMode('raw_material_wise');
-                    }}
-                    className={`w-full py-2.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center justify-center space-x-1.5 shadow-sm ${
-                      selectedStockMode === 'raw_material_wise'
-                        ? 'bg-emerald-600 text-white shadow-emerald-600/30 ring-2 ring-emerald-400'
-                        : 'bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-700'
-                    }`}
-                  >
-                    <Check className="w-4 h-4" />
-                    <span>{selectedStockMode === 'raw_material_wise' ? '✓ Currently Active (सक्रिय)' : 'Click to Set Option 2'}</span>
-                  </button>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Bottom Actions */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100">
-              <div className="text-xs text-slate-500 font-semibold">
-                Selected Mode:{' '}
-                <strong className="text-slate-900">
-                  {selectedStockMode === 'item_wise' ? 'Item & Recipe-Wise' : 'Raw Material-Wise Only'}
-                </strong>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleSaveStockMode(selectedStockMode)}
-                className="bg-neutral-900 hover:bg-black text-white font-black text-xs px-6 py-3 rounded-2xl shadow-md cursor-pointer transition-all flex items-center space-x-2 hover:scale-102"
-              >
-                <Save className="w-4 h-4 text-emerald-400" />
-                <span>Save Stock Master Mode (स्टॉक पद्धत सेव्ह करा)</span>
-              </button>
-            </div>
-
-          </div>
-
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* SUB-TAB 4: DYNAMIC UPI QR CODE SETTINGS (Matches Mockup)                  */}
@@ -2287,34 +2125,19 @@ export default function OwnerAdmin({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">
-                    Counter Assignment
-                  </label>
-                  <select
-                    value={newDishCounter}
-                    onChange={(e) => setNewDishCounter(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold outline-none"
-                  >
-                    <option value="Breakfast">Breakfast & Snacks</option>
-                    <option value="Sweets">Sweets & Farsan</option>
-                    <option value="Parcel">Parcel & Takeaway</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">
-                    Initial Stock (Kg)
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="20"
-                    value={newDishStockQty}
-                    onChange={(e) => setNewDishStockQty(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold outline-none"
-                  />
-                </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">
+                  Counter Assignment
+                </label>
+                <select
+                  value={newDishCounter}
+                  onChange={(e) => setNewDishCounter(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                >
+                  <option value="Breakfast">Breakfast & Snacks</option>
+                  <option value="Sweets">Sweets & Farsan</option>
+                  <option value="Parcel">Parcel & Takeaway</option>
+                </select>
               </div>
 
               {/* Multi-Price Checkbox (Requirement 8) */}
@@ -2480,7 +2303,7 @@ export default function OwnerAdmin({
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">
                     Standard Price (₹)
@@ -2501,18 +2324,6 @@ export default function OwnerAdmin({
                     type="number"
                     value={editingDish.pricePerKg || ''}
                     onChange={(e) => handleBasePricePerKgChange(e.target.value, true)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">
-                    Stock (Kg)
-                  </label>
-                  <input
-                    type="number"
-                    value={editingDish.stockQty !== undefined ? editingDish.stockQty : ''}
-                    onChange={(e) => setEditingDish({ ...editingDish, stockQty: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold outline-none"
                   />
                 </div>
