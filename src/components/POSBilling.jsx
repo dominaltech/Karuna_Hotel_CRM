@@ -61,7 +61,9 @@ export default function POSBilling({
   onClearCart,
   onSettleBill,
   printLanguage = 'mr',
-  activeCounter = ''
+  activeCounter = '',
+  isSettledBillEditEnabled,
+  preOrders = []
 }) {
   const sortedCategories = [...categories].sort((a, b) => (a.srNo || 0) - (b.srNo || 0));
 
@@ -87,6 +89,8 @@ export default function POSBilling({
   // Footer bar active dish for multi-price options (Requirement 1)
   const [activeFooterDish, setActiveFooterDish] = useState(null);
   const [customKgInput, setCustomKgInput] = useState('');
+  const [sweetEntryMode, setSweetEntryMode] = useState('kg'); // 'kg' | 'price'
+  const [customPriceInput, setCustomPriceInput] = useState('');
   const [editingCartItemIndex, setEditingCartItemIndex] = useState(null); // in-place cart edit index
   const [isParcelMode, setIsParcelMode] = useState(false); // Toggle to add items as Parcel from top search bar
 
@@ -339,6 +343,7 @@ export default function POSBilling({
       } else {
         setActiveFooterDish(dish);
         setCustomKgInput('');
+        setCustomPriceInput('');
       }
       return;
     }
@@ -438,6 +443,49 @@ export default function POSBilling({
     const kg = parseFloat(customKgInput);
     if (kg && !isNaN(kg) && kg > 0) {
       onReduceFromCart({ ...activeFooterDish, unit: `${kg} Kg` });
+    } else {
+      const match = cartItems.slice().reverse().find((i) => (i.id === activeFooterDish.id || i.name === activeFooterDish.name) && i.weightKg);
+      if (match) {
+        onReduceFromCart({ ...activeFooterDish, unit: match.unit });
+      } else {
+        onReduceFromCart(activeFooterDish);
+      }
+    }
+  };
+
+  // Handle Custom Price (₹) entry from Footer Bar: Automatically calculates grams
+  const handleAddCustomPrice = (e) => {
+    if (e) e.preventDefault();
+    if (!activeFooterDish) return;
+    const priceNum = parseFloat(customPriceInput);
+    if (!priceNum || isNaN(priceNum) || priceNum <= 0) return;
+
+    const ratePerKg = activeFooterDish.pricePerKg || (activeFooterDish.variants?.find((v) => v.unit === '1 Kg' || v.unit === '1Kg')?.price) || activeFooterDish.sectionPrices?.[5] || (activeFooterDish.price ? activeFooterDish.price * 4 : 320);
+    const calculatedGrams = Math.round((priceNum / ratePerKg) * 1000);
+    const calculatedKg = parseFloat((calculatedGrams / 1000).toFixed(3));
+    const unitLabel = calculatedGrams >= 1000 ? `${calculatedKg} Kg` : `${calculatedGrams}g`;
+
+    onAddToCart({
+      ...activeFooterDish,
+      price: priceNum,
+      unit: unitLabel,
+      weightKg: calculatedKg,
+      qty: 1,
+      isParcel: isParcelMode
+    });
+    setCustomPriceInput('');
+  };
+
+  // Handle Reducing Custom Price item from cart
+  const handleReduceCustomPrice = () => {
+    if (!activeFooterDish || typeof onReduceFromCart !== 'function') return;
+    const priceNum = parseFloat(customPriceInput);
+    if (priceNum && !isNaN(priceNum) && priceNum > 0) {
+      const ratePerKg = activeFooterDish.pricePerKg || (activeFooterDish.variants?.find((v) => v.unit === '1 Kg' || v.unit === '1Kg')?.price) || activeFooterDish.sectionPrices?.[5] || (activeFooterDish.price ? activeFooterDish.price * 4 : 320);
+      const calculatedGrams = Math.round((priceNum / ratePerKg) * 1000);
+      const calculatedKg = parseFloat((calculatedGrams / 1000).toFixed(3));
+      const unitLabel = calculatedGrams >= 1000 ? `${calculatedKg} Kg` : `${calculatedGrams}g`;
+      onReduceFromCart({ ...activeFooterDish, unit: unitLabel });
     } else {
       const match = cartItems.slice().reverse().find((i) => (i.id === activeFooterDish.id || i.name === activeFooterDish.name) && i.weightKg);
       if (match) {
@@ -559,6 +607,8 @@ export default function POSBilling({
         onSplitTable={onSplitTable}
         onDeleteTable={onDeleteTable}
         printLanguage={printLanguage}
+        isSettledBillEditEnabled={isSettledBillEditEnabled}
+        preOrders={preOrders}
         onOpenOrderPopupForTable={(tbl) => {
           if (tbl) {
             onSelectTable(tbl);
@@ -618,13 +668,18 @@ export default function POSBilling({
 
           <button
             onClick={() => setSelectedSubCatId('all')}
-            className={`w-full text-left py-2 px-2 rounded-xl font-bold text-xs transition-all cursor-pointer leading-tight ${
+            className={`w-full text-left py-2 px-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer leading-tight ${
               selectedSubCatId === 'all'
-                ? 'bg-blue-50 text-blue-900 border border-blue-200 font-black'
+                ? 'bg-blue-50 text-blue-900 border border-blue-200 font-black shadow-xs'
                 : 'text-slate-600 hover:bg-slate-50 border border-transparent'
             }`}
           >
-            All Items
+            <div className="flex flex-col">
+              <span>All Items</span>
+              <span className={`text-[11px] font-semibold mt-0.5 ${selectedSubCatId === 'all' ? 'text-blue-700' : 'text-slate-500'}`}>
+                सर्व पदार्थ
+              </span>
+            </div>
           </button>
 
           {currentSubCats.map((sc, scIdx) => {
@@ -633,13 +688,20 @@ export default function POSBilling({
               <button
                 key={`sub-cat-${sc.id}-${scIdx}`}
                 onClick={() => setSelectedSubCatId(sc.id)}
-                className={`w-full text-left py-2 px-2 rounded-xl font-bold text-xs transition-all cursor-pointer leading-tight ${
+                className={`w-full text-left py-2 px-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer leading-tight ${
                   isSelected
-                    ? 'bg-blue-50 text-blue-900 border border-blue-200 font-black'
+                    ? 'bg-blue-50 text-blue-900 border border-blue-200 font-black shadow-xs'
                     : 'text-slate-600 hover:bg-slate-50 border border-transparent'
                 }`}
               >
-                {sc.name}
+                <div className="flex flex-col">
+                  <span>{sc.name}</span>
+                  {sc.marathiName && (
+                    <span className={`text-[11px] font-semibold mt-0.5 ${isSelected ? 'text-blue-700' : 'text-slate-500'}`}>
+                      {sc.marathiName}
+                    </span>
+                  )}
+                </div>
               </button>
             );
           })}
@@ -792,15 +854,15 @@ export default function POSBilling({
 
         {/* DOCKED BOTTOM BAR FOR SWEET KG ITEMS (Only in Parcel or Sweet section) */}
         {activeFooterDish && isSweetKgDish(activeFooterDish) && isParcelOrSweetContext && (() => {
-          const defaultRate = activeFooterDish.pricePerKg || activeFooterDish.price || (activeFooterDish.variants?.[0]?.price ? activeFooterDish.variants[0].price * 4 : 320);
+          const defaultRate = activeFooterDish.pricePerKg || (activeFooterDish.variants?.find((v) => v.unit === '1 Kg' || v.unit === '1Kg')?.price) || activeFooterDish.sectionPrices?.[5] || activeFooterDish.price || (activeFooterDish.variants?.[0]?.price ? activeFooterDish.variants[0].price * 4 : 320);
           const variants = (activeFooterDish.variants && activeFooterDish.variants.length > 0)
             ? activeFooterDish.variants
             : [
                 { unit: '250g', weightKg: 0.25, price: Math.round(defaultRate * 0.25) },
                 { unit: '500g', weightKg: 0.5, price: Math.round(defaultRate * 0.5) },
-                { unit: '1Kg', weightKg: 1, price: Math.round(defaultRate) }
+                { unit: '1 Kg', weightKg: 1, price: Math.round(defaultRate) }
               ];
-          const rateDisplay = activeFooterDish.variants?.[0]?.price || activeFooterDish.price || Math.round(defaultRate * 0.25);
+          const rateDisplay = activeFooterDish.pricePerKg || (activeFooterDish.variants?.find((v) => v.unit === '1 Kg' || v.unit === '1Kg')?.price) || activeFooterDish.sectionPrices?.[5] || defaultRate;
           
           // Match cart items for this dish to determine if it has already been added
           const matchingCartItems = cartItems.filter(
@@ -813,9 +875,9 @@ export default function POSBilling({
 
           return (
             <div className="shrink-0 px-3 pb-3 pt-0 bg-slate-100 z-30 animate-in slide-in-from-bottom-2 duration-150">
-              <div className="bg-white border-2 border-blue-600 rounded-2xl shadow-xl p-3 sm:p-3.5 px-4 sm:px-6 space-y-2.5">
-                {/* Top Row: Dish Name & Rate Badge (No "X" button) */}
-                <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
+              <div className="bg-white border-2 border-blue-600 rounded-2xl shadow-xl p-3 sm:p-3.5 px-4 sm:px-5 space-y-2.5">
+                {/* Top Row: Dish Name & Rate Badge + Custom Entry Mode Toggle (UP) + Close Button */}
+                <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2.5">
                   <div className="flex items-center space-x-2.5 min-w-0">
                     <h4 className="font-black text-base sm:text-lg text-slate-900 leading-tight flex items-center gap-2 truncate">
                       <span>{activeFooterDish.name}</span>
@@ -829,12 +891,51 @@ export default function POSBilling({
                       #{activeFooterDish.srNo || activeFooterDish.id} • Rate: ₹{rateDisplay} {activeFooterDish.pricePerKg ? `(₹${activeFooterDish.pricePerKg}/Kg)` : ''}
                     </span>
                   </div>
+
+                  {/* Option Toggle moved UP into Top Row & Close Button */}
+                  <div className="flex items-center space-x-2 shrink-0">
+                    <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-300 text-xs font-black select-none shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => setSweetEntryMode('kg')}
+                        className={`px-3 py-1 rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
+                          sweetEntryMode === 'kg'
+                            ? 'bg-white text-slate-900 shadow-sm border border-slate-200 font-black'
+                            : 'text-slate-600 hover:text-slate-900 font-bold'
+                        }`}
+                      >
+                        <span>⚖️</span>
+                        <span>By Kg</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSweetEntryMode('price')}
+                        className={`px-3 py-1 rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
+                          sweetEntryMode === 'price'
+                            ? 'bg-emerald-600 text-white shadow-sm font-black'
+                            : 'text-slate-600 hover:text-slate-900 font-bold'
+                        }`}
+                      >
+                        <span>💰</span>
+                        <span>By Price (₹)</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveFooterDish(null)}
+                      className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center transition-all cursor-pointer"
+                      title="Close"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
-                {/* Bottom Row: Large Portion Buttons & Custom Kg Entry */}
-                <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2.5">
+                {/* Bottom Row: Large Portion Buttons & Custom Kg/Price Entry - Perfectly Aligned */}
+                <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-3">
                   {/* Portion Variants (250g, 500g, 1Kg) */}
-                  <div className="flex items-center gap-2 sm:gap-2.5 flex-1 min-w-0">
+                  <div className="flex items-center gap-2.5 flex-1 min-w-[340px]">
                     {variants.map((v, vIdx) => {
                       const matchingVariantItem = matchingCartItems.find((ci) => ci.unit === v.unit);
                       const variantQty = matchingVariantItem ? matchingVariantItem.qty : 0;
@@ -843,38 +944,47 @@ export default function POSBilling({
                       return (
                         <div
                           key={`opt-btn-${v.unit}-${vIdx}`}
-                          className="flex-1 bg-slate-50 border-2 border-slate-200 hover:border-blue-600 rounded-2xl p-1 shadow-xs flex items-center justify-between transition-all min-w-[110px]"
+                          className={`flex-1 rounded-2xl p-1.5 shadow-xs flex items-center justify-between transition-all min-w-[105px] h-14 border-2 ${
+                            variantQty > 0
+                              ? 'border-blue-600 bg-blue-50/30'
+                              : 'border-slate-200 bg-slate-50/80 hover:border-slate-300'
+                          }`}
                         >
-                          {/* (-) Minus Button on Left: Only visible if item/variant is already in cart */}
-                          {canDecrement && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (typeof onReduceFromCart === 'function') {
-                                  onReduceFromCart({ ...activeFooterDish, unit: v.unit });
-                                }
-                              }}
-                              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white hover:bg-slate-200 text-slate-900 border border-slate-300 font-black flex items-center justify-center cursor-pointer transition text-base shadow-xs shrink-0"
-                              title="Reduce from cart"
-                            >
-                              <Minus className="w-5 h-5 stroke-[3]" />
-                            </button>
-                          )}
+                          {/* (-) Minus Button on Left: Always rendered for symmetry and perfect alignment */}
+                          <button
+                            type="button"
+                            disabled={!canDecrement}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (canDecrement && typeof onReduceFromCart === 'function') {
+                                onReduceFromCart({ ...activeFooterDish, unit: v.unit });
+                              }
+                            }}
+                            className={`w-10 h-10 rounded-xl font-black flex items-center justify-center transition text-base shrink-0 ${
+                              canDecrement
+                                ? 'bg-white hover:bg-rose-50 text-rose-600 border border-slate-300 shadow-xs cursor-pointer'
+                                : 'opacity-20 cursor-not-allowed bg-slate-100 border border-slate-200 text-slate-400'
+                            }`}
+                            title={canDecrement ? 'Reduce from cart' : 'Not in cart'}
+                          >
+                            <Minus className="w-4 h-4 stroke-[3]" />
+                          </button>
 
-                          {/* Center Option Label */}
+                          {/* Center Option Label: Perfectly centered */}
                           <button
                             type="button"
                             onClick={() => handleSelectOptionFromFooter(v)}
-                            className="flex-1 px-1.5 py-1 cursor-pointer flex flex-col items-center justify-center text-slate-900 text-center leading-tight"
+                            className="flex-1 px-1 py-0.5 cursor-pointer flex flex-col items-center justify-center text-slate-900 text-center leading-tight select-none"
                           >
                             <span className="font-black text-xs sm:text-sm">{v.unit}</span>
                             <span className="text-blue-600 font-black text-xs sm:text-sm">₹{v.price}</span>
-                            {variantQty > 0 && (
-                              <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-1.5 rounded-full mt-0.5">
-                                {variantQty} in cart
-                              </span>
-                            )}
+                            <div className="h-3 flex items-center justify-center">
+                              {variantQty > 0 ? (
+                                <span className="text-[9px] font-black text-emerald-800 bg-emerald-100 px-1.5 rounded-full leading-none">
+                                  {variantQty} in cart
+                                </span>
+                              ) : null}
+                            </div>
                           </button>
 
                           {/* (+) Plus Button on Right */}
@@ -884,53 +994,123 @@ export default function POSBilling({
                               e.stopPropagation();
                               handleSelectOptionFromFooter(v);
                             }}
-                            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black flex items-center justify-center cursor-pointer transition text-base shadow-xs shrink-0"
+                            className="w-10 h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black flex items-center justify-center cursor-pointer transition text-base shadow-xs shrink-0"
                             title="Add to cart"
                           >
-                            <Plus className="w-5 h-5 stroke-[3]" />
+                            <Plus className="w-4 h-4 stroke-[3]" />
                           </button>
                         </div>
                       );
                     })}
                   </div>
 
-                  {/* Custom Weight Entry (Strictly in Kg) */}
-                  <form
-                    onSubmit={handleAddCustomKg}
-                    className="flex items-center gap-1.5 bg-white border-2 border-stone-300 focus-within:border-blue-600 rounded-2xl p-1 shadow-xs shrink-0 h-12 sm:h-13"
-                  >
-                    {/* (-) Minus button for custom kg only if already in cart */}
-                    {canDecrementCustom && (
-                      <button
-                        type="button"
-                        onClick={handleReduceCustomKg}
-                        className="w-10 h-10 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-900 font-black flex items-center justify-center cursor-pointer transition text-base shrink-0"
-                        title="Reduce custom quantity"
+                  {/* Subtle Vertical Divider */}
+                  <div className="hidden lg:block h-10 w-px bg-slate-200 shrink-0 mx-0.5" />
+
+                  {/* Custom Weight / Price Entry Form (Aligned at h-14 height) */}
+                  <div className="shrink-0">
+                    {sweetEntryMode === 'kg' ? (
+                      <form
+                        onSubmit={handleAddCustomKg}
+                        className="flex items-center gap-2 bg-slate-50 border-2 border-slate-300 focus-within:border-blue-600 rounded-2xl p-1.5 shadow-xs shrink-0 h-14"
                       >
-                        <Minus className="w-5 h-5 stroke-[3]" />
-                      </button>
+                        {/* (-) Minus button for custom kg only if already in cart */}
+                        {canDecrementCustom && (
+                          <button
+                            type="button"
+                            onClick={handleReduceCustomKg}
+                            className="w-10 h-10 rounded-xl bg-white hover:bg-rose-50 text-rose-600 border border-slate-300 font-black flex items-center justify-center cursor-pointer transition text-base shrink-0 shadow-xs"
+                            title="Reduce custom quantity"
+                          >
+                            <Minus className="w-4 h-4 stroke-[3]" />
+                          </button>
+                        )}
+
+                        <div className="flex items-center px-1.5">
+                          <input
+                            type="number"
+                            step="0.05"
+                            min="0.05"
+                            placeholder="0.75"
+                            value={customKgInput}
+                            onChange={(e) => setCustomKgInput(e.target.value)}
+                            className="w-20 sm:w-24 text-center text-sm font-black text-neutral-900 outline-none bg-transparent placeholder:text-stone-400 placeholder:font-normal"
+                          />
+                          <span className="text-xs font-black text-stone-500 pr-1 select-none">Kg</span>
+                        </div>
+
+                        {(() => {
+                          const kgNum = parseFloat(customKgInput);
+                          const p = (!isNaN(kgNum) && kgNum > 0 && defaultRate > 0) ? Math.round(kgNum * defaultRate) : 0;
+                          if (!p) return null;
+                          return (
+                            <span className="text-xs font-black text-blue-800 bg-blue-100 px-2.5 py-1 rounded-xl border border-blue-200 select-none whitespace-nowrap animate-in fade-in">
+                              = ₹{p}
+                            </span>
+                          );
+                        })()}
+
+                        <button
+                          type="submit"
+                          disabled={!customKgInput || parseFloat(customKgInput) <= 0}
+                          className="h-10 bg-neutral-900 hover:bg-black text-white font-black text-xs px-4 rounded-xl cursor-pointer disabled:opacity-40 shadow-xs flex items-center space-x-1 shrink-0"
+                        >
+                          <Plus className="w-4 h-4 stroke-[3]" />
+                          <span>Add Kg</span>
+                        </button>
+                      </form>
+                    ) : (
+                      <form
+                        onSubmit={handleAddCustomPrice}
+                        className="flex items-center gap-2 bg-emerald-50/40 border-2 border-emerald-500 focus-within:border-emerald-600 rounded-2xl p-1.5 shadow-xs shrink-0 h-14"
+                      >
+                        {canDecrementCustom && (
+                          <button
+                            type="button"
+                            onClick={handleReduceCustomPrice}
+                            className="w-10 h-10 rounded-xl bg-white hover:bg-rose-50 text-rose-600 border border-emerald-300 font-black flex items-center justify-center cursor-pointer transition text-base shrink-0 shadow-xs"
+                            title="Reduce custom quantity"
+                          >
+                            <Minus className="w-4 h-4 stroke-[3]" />
+                          </button>
+                        )}
+
+                        <div className="flex items-center px-1.5">
+                          <span className="text-sm font-black text-emerald-700 select-none mr-1">₹</span>
+                          <input
+                            type="number"
+                            step="1"
+                            min="1"
+                            placeholder="Amount (e.g. 100)"
+                            value={customPriceInput}
+                            onChange={(e) => setCustomPriceInput(e.target.value)}
+                            className="w-24 sm:w-32 text-center text-sm font-black text-neutral-900 outline-none bg-transparent placeholder:text-stone-400 placeholder:text-xs"
+                          />
+                        </div>
+
+                        {/* Live Auto-calculated Grams Display Badge */}
+                        {(() => {
+                          const pNum = parseFloat(customPriceInput);
+                          const g = (!isNaN(pNum) && pNum > 0 && defaultRate > 0) ? Math.round((pNum / defaultRate) * 1000) : 0;
+                          if (!g) return null;
+                          return (
+                            <span className="text-xs font-black text-emerald-900 bg-emerald-100 px-2.5 py-1 rounded-xl border border-emerald-300 animate-in fade-in select-none whitespace-nowrap">
+                              ➔ {g >= 1000 ? `${(g / 1000).toFixed(2)} Kg` : `${g}g`}
+                            </span>
+                          );
+                        })()}
+
+                        <button
+                          type="submit"
+                          disabled={!customPriceInput || parseFloat(customPriceInput) <= 0}
+                          className="h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-4 rounded-xl cursor-pointer disabled:opacity-40 shadow-xs flex items-center space-x-1 shrink-0"
+                        >
+                          <Plus className="w-4 h-4 stroke-[3]" />
+                          <span>Add Price</span>
+                        </button>
+                      </form>
                     )}
-
-                    <input
-                      type="number"
-                      step="0.05"
-                      min="0.05"
-                      placeholder="Kg (e.g. 0.75)"
-                      value={customKgInput}
-                      onChange={(e) => setCustomKgInput(e.target.value)}
-                      className="w-24 sm:w-28 text-center text-xs sm:text-sm font-black text-neutral-900 outline-none placeholder:text-stone-400 placeholder:font-normal"
-                    />
-                    <span className="text-xs font-black text-stone-500 pr-1 select-none">Kg</span>
-
-                    <button
-                      type="submit"
-                      disabled={!customKgInput}
-                      className="h-10 bg-neutral-900 hover:bg-black text-white font-black text-xs sm:text-sm px-4 rounded-xl cursor-pointer disabled:opacity-40 shadow-xs flex items-center space-x-1.5 shrink-0"
-                    >
-                      <Plus className="w-4 h-4 stroke-[3]" />
-                      <span>Add</span>
-                    </button>
-                  </form>
+                  </div>
                 </div>
               </div>
             </div>
@@ -940,7 +1120,7 @@ export default function POSBilling({
       </main>
 
       {/* COLUMN 3: RIGHT SIDE ITEMS CART (Enlarged Items & Controls) */}
-      <aside className="w-full sm:w-[380px] md:w-[420px] lg:w-[440px] bg-white border-l border-stone-200 flex flex-col shrink-0 shadow-lg select-none">
+      <aside className="w-full sm:w-[400px] md:w-[440px] lg:w-[480px] xl:w-[500px] bg-white border-l border-stone-200 flex flex-col shrink-0 shadow-lg select-none">
         
         {/* Top Dark Header Bar (TABLE, TOKEN, CUSTOMER) */}
         <div className="bg-[#111111] text-white p-3 flex items-center justify-between text-xs font-bold border-b border-stone-800">
@@ -959,7 +1139,7 @@ export default function POSBilling({
 
           <div className="text-center cursor-pointer" onClick={() => setEditingMeta(editingMeta === 'customer' ? null : 'customer')}>
             <span className="text-[10px] text-stone-400 block uppercase font-bold">CUSTOMER</span>
-            <span className="text-white hover:underline truncate max-w-[100px] block">
+            <span className="text-white hover:underline truncate max-w-[150px] block">
               {customerName ? customerName : '+ Add'}
             </span>
           </div>

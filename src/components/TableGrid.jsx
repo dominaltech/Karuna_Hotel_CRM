@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Utensils,
   Building,
@@ -20,7 +20,8 @@ import {
   Edit3,
   History,
   Minus,
-  Sparkles
+  Sparkles,
+  Lock
 } from 'lucide-react';
 import { db, getNextSequentialNumber } from '../db/db';
 import { printThermalReceipt } from '../utils/receiptUtils';
@@ -97,8 +98,14 @@ export default function TableGrid({
   onSplitTable,
   onDeleteTable,
   onOpenOrderPopupForTable,
-  printLanguage = 'mr'
+  printLanguage = 'mr',
+  isSettledBillEditEnabled: propIsSettledBillEditEnabled,
+  preOrders = []
 }) {
+  const isSettledBillEditEnabled = propIsSettledBillEditEnabled !== undefined
+    ? propIsSettledBillEditEnabled
+    : (localStorage.getItem('karuna_settled_bill_edit_enabled') !== 'false');
+
   const [activeAreaFilter, setActiveAreaFilter] = useState(initialAreaFilter || 'all');
 
   useEffect(() => {
@@ -310,6 +317,11 @@ export default function TableGrid({
 
   const handleSaveResettle = async () => {
     if (!selectedBill) return;
+    if (!isSettledBillEditEnabled) {
+      setShiftToast('Editing settled bills is disabled by owner in UPI Settings.');
+      setTimeout(() => setShiftToast(null), 3000);
+      return;
+    }
 
     const newSubtotal = editedItems.reduce(
       (sum, item) => sum + (item.price || 0) * (item.qty || 1),
@@ -324,7 +336,17 @@ export default function TableGrid({
       subtotal: newSubtotal,
       total: newTotal,
       finalTotal: newTotal,
+      grandTotal: newTotal,
       paymentMode: effectivePayMode,
+      paymentDetails: selectedBill.paymentDetails && typeof selectedBill.paymentDetails === 'object'
+        ? {
+            ...selectedBill.paymentDetails,
+            mode: effectivePayMode,
+            cash: (effectivePayMode === 'Cash' || !effectivePayMode) ? newTotal : (selectedBill.paymentDetails.cash || 0),
+            online: (effectivePayMode === 'Online' || effectivePayMode === 'UPI') ? newTotal : (selectedBill.paymentDetails.online || 0),
+            card: effectivePayMode === 'Card' ? newTotal : (selectedBill.paymentDetails.card || 0)
+          }
+        : selectedBill.paymentDetails,
       isResettled: true,
       resettledAt: new Date().toISOString()
     };
@@ -359,10 +381,32 @@ export default function TableGrid({
   const todaySettledBills = (settledBills || [])
     .filter((b) => {
       if (!b) return false;
+      if (b.isPreOrderAdvance) return false;
       if (!b.createdAt) return true;
       return getLocalDateStr(b.createdAt) === todayStr;
     })
     .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+  // Requirement: Advance payment from pre-orders should add in today revenue box in bill tab
+  const todayAdvanceRevenue = useMemo(() => {
+    return (preOrders || []).reduce((sum, po) => {
+      if (!po || !po.createdAt) return sum;
+      if (getLocalDateStr(po.createdAt) !== todayStr) return sum;
+      // If customer paid full payment upfront, it was directly settled into settledBills,
+      // so avoid double counting!
+      if (po.isFullPayment || po.fullPaymentPaid) return sum;
+      return sum + (parseFloat(po.advancePayment) || 0);
+    }, 0);
+  }, [preOrders, todayStr]);
+
+  const todaySettledBillsRevenue = useMemo(() => {
+    return todaySettledBills.reduce((sum, b) => {
+      const amt = parseFloat(b.finalTotal !== undefined ? b.finalTotal : (b.grandTotal !== undefined ? b.grandTotal : (b.total !== undefined ? b.total : (b.totalAmount || 0)))) || 0;
+      return sum + amt;
+    }, 0);
+  }, [todaySettledBills]);
+
+  const todayTotalRevenue = todaySettledBillsRevenue + todayAdvanceRevenue;
 
 
   const handleShiftTable = async (srcTable, targetTable) => {
@@ -400,7 +444,8 @@ export default function TableGrid({
 
     // 2. Clear or delete source table
     const isParcel = srcTable.isParcel || srcTable.sectionId === 4 || (srcTable.name && String(srcTable.name).toUpperCase().startsWith('P'));
-    if (isParcel) {
+    const isSweet = srcTable.isSweet || srcTable.sectionId === 5 || (srcTable.name && String(srcTable.name).toUpperCase().startsWith('S'));
+    if (isParcel || isSweet) {
       try {
         await db.diningTables.delete(srcTable.id);
       } catch (e) {}
@@ -673,8 +718,13 @@ export default function TableGrid({
               <div className="text-right">
                 <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Today's Revenue</span>
                 <span className="font-black text-lg text-emerald-700">
-                  ₹{todaySettledBills.reduce((sum, b) => sum + (parseFloat(b.finalTotal || b.grandTotal || b.totalAmount || 0) || 0), 0).toFixed(2)}
+                  ₹{todayTotalRevenue.toFixed(2)}
                 </span>
+                {todayAdvanceRevenue > 0 && (
+                  <span className="text-[10px] font-extrabold text-slate-500 block">
+                    (Bills: ₹{todaySettledBillsRevenue.toFixed(2)} + Adv: ₹{todayAdvanceRevenue.toFixed(2)})
+                  </span>
+                )}
               </div>
             </div>
 
@@ -793,13 +843,15 @@ export default function TableGrid({
           </div>
         ) : activeAreaFilter === 'all' ? (
           <>
-            {/* 1. Unified Cards Grid for All Regular Floors (No floor dividers, S1 next to F6, 9 per row) */}
+            {/* 1. Unified Cards Grid for All Regular Dining Floors (Dining tables only, sweets and parcels in their own sections) */}
             {(() => {
               const parcelSec = sortedSections.find((s) => s && s.name && s.name.toLowerCase().includes('parcel')) || { id: 4, name: 'Parcels' };
-              const regularSecs = sortedSections.filter((s) => !s || !s.name || !s.name.toLowerCase().includes('parcel'));
-              const regularSecIds = new Set(regularSecs.map((s) => String(s.id)));
+              const sweetSec = sortedSections.find((s) => s && s.name && s.name.toLowerCase().includes('sweet')) || { id: 5, name: 'Sweets' };
               const isParcelTable = (t) => t && ((parcelSec && String(t.sectionId) === String(parcelSec.id)) || (t.name && String(t.name).toUpperCase().startsWith('P')) || t.isParcel);
-              const rawRegTables = tables.filter((t) => t && regularSecIds.has(String(t.sectionId)) && !isParcelTable(t));
+              const isSweetTable = (t) => t && ((sweetSec && String(t.sectionId) === String(sweetSec.id)) || (t.name && String(t.name).toUpperCase().startsWith('S')) || t.isSweet);
+              const regularSecs = sortedSections.filter((s) => !s || !s.name || (!s.name.toLowerCase().includes('parcel') && !s.name.toLowerCase().includes('sweet')));
+              const regularSecIds = new Set(regularSecs.map((s) => String(s.id)));
+              const rawRegTables = tables.filter((t) => t && !isParcelTable(t) && !isSweetTable(t) && (regularSecIds.has(String(t.sectionId)) || !t.sectionId));
               
               const tableMap = new Map();
               rawRegTables.forEach((t) => {
@@ -1351,7 +1403,19 @@ export default function TableGrid({
             const SectionIcon = getSectionIcon(sec.name);
             const theme = getSectionTheme(sec.name);
             const isParcel = sec.name && sec.name.toLowerCase().includes('parcel');
-            const rawSecTables = tables.filter((t) => t && (String(t.sectionId) === String(sec.id) || (isParcel && (t.name?.toUpperCase().startsWith('P') || t.isParcel))));
+            const isSweet = sec.name && sec.name.toLowerCase().includes('sweet');
+            const rawSecTables = tables.filter((t) => {
+              if (!t) return false;
+              if (isParcel) {
+                return (String(t.sectionId) === String(sec.id) || (t.name && String(t.name).toUpperCase().startsWith('P')) || t.isParcel);
+              }
+              if (isSweet) {
+                return (String(t.sectionId) === String(sec.id) || (t.name && String(t.name).toUpperCase().startsWith('S')) || t.isSweet);
+              }
+              const isP = (t.name && String(t.name).toUpperCase().startsWith('P')) || t.isParcel;
+              const isS = (t.name && String(t.name).toUpperCase().startsWith('S')) || t.isSweet;
+              return String(t.sectionId) === String(sec.id) && !isP && !isS;
+            });
             
             const tableMap = new Map();
             rawSecTables.forEach((t) => {
@@ -1707,6 +1771,14 @@ export default function TableGrid({
             {/* Modal Body */}
             <div className="p-4 overflow-y-auto flex-1 space-y-4">
               
+              {/* Security Warning Banner when Disabled by Owner */}
+              {!isSettledBillEditEnabled && (
+                <div className="bg-amber-50 border border-amber-300 text-amber-900 px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 shadow-2xs">
+                  <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>View-Only Mode: Bill editing is disabled by owner in Owner &gt; UPI Tab. Modifying items or resettling is locked.</span>
+                </div>
+              )}
+
               {/* Simple, Natural Payment Mode Selection & Automated Input */}
               {(() => {
                 const currentModalBillTotal = editedItems.reduce((s, i) => s + (i.price || 0) * (i.qty || 1), 0);
@@ -2051,36 +2123,44 @@ export default function TableGrid({
                           </div>
 
                           <div className="flex items-center space-x-2">
-                            {/* (-) and (+) Qty Stepper */}
-                            <div className="flex items-center space-x-1 bg-slate-100 border border-slate-300 rounded-lg p-0.5">
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateItemQty(idx, -1)}
-                                className="w-6 h-6 hover:bg-slate-200 text-slate-800 font-black rounded flex items-center justify-center cursor-pointer"
-                                title="Reduce quantity"
-                              >
-                                <Minus className="w-3.5 h-3.5" />
-                              </button>
-                              <span className="font-black px-2 text-xs text-slate-900">{itemQty}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateItemQty(idx, 1)}
-                                className="w-6 h-6 hover:bg-slate-200 text-slate-800 font-black rounded flex items-center justify-center cursor-pointer"
-                                title="Increase quantity"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                            {isSettledBillEditEnabled ? (
+                              <>
+                                {/* (-) and (+) Qty Stepper */}
+                                <div className="flex items-center space-x-1 bg-slate-100 border border-slate-300 rounded-lg p-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateItemQty(idx, -1)}
+                                    className="w-6 h-6 hover:bg-slate-200 text-slate-800 font-black rounded flex items-center justify-center cursor-pointer"
+                                    title="Reduce quantity"
+                                  >
+                                    <Minus className="w-3.5 h-3.5" />
+                                  </button>
+                                  <span className="font-black px-2 text-xs text-slate-900">{itemQty}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateItemQty(idx, 1)}
+                                    className="w-6 h-6 hover:bg-slate-200 text-slate-800 font-black rounded flex items-center justify-center cursor-pointer"
+                                    title="Increase quantity"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
 
-                            {/* Remove Item Button */}
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveItem(idx)}
-                              className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 cursor-pointer transition-colors"
-                              title="Remove item"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                                {/* Remove Item Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveItem(idx)}
+                                  className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 cursor-pointer transition-colors"
+                                  title="Remove item"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </>
+                            ) : (
+                              <span className="font-black px-2.5 py-1 text-xs text-slate-800 bg-slate-100 rounded-lg border border-slate-200">
+                                Qty: {itemQty}
+                              </span>
+                            )}
                           </div>
                         </div>
                       );
@@ -2089,29 +2169,31 @@ export default function TableGrid({
                 </div>
 
                 {/* Add Dish Dropdown Selector */}
-                <div className="flex items-center space-x-2 pt-1">
-                  <select
-                    value={addDishId}
-                    onChange={(e) => setAddDishId(e.target.value)}
-                    className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold outline-none text-slate-800 cursor-pointer"
-                  >
-                    <option value="">+ Select dish to add to this bill...</option>
-                    {(allDishes || []).map((d) => (
-                      <option key={`add-dish-opt-${d.id}`} value={d.id}>
-                        #{d.srNo || d.id} - {d.name} (₹{d.price})
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={handleAddNewDishToBill}
-                    disabled={!addDishId}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold cursor-pointer disabled:opacity-40 shadow-2xs flex items-center space-x-1 shrink-0"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Item</span>
-                  </button>
-                </div>
+                {isSettledBillEditEnabled && (
+                  <div className="flex items-center space-x-2 pt-1">
+                    <select
+                      value={addDishId}
+                      onChange={(e) => setAddDishId(e.target.value)}
+                      className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold outline-none text-slate-800 cursor-pointer"
+                    >
+                      <option value="">+ Select dish to add to this bill...</option>
+                      {(allDishes || []).map((d) => (
+                        <option key={`add-dish-opt-${d.id}`} value={d.id}>
+                          #{d.srNo || d.id} - {d.name} (₹{d.price})
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleAddNewDishToBill}
+                      disabled={!addDishId}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold cursor-pointer disabled:opacity-40 shadow-2xs flex items-center space-x-1 shrink-0"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Item</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Bottom Change & Reprint Audit Logs (Always Visible) */}
@@ -2169,16 +2251,23 @@ export default function TableGrid({
                   onClick={() => setSelectedBill(null)}
                   className="bg-white border border-slate-300 text-slate-700 font-bold text-xs px-3.5 py-2.5 rounded-xl cursor-pointer hover:bg-slate-50"
                 >
-                  Cancel
+                  {isSettledBillEditEnabled ? 'Cancel' : 'Close'}
                 </button>
-                <button
-                  type="button"
-                  onClick={handleSaveResettle}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-5 py-2.5 rounded-xl shadow-md cursor-pointer flex items-center space-x-1.5 transition-all"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Resettle Bill</span>
-                </button>
+                {isSettledBillEditEnabled ? (
+                  <button
+                    type="button"
+                    onClick={handleSaveResettle}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-5 py-2.5 rounded-xl shadow-md cursor-pointer flex items-center space-x-1.5 transition-all"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Resettle Bill</span>
+                  </button>
+                ) : (
+                  <div className="flex items-center space-x-1.5 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-3.5 py-2 rounded-xl">
+                    <Lock className="w-4 h-4 text-amber-600" />
+                    <span>Editing Disabled by Owner</span>
+                  </div>
+                )}
               </div>
             </div>
 

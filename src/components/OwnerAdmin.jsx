@@ -43,7 +43,9 @@ import {
   QrCode,
   Package,
   CheckCircle,
-  Sliders
+  Sliders,
+  Ban,
+  RotateCcw
 } from 'lucide-react';
 import { db, getDishPriceForSection } from '../db/db';
 import { 
@@ -76,7 +78,12 @@ export default function OwnerAdmin({
   onDeleteTable,
   onBulkUpdatePrices,
   onUpdateSettledBill,
-  printLanguage = 'mr'
+  printLanguage = 'mr',
+  isSettledBillEditEnabled: propIsSettledBillEditEnabled,
+  onToggleSettledBillEdit,
+  preOrders = [],
+  onMatrixUnsavedChange,
+  onRegisterMatrixActions
 }) {
   const sortSectionsWithParcelsLast = (secArray) => {
     if (!Array.isArray(secArray)) return [];
@@ -117,10 +124,41 @@ export default function OwnerAdmin({
 
   // Edit Dish Modal State
   const [editingDish, setEditingDish] = useState(null);
-  // UPI Setting State
+  // UPI Setting State & Settle Tab Edit Button Permission
   const [upiId, setUpiId] = useState(localStorage.getItem('karuna_upi_id') || '8446091809@ybl');
   const [payeeName, setPayeeName] = useState(localStorage.getItem('karuna_payee_name') || 'Karuna Hotel');
   const [upiSavedToast, setUpiSavedToast] = useState(false);
+  const [isSettledBillEditEnabled, setIsSettledBillEditEnabled] = useState(() => {
+    if (propIsSettledBillEditEnabled !== undefined) return propIsSettledBillEditEnabled;
+    return localStorage.getItem('karuna_settled_bill_edit_enabled') !== 'false';
+  });
+
+  useEffect(() => {
+    if (propIsSettledBillEditEnabled !== undefined) {
+      setIsSettledBillEditEnabled(propIsSettledBillEditEnabled);
+    }
+  }, [propIsSettledBillEditEnabled]);
+
+  // Instant toggle for Settle tab bill edit permission
+  const handleToggleEditPermission = async (enableVal) => {
+    setIsSettledBillEditEnabled(enableVal);
+    localStorage.setItem('karuna_settled_bill_edit_enabled', String(enableVal));
+    if (typeof onToggleSettledBillEdit === 'function') {
+      onToggleSettledBillEdit(enableVal);
+    }
+    try {
+      await db.systemSettings.put({
+        id: 1,
+        hotelName: payeeName.trim(),
+        upiId: upiId.trim(),
+        payeeName: payeeName.trim(),
+        settledBillEditEnabled: enableVal,
+        lastSyncTime: new Date().toISOString()
+      });
+    } catch (err) {
+      console.warn('Failed to update settledBillEditEnabled in systemSettings:', err);
+    }
+  };
 
   // Backup & Import Feedback State
   const [bulkRatesMessage, setBulkRatesMessage] = useState(null);
@@ -129,8 +167,30 @@ export default function OwnerAdmin({
   // Section Rates Matrix Local State
   const [dishSectionRates, setDishSectionRates] = useState({});
   const [ratesSavedFeedback, setRatesSavedFeedback] = useState(false);
-  const [matrixFilterCat, setMatrixFilterCat] = useState('all');
+  const [matrixFilterCat, setMatrixFilterCat] = useState('1');
   const [matrixSearchQuery, setMatrixSearchQuery] = useState('');
+  const [hasUnsavedMatrixChanges, setHasUnsavedMatrixChanges] = useState(false);
+  const [pendingSubTab, setPendingSubTab] = useState(null);
+  const [showSubTabUnsavedModal, setShowSubTabUnsavedModal] = useState(false);
+
+  // Notify parent of unsaved matrix changes
+  useEffect(() => {
+    if (typeof onMatrixUnsavedChange === 'function') {
+      onMatrixUnsavedChange(hasUnsavedMatrixChanges);
+    }
+  }, [hasUnsavedMatrixChanges, onMatrixUnsavedChange]);
+
+  // Warn user before closing or reloading browser window if changes unsaved
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedMatrixChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedMatrixChanges]);
 
   // Dining Area & Table Management State
   const [showAddAreaModal, setShowAddAreaModal] = useState(false);
@@ -195,14 +255,26 @@ export default function OwnerAdmin({
     }
   };
 
-  // Sync section rates matrix from dishes without wiping active local edits
+  // Sync section rates matrix and sweet portion rates from dishes without wiping active local edits
   useEffect(() => {
     if (dishes && dishes.length > 0) {
       setDishSectionRates((prev) => {
         const next = { ...prev };
         dishes.forEach((d) => {
+          const isSweet = d.categoryId === 2 || d.counter?.toLowerCase() === 'sweets';
+          const p1k = d.pricePerKg || d.variants?.find((v) => v.unit === '1 Kg' || v.unit === '1Kg')?.price || (d.price ? d.price * 4 : 320);
+          const p250 = d.variants?.find((v) => v.unit === '250g')?.price || d.price || Math.round(p1k * 0.25);
+          const p500 = d.variants?.find((v) => v.unit === '500g')?.price || (d.price ? d.price * 2 : Math.round(p1k * 0.5));
+
           next[d.id] = {
             ...(d.sectionPrices || {}),
+            ...(isSweet
+              ? {
+                  price1kg: p1k !== undefined && p1k !== null ? p1k.toString() : '',
+                  price250g: p250 !== undefined && p250 !== null ? p250.toString() : '',
+                  price500g: p500 !== undefined && p500 !== null ? p500.toString() : ''
+                }
+              : {}),
             ...(prev[d.id] || {})
           };
         });
@@ -210,6 +282,180 @@ export default function OwnerAdmin({
       });
     }
   }, [dishes]);
+
+  // Handle 1 Kg price entry for Sweet dishes: Automatically calculates 250g and 500g prices
+  const handleSweet1KgChange = (dishId, new1KgStr) => {
+    setHasUnsavedMatrixChanges(true);
+    const p1k = parseFloat(new1KgStr);
+    const p250 = !isNaN(p1k) && p1k > 0 ? Math.round(p1k * 0.25).toString() : '';
+    const p500 = !isNaN(p1k) && p1k > 0 ? Math.round(p1k * 0.5).toString() : '';
+
+    setDishSectionRates((prev) => ({
+      ...prev,
+      [dishId]: {
+        ...(prev[dishId] || {}),
+        price1kg: new1KgStr,
+        price250g: p250,
+        price500g: p500,
+        5: new1KgStr // Also update section 5 (Sweets area)
+      }
+    }));
+  };
+
+  // Handle by-gram price entry (250g or 500g) manually changed by user
+  const handleSweetGramChange = (dishId, gramKey, newGramStr) => {
+    setHasUnsavedMatrixChanges(true);
+    setDishSectionRates((prev) => ({
+      ...prev,
+      [dishId]: {
+        ...(prev[dishId] || {}),
+        [gramKey]: newGramStr
+      }
+    }));
+  };
+
+  // Bulk save all modified area matrix rates
+  const handleSaveAllMatrixRates = async () => {
+    for (const d of dishes) {
+      const rates = dishSectionRates[d.id] || d.sectionPrices || {};
+      const isSweet = d.categoryId === 2 || d.counter?.toLowerCase() === 'sweets';
+      if (isSweet) {
+        const p1k = parseFloat(rates.price1kg !== undefined && rates.price1kg !== '' ? rates.price1kg : (d.pricePerKg || 320));
+        const p250 = parseFloat(rates.price250g !== undefined && rates.price250g !== '' ? rates.price250g : (!isNaN(p1k) ? Math.round(p1k * 0.25) : 80));
+        const p500 = parseFloat(rates.price500g !== undefined && rates.price500g !== '' ? rates.price500g : (!isNaN(p1k) ? Math.round(p1k * 0.5) : 160));
+
+        const cleanRates = { ...(d.sectionPrices || {}) };
+        Object.entries(rates).forEach(([key, val]) => {
+          if (key !== 'price1kg' && key !== 'price250g' && key !== 'price500g') {
+            const num = parseFloat(val);
+            if (!isNaN(num) && num > 0) cleanRates[key] = num;
+            else delete cleanRates[key];
+          }
+        });
+        if (!isNaN(p1k) && p1k > 0) cleanRates[5] = p1k;
+
+        const updatedDish = {
+          ...d,
+          pricePerKg: !isNaN(p1k) && p1k > 0 ? p1k : d.pricePerKg,
+          price: !isNaN(p250) && p250 > 0 ? p250 : d.price,
+          variants: [
+            { unit: '250g', weightKg: 0.25, price: !isNaN(p250) && p250 > 0 ? p250 : Math.round(p1k * 0.25) },
+            { unit: '500g', weightKg: 0.5, price: !isNaN(p500) && p500 > 0 ? p500 : Math.round(p1k * 0.5) },
+            { unit: '1 Kg', weightKg: 1, price: !isNaN(p1k) && p1k > 0 ? p1k : 320 }
+          ],
+          sectionPrices: cleanRates
+        };
+        await db.dishes.update(d.id, updatedDish);
+        if (typeof onUpdateDish === 'function') onUpdateDish(d.id, updatedDish);
+      } else {
+        const cleanRates = {};
+        Object.entries(rates).forEach(([secId, rateVal]) => {
+          const num = parseFloat(rateVal);
+          if (!isNaN(num) && num > 0) cleanRates[secId] = num;
+        });
+        const basePrice = cleanRates[1] || cleanRates[4] || cleanRates[2] || cleanRates[3] || d.price;
+        await db.dishes.update(d.id, { sectionPrices: cleanRates, price: basePrice });
+        if (typeof onUpdateDish === 'function') onUpdateDish(d.id, { ...d, sectionPrices: cleanRates, price: basePrice });
+      }
+    }
+    setHasUnsavedMatrixChanges(false);
+    setRatesSavedFeedback(true);
+    setTimeout(() => setRatesSavedFeedback(false), 2000);
+  };
+
+  // Revert matrix edits to original database values
+  const handleDiscardMatrixChanges = () => {
+    if (dishes && dishes.length > 0) {
+      const freshRates = {};
+      dishes.forEach((d) => {
+        const isSweet = d.categoryId === 2 || d.counter?.toLowerCase() === 'sweets';
+        const p1k = d.pricePerKg || d.variants?.find((v) => v.unit === '1 Kg' || v.unit === '1Kg')?.price || (d.price ? d.price * 4 : 320);
+        const p250 = d.variants?.find((v) => v.unit === '250g')?.price || d.price || Math.round(p1k * 0.25);
+        const p500 = d.variants?.find((v) => v.unit === '500g')?.price || (d.price ? d.price * 2 : Math.round(p1k * 0.5));
+
+        freshRates[d.id] = {
+          ...(d.sectionPrices || {}),
+          ...(isSweet
+            ? {
+                price1kg: p1k !== undefined && p1k !== null ? p1k.toString() : '',
+                price250g: p250 !== undefined && p250 !== null ? p250.toString() : '',
+                price500g: p500 !== undefined && p500 !== null ? p500.toString() : ''
+              }
+            : {})
+        };
+      });
+      setDishSectionRates(freshRates);
+    }
+    setHasUnsavedMatrixChanges(false);
+  };
+
+  // Register matrix actions with parent container
+  useEffect(() => {
+    if (typeof onRegisterMatrixActions === 'function') {
+      onRegisterMatrixActions({
+        save: handleSaveAllMatrixRates,
+        discard: handleDiscardMatrixChanges
+      });
+    }
+  }, [onRegisterMatrixActions, dishes, dishSectionRates]);
+
+  // Sub-tab navigation guard: prompts user to save or discard before switching sub-tabs
+  const handleSubTabClick = (targetSubTab) => {
+    if (targetSubTab === activeAdminSubTab) return;
+    if (activeAdminSubTab === 'sections' && hasUnsavedMatrixChanges) {
+      setPendingSubTab(targetSubTab);
+      setShowSubTabUnsavedModal(true);
+      return;
+    }
+    setActiveAdminSubTab(targetSubTab);
+  };
+
+  // Persist Sweet dish rates (1kg, 250g, 500g and section prices)
+  const handleSaveSweetRates = async (dishId) => {
+    const dish = dishes.find((d) => d.id === dishId);
+    if (!dish) return;
+    const rates = dishSectionRates[dishId] || {};
+
+    const p1k = parseFloat(rates.price1kg !== undefined && rates.price1kg !== '' ? rates.price1kg : (dish.pricePerKg || 320));
+    const p250 = parseFloat(rates.price250g !== undefined && rates.price250g !== '' ? rates.price250g : (!isNaN(p1k) ? Math.round(p1k * 0.25) : 80));
+    const p500 = parseFloat(rates.price500g !== undefined && rates.price500g !== '' ? rates.price500g : (!isNaN(p1k) ? Math.round(p1k * 0.5) : 160));
+
+    const cleanRates = { ...(dish.sectionPrices || {}) };
+    Object.entries(rates).forEach(([key, val]) => {
+      if (key !== 'price1kg' && key !== 'price250g' && key !== 'price500g') {
+        const num = parseFloat(val);
+        if (!isNaN(num) && num > 0) {
+          cleanRates[key] = num;
+        } else {
+          delete cleanRates[key];
+        }
+      }
+    });
+    if (!isNaN(p1k) && p1k > 0) {
+      cleanRates[5] = p1k;
+    }
+
+    const updatedDish = {
+      ...dish,
+      pricePerKg: !isNaN(p1k) && p1k > 0 ? p1k : dish.pricePerKg,
+      price: !isNaN(p250) && p250 > 0 ? p250 : dish.price,
+      variants: [
+        { unit: '250g', weightKg: 0.25, price: !isNaN(p250) && p250 > 0 ? p250 : Math.round(p1k * 0.25) },
+        { unit: '500g', weightKg: 0.5, price: !isNaN(p500) && p500 > 0 ? p500 : Math.round(p1k * 0.5) },
+        { unit: '1 Kg', weightKg: 1, price: !isNaN(p1k) && p1k > 0 ? p1k : 320 }
+      ],
+      sectionPrices: cleanRates
+    };
+
+    try {
+      await db.dishes.update(dishId, updatedDish);
+      if (typeof onUpdateDish === 'function') {
+        onUpdateDish(dishId, updatedDish);
+      }
+    } catch (err) {
+      console.warn('Auto-save sweet matrix rates error:', err);
+    }
+  };
 
   // Instantly save area rate when user leaves box or presses Enter
   const handleSaveSingleRate = async (dishId, secId, rawVal) => {
@@ -237,35 +483,23 @@ export default function OwnerAdmin({
       }
     }));
 
+    const basePrice = currentRates[1] || currentRates[4] || currentRates[2] || currentRates[3] || (!isNaN(num) && num > 0 ? num : dish.price);
+
     try {
-      await db.dishes.update(dishId, { sectionPrices: currentRates });
+      await db.dishes.update(dishId, { sectionPrices: currentRates, price: basePrice });
       if (typeof onUpdateDish === 'function') {
-        onUpdateDish(dishId, { ...dish, sectionPrices: currentRates });
+        onUpdateDish(dishId, { ...dish, sectionPrices: currentRates, price: basePrice });
       }
     } catch (err) {
       console.warn('Auto-save matrix rate error:', err);
     }
   };
 
-  // Handle Save New Dish
+  // Handle Save New Dish (Rates and prices are set exclusively in Area Matrix tab)
   const handleSaveNewDish = () => {
     if (!newDishName) return;
 
-    let finalPrice = parseFloat(newDishPrice) || 0;
-    let variants = [];
-
-    if (newDishHasMultiplePrices) {
-      variants = newDishVariants
-        .filter((v) => v.unit && v.price)
-        .map((v) => ({
-          unit: v.unit,
-          weightKg: parseFloat(v.weightKg) || (v.unit.includes('250') ? 0.25 : v.unit.includes('500') ? 0.5 : 1),
-          price: parseFloat(v.price)
-        }));
-      if (variants.length > 0 && !finalPrice) {
-        finalPrice = variants[0].price;
-      }
-    }
+    const isSweet = parseInt(newDishCatId) === 2 || newDishCounter === 'Sweets';
 
     onAddDish({
       srNo: newDishSrNo ? parseInt(newDishSrNo) : Math.floor(100 + Math.random() * 900),
@@ -273,13 +507,13 @@ export default function OwnerAdmin({
       marathiName: newDishMarathiName.trim(),
       categoryId: parseInt(newDishCatId) || 1,
       subCategoryId: parseInt(newDishSubCatId) || 1,
-      price: finalPrice,
-      pricePerKg: parseFloat(newDishPricePerKg) || (newDishHasMultiplePrices ? finalPrice * 4 : null),
+      price: 0,
+      pricePerKg: null,
       stockQty: 9999,
       counter: newDishCounter,
       status: 'In Stock',
-      hasMultiplePrices: newDishHasMultiplePrices,
-      variants,
+      hasMultiplePrices: isSweet,
+      variants: [],
       sectionPrices: {},
       subItems: []
     });
@@ -294,13 +528,11 @@ export default function OwnerAdmin({
     setShowAddDishModal(false);
   };
 
-  // Handle Save Dish Edits
+  // Handle Save Dish Edits (Rates and prices are preserved from Area Matrix tab)
   const handleSaveDishEdits = () => {
     if (!editingDish) return;
     onUpdateDish(editingDish.id, {
       ...editingDish,
-      price: parseFloat(editingDish.price) || 0,
-      pricePerKg: parseFloat(editingDish.pricePerKg) || null,
       stockQty: editingDish.stockQty !== undefined ? (parseFloat(editingDish.stockQty) || 9999) : 9999
     });
     setEditingDish(null);
@@ -333,12 +565,17 @@ export default function OwnerAdmin({
     const cleanPayee = payeeName.trim();
     localStorage.setItem('karuna_upi_id', cleanUpi);
     localStorage.setItem('karuna_payee_name', cleanPayee);
+    localStorage.setItem('karuna_settled_bill_edit_enabled', String(isSettledBillEditEnabled));
+    if (typeof onToggleSettledBillEdit === 'function') {
+      onToggleSettledBillEdit(isSettledBillEditEnabled);
+    }
     try {
       await db.systemSettings.put({
         id: 1,
         hotelName: cleanPayee,
         upiId: cleanUpi,
         payeeName: cleanPayee,
+        settledBillEditEnabled: isSettledBillEditEnabled,
         lastSyncTime: new Date().toISOString()
       });
     } catch (e) {}
@@ -442,16 +679,22 @@ export default function OwnerAdmin({
     return dishes.filter((d) => d.subCategoryId === subCatId).length;
   };
 
+  // Helper for accurate local YYYY-MM-DD date string
+  const getLocalDateStr = (dateObjOrStr) => {
+    if (!dateObjOrStr) return '';
+    const d = new Date(dateObjOrStr);
+    if (isNaN(d.getTime())) return '';
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Filter Bills for History Tab (Requirement 8: Date-Wise / All Time)
   const baseTimeBills = bills.filter((b) => {
     if (historyTimeFilter === 'all' || !historySelectedDate) return true;
     if (!b.createdAt) return false;
-    const bDate = new Date(b.createdAt);
-    const year = bDate.getFullYear();
-    const month = String(bDate.getMonth() + 1).padStart(2, '0');
-    const day = String(bDate.getDate()).padStart(2, '0');
-    const localDateStr = `${year}-${month}-${day}`;
-    return localDateStr === historySelectedDate;
+    return getLocalDateStr(b.createdAt) === historySelectedDate;
   });
 
   const baseCounterBills = baseTimeBills.filter((b) => {
@@ -472,6 +715,27 @@ export default function OwnerAdmin({
 
   // Metric Totals for History Tab
   const totalHistoryRevenue = baseCounterBills.reduce((sum, b) => sum + (b.total || 0), 0);
+
+  // Today's Revenue Calculation (Always live for today regardless of history filter)
+  const todayDateStr = getLocalDateStr(new Date());
+  const todaySettledBills = (bills || []).filter((b) => {
+    if (!b?.createdAt) return false;
+    if (b.isPreOrderAdvance) return false;
+    return getLocalDateStr(b.createdAt) === todayDateStr;
+  });
+  const todayAdvanceRevenue = (preOrders || []).reduce((sum, po) => {
+    if (!po?.createdAt) return sum;
+    if (getLocalDateStr(po.createdAt) !== todayDateStr) return sum;
+    if (po.isFullPayment || po.fullPaymentPaid) return sum;
+    return sum + (parseFloat(po.advancePayment) || 0);
+  }, 0);
+  const todaySettledBillsRevenue = todaySettledBills.reduce((sum, b) => {
+    const amt = parseFloat(b.total !== undefined ? b.total : (b.finalTotal || b.grandTotal || 0)) || 0;
+    return sum + amt;
+  }, 0);
+  const todayTotalRevenue = todaySettledBillsRevenue + todayAdvanceRevenue;
+  const todaySettledCount = todaySettledBills.length;
+
   let totalCash = 0;
   let totalOnline = 0;
   let totalCard = 0;
@@ -544,7 +808,7 @@ export default function OwnerAdmin({
         <div className="flex items-center space-x-2 bg-white border border-stone-200 rounded-xl p-1.5 shadow-2xs mr-12">
           
           <button
-            onClick={() => setActiveAdminSubTab('dishes')}
+            onClick={() => handleSubTabClick('dishes')}
             className={`px-3.5 py-2 rounded-lg font-black text-xs transition-all cursor-pointer flex items-center space-x-1.5 ${
               activeAdminSubTab === 'dishes'
                 ? 'bg-neutral-900 text-white shadow-xs'
@@ -556,7 +820,7 @@ export default function OwnerAdmin({
           </button>
 
           <button
-            onClick={() => setActiveAdminSubTab('history')}
+            onClick={() => handleSubTabClick('history')}
             className={`px-3.5 py-2 rounded-lg font-black text-xs transition-all cursor-pointer flex items-center space-x-1.5 ${
               activeAdminSubTab === 'history'
                 ? 'bg-neutral-900 text-white shadow-xs'
@@ -568,7 +832,7 @@ export default function OwnerAdmin({
           </button>
 
           <button
-            onClick={() => setActiveAdminSubTab('sections')}
+            onClick={() => handleSubTabClick('sections')}
             className={`px-3.5 py-2 rounded-lg font-black text-xs transition-all cursor-pointer flex items-center space-x-1.5 ${
               activeAdminSubTab === 'sections'
                 ? 'bg-neutral-900 text-white shadow-xs'
@@ -577,10 +841,13 @@ export default function OwnerAdmin({
           >
             <Layers className="w-3.5 h-3.5" />
             <span>Area Rates Matrix</span>
+            {hasUnsavedMatrixChanges && (
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse ml-1 inline-block" />
+            )}
           </button>
 
           <button
-            onClick={() => setActiveAdminSubTab('upi')}
+            onClick={() => handleSubTabClick('upi')}
             className={`px-3.5 py-2 rounded-lg font-black text-xs transition-all cursor-pointer flex items-center space-x-1.5 ${
               activeAdminSubTab === 'upi'
                 ? 'bg-neutral-900 text-white shadow-xs'
@@ -592,7 +859,7 @@ export default function OwnerAdmin({
           </button>
 
           <button
-            onClick={() => setActiveAdminSubTab('backup')}
+            onClick={() => handleSubTabClick('backup')}
             className={`px-3.5 py-2 rounded-lg font-black text-xs transition-all cursor-pointer flex items-center space-x-1.5 ${
               activeAdminSubTab === 'backup'
                 ? 'bg-neutral-900 text-white shadow-xs'
@@ -716,7 +983,7 @@ export default function OwnerAdmin({
                         onClick={() => setSelectedSubDivisionFilter(sc.id)}
                         className="cursor-pointer font-black"
                       >
-                        <span>{sc.name} ({dishCount})</span>
+                        <span>{sc.name}{sc.marathiName ? ` (${sc.marathiName})` : ''} ({dishCount})</span>
                       </button>
 
                       <button
@@ -796,7 +1063,6 @@ export default function OwnerAdmin({
                     <th className="py-3 px-4">Dish Name (English)</th>
                     <th className="py-3 px-4">पदार्थाचे नाव (मराठी)</th>
                     <th className="py-3 px-4">Sub-Category</th>
-                    <th className="py-3 px-4 text-right">Price (₹)</th>
                     <th className="py-3 px-4 text-center">Counter</th>
                     <th className="py-3 px-4 text-center">Actions</th>
                   </tr>
@@ -804,7 +1070,7 @@ export default function OwnerAdmin({
                 <tbody className="divide-y divide-slate-100">
                   {filteredDishes.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-slate-400 font-semibold">
+                      <td colSpan={7} className="py-12 text-center text-slate-400 font-semibold">
                         No dishes found matching the current division or search query.
                       </td>
                     </tr>
@@ -845,22 +1111,8 @@ export default function OwnerAdmin({
                           {/* Sub-Category */}
                           <td className="py-3 px-4">
                             <span className="bg-slate-100 border border-slate-300 text-slate-800 text-[10px] font-bold px-2 py-0.5 rounded-md">
-                              {subCat?.name || 'General'}
+                              {subCat?.name || 'General'}{subCat?.marathiName ? ` (${subCat.marathiName})` : ''}
                             </span>
-                          </td>
-
-                          {/* Price */}
-                          <td className="py-3 px-4 text-right font-black text-slate-900 text-sm">
-                            {isMulti ? (
-                              <div>
-                                <span>₹{dish.pricePerKg ? `${dish.pricePerKg}/Kg` : `${dish.variants[0]?.price} (Opts)`}</span>
-                                <div className="text-[10px] font-bold text-blue-600">
-                                  {dish.variants.length} options
-                                </div>
-                              </div>
-                            ) : (
-                              <span>₹{(dish.price || 0).toFixed(2)}</span>
-                            )}
                           </td>
 
                           {/* Counter */}
@@ -1030,7 +1282,7 @@ export default function OwnerAdmin({
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search token, table..."
+                  placeholder="Search table, counter, items..."
                   value={historySearchQuery}
                   onChange={(e) => setHistorySearchQuery(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 text-slate-900 text-xs font-semibold rounded-xl pl-8 pr-3 py-2 outline-none focus:ring-2 focus:ring-blue-600"
@@ -1040,17 +1292,37 @@ export default function OwnerAdmin({
           </div>
 
           {/* ALL SUMMARY METRIC BOXES WITH CHARGES (Requirement 8, 9 & 11) */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-            <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-3">
+            
+            {/* 1. Today's Revenue Box */}
+            <div className="bg-gradient-to-br from-emerald-600 via-teal-600 to-emerald-700 text-white rounded-2xl p-3.5 shadow-xs border border-emerald-500 flex flex-col justify-between">
+              <div className="flex items-center justify-between text-emerald-100 mb-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-100">Today's Revenue</span>
+                <span className="bg-white/20 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full border border-white/20">
+                  Live
+                </span>
+              </div>
+              <div className="text-xl font-black text-white tracking-tight">₹{todayTotalRevenue.toFixed(2)}</div>
+              <div className="text-[10px] font-bold text-emerald-100/90 mt-1 flex items-center justify-between">
+                <span>{todaySettledCount} Bills Today</span>
+                <span className="text-emerald-200 text-[9px] font-extrabold">{new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
+              </div>
+            </div>
+
+            {/* 2. Total Sales in Active Filter */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between text-slate-400 mb-1">
-                <span className="text-[10px] font-black uppercase tracking-wider">Total Sales</span>
+                <span className="text-[10px] font-black uppercase tracking-wider">
+                  {historySelectedDate ? 'Selected Date' : (historyTimeFilter === 'all' ? 'All-Time Total' : 'Total Sales')}
+                </span>
                 <TrendingUp className="w-4 h-4 text-blue-600" />
               </div>
               <div className="text-lg font-black text-neutral-900">₹{totalHistoryRevenue.toFixed(2)}</div>
-              <div className="text-[10px] font-bold text-stone-500 mt-1">{baseCounterBills.length} Bills Total</div>
+              <div className="text-[10px] font-bold text-stone-500 mt-1">{baseCounterBills.length} Bills in Filter</div>
             </div>
 
-            <div className="bg-white border border-stone-200 rounded-2xl p-3.5 shadow-xs">
+            {/* 3. Cash Total */}
+            <div className="bg-white border border-stone-200 rounded-2xl p-3.5 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between text-stone-400 mb-1">
                 <span className="text-[10px] font-black uppercase tracking-wider">Cash Total</span>
                 <Banknote className="w-4 h-4 text-emerald-600" />
@@ -1059,7 +1331,8 @@ export default function OwnerAdmin({
               <div className="text-[10px] font-bold text-stone-500 mt-1">Direct Cash Drawer</div>
             </div>
 
-            <div className="bg-white border border-stone-200 rounded-2xl p-3.5 shadow-xs">
+            {/* 4. Online / UPI */}
+            <div className="bg-white border border-stone-200 rounded-2xl p-3.5 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between text-stone-400 mb-1">
                 <span className="text-[10px] font-black uppercase tracking-wider">Online / UPI</span>
                 <Smartphone className="w-4 h-4 text-blue-600" />
@@ -1068,7 +1341,8 @@ export default function OwnerAdmin({
               <div className="text-[10px] font-bold text-stone-500 mt-1">QR Phone Payments</div>
             </div>
 
-            <div className="bg-white border border-stone-200 rounded-2xl p-3.5 shadow-xs">
+            {/* 5. Card Total */}
+            <div className="bg-white border border-stone-200 rounded-2xl p-3.5 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between text-stone-400 mb-1">
                 <span className="text-[10px] font-black uppercase tracking-wider">Card Total</span>
                 <CreditCard className="w-4 h-4 text-purple-600" />
@@ -1077,7 +1351,8 @@ export default function OwnerAdmin({
               <div className="text-[10px] font-bold text-stone-500 mt-1">POS Card Swipes</div>
             </div>
 
-            <div className="bg-white border border-rose-200 rounded-2xl p-3.5 shadow-xs">
+            {/* 6. Discounts */}
+            <div className="bg-white border border-rose-200 rounded-2xl p-3.5 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between text-rose-400 mb-1">
                 <span className="text-[10px] font-black uppercase tracking-wider text-rose-700">Discounts</span>
                 <Tag className="w-4 h-4 text-rose-600" />
@@ -1086,7 +1361,8 @@ export default function OwnerAdmin({
               <div className="text-[10px] font-bold text-rose-500 mt-1">Total Concessions</div>
             </div>
 
-            <div className="bg-white border border-amber-200 rounded-2xl p-3.5 shadow-xs">
+            {/* 7. Extra Charges */}
+            <div className="bg-white border border-amber-200 rounded-2xl p-3.5 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between text-amber-500 mb-1">
                 <span className="text-[10px] font-black uppercase tracking-wider text-amber-800">Extra Charges</span>
                 <Layers className="w-4 h-4 text-amber-600" />
@@ -1099,7 +1375,8 @@ export default function OwnerAdmin({
               </div>
             </div>
 
-            <div className="bg-white border border-stone-200 rounded-2xl p-3.5 shadow-xs">
+            {/* 8. Settled Count */}
+            <div className="bg-white border border-stone-200 rounded-2xl p-3.5 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between text-stone-400 mb-1">
                 <span className="text-[10px] font-black uppercase tracking-wider">Settled Count</span>
                 <Receipt className="w-4 h-4 text-neutral-800" />
@@ -1145,7 +1422,6 @@ export default function OwnerAdmin({
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-100 border-b border-slate-200 text-slate-800 font-extrabold text-[11px] uppercase tracking-wider">
-                    <th className="py-3 px-4">Token #</th>
                     <th className="py-3 px-4">Table / Area</th>
                     <th className="py-3 px-4">Counter</th>
                     <th className="py-3 px-4">Items Summary</th>
@@ -1158,7 +1434,7 @@ export default function OwnerAdmin({
                 <tbody className="divide-y divide-stone-100">
                   {displayedHistoryBills.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-stone-400 font-semibold">
+                      <td colSpan={7} className="py-12 text-center text-stone-400 font-semibold">
                         No billing history records found.
                       </td>
                     </tr>
@@ -1178,9 +1454,6 @@ export default function OwnerAdmin({
 
                       return (
                         <tr key={`h-bill-${bill.id || bIdx}`} className="hover:bg-amber-50/30">
-                          <td className="py-3 px-4 font-mono font-black text-neutral-900">
-                            #{bill.tokenNo || bill.id}
-                          </td>
                           <td className="py-3 px-4 font-bold text-neutral-900">
                             {bill.tableNo || 'Takeaway'}
                           </td>
@@ -1552,72 +1825,73 @@ export default function OwnerAdmin({
           {/* SECTION 2: DINING AREA PRICE MATRIX */}
           <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-xs flex flex-wrap justify-between items-center gap-3">
             <div>
-              <h3 className="text-base font-black text-neutral-900">
-                Dining Area Price Matrix
-              </h3>
+              <div className="flex items-center space-x-2">
+                <h3 className="text-base font-black text-neutral-900">
+                  Dining Area Price Matrix
+                </h3>
+                {hasUnsavedMatrixChanges && (
+                  <span className="px-2 py-0.5 text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 rounded-full animate-pulse">
+                    Unsaved Changes / जतन न केलेले बदल
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-stone-500 font-semibold mt-0.5">
                 Set custom prices per dish for different sections (e.g. First Floor, AC Hall, Parcels, Sweets)
               </p>
             </div>
 
-            <button
-              onClick={async () => {
-                for (const d of dishes) {
-                  const rates = dishSectionRates[d.id] || d.sectionPrices || {};
-                  const cleanRates = {};
-                  Object.entries(rates).forEach(([secId, rateVal]) => {
-                    const num = parseFloat(rateVal);
-                    if (!isNaN(num) && num > 0) {
-                      cleanRates[secId] = num;
-                    }
-                  });
-                  await db.dishes.update(d.id, { sectionPrices: cleanRates });
-                  if (typeof onUpdateDish === 'function') {
-                    onUpdateDish(d.id, { ...d, sectionPrices: cleanRates });
-                  }
-                }
-                setRatesSavedFeedback(true);
-                setTimeout(() => setRatesSavedFeedback(false), 2000);
-              }}
-              className="bg-neutral-900 hover:bg-black text-white font-black text-xs px-4 py-2 rounded-xl shadow-md cursor-pointer transition-all flex items-center space-x-1.5"
-            >
-              <Save className="w-4 h-4" />
-              <span>{ratesSavedFeedback ? '✓ Rates Saved!' : 'Save All Matrix Rates'}</span>
-            </button>
-          </div>
+            <div className="flex items-center space-x-2">
+              {hasUnsavedMatrixChanges && (
+                <button
+                  type="button"
+                  onClick={handleDiscardMatrixChanges}
+                  className="bg-stone-100 hover:bg-stone-200 text-stone-700 font-black text-xs px-3.5 py-2 rounded-xl border border-stone-300 cursor-pointer transition-all flex items-center space-x-1.5"
+                  title="Discard changes and revert to database rates"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-stone-500" />
+                  <span>Discard Changes</span>
+                </button>
+              )}
 
-          {/* Search & Category Filter for Matrix */}
-          <div className="bg-white border border-stone-200 rounded-2xl p-3 shadow-xs flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5 flex-wrap">
               <button
                 type="button"
-                onClick={() => setMatrixFilterCat('all')}
-                className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer ${
-                  matrixFilterCat === 'all'
-                    ? 'bg-neutral-900 text-white shadow-xs'
+                onClick={handleSaveAllMatrixRates}
+                className="bg-neutral-900 hover:bg-black text-white font-black text-xs px-4 py-2 rounded-xl shadow-md cursor-pointer transition-all flex items-center space-x-1.5"
+              >
+                <Save className="w-4 h-4 text-emerald-400" />
+                <span>{ratesSavedFeedback ? '✓ Rates Saved!' : 'Save All Matrix Rates'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Category Filter for Matrix: Strictly Two Filters (Breakfast & Sweet) */}
+          <div className="bg-white border border-stone-200 rounded-2xl p-3 shadow-xs flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setMatrixFilterCat('1')}
+                className={`px-4 py-2 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center space-x-2 ${
+                  matrixFilterCat === '1'
+                    ? 'bg-blue-600 text-white shadow-md'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
-                All Items ({dishes.length})
+                <Coffee className="w-4 h-4" />
+                <span>Breakfast ({dishes.filter((d) => d.categoryId === 1).length})</span>
               </button>
-              {categories.map((cat) => {
-                const isSelected = matrixFilterCat === cat.id.toString() || matrixFilterCat === cat.id;
-                const count = dishes.filter((d) => d.categoryId === cat.id).length;
-                return (
-                  <button
-                    key={`matrix-cat-filter-${cat.id}`}
-                    type="button"
-                    onClick={() => setMatrixFilterCat(cat.id.toString())}
-                    className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-neutral-900 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
-                  >
-                    {cat.name} ({count})
-                  </button>
-                );
-              })}
+
+              <button
+                type="button"
+                onClick={() => setMatrixFilterCat('2')}
+                className={`px-4 py-2 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center space-x-2 ${
+                  matrixFilterCat === '2'
+                    ? 'bg-rose-600 text-white shadow-md'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <Candy className="w-4 h-4" />
+                <span>Sweet ({dishes.filter((d) => d.categoryId === 2).length})</span>
+              </button>
             </div>
 
             <div className="relative w-full sm:w-64">
@@ -1641,105 +1915,219 @@ export default function OwnerAdmin({
             </div>
           </div>
 
-          <div className="bg-white border border-stone-200 rounded-2xl shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-slate-100 border-b border-slate-200 text-slate-800 font-extrabold text-[11px] uppercase tracking-wider">
-                    <th className="py-3 px-4 w-20">Code</th>
-                    <th className="py-3 px-4 min-w-[200px]">Dish Name</th>
-                    {sections.map((sec) => (
-                      <th key={`sec-rate-th-${sec.id}`} className="py-3 px-4 text-center">
-                        {sec.name} (₹)
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {(() => {
-                    const matrixFilteredDishes = dishes.filter((dish) => {
-                      if (matrixFilterCat !== 'all' && String(dish.categoryId) !== String(matrixFilterCat)) {
-                        return false;
-                      }
-                      if (matrixSearchQuery.trim()) {
-                        const q = matrixSearchQuery.toLowerCase().trim();
-                        const matchName = dish.name?.toLowerCase().includes(q);
-                        const matchMarathi = dish.marathiName?.toLowerCase().includes(q);
-                        const matchCode = dish.srNo?.toString().includes(q) || dish.id?.toString().includes(q);
-                        return matchName || matchMarathi || matchCode;
-                      }
-                      return true;
-                    });
+          {(() => {
+            const isSweetMatrix = matrixFilterCat === '2';
 
-                    if (matrixFilteredDishes.length === 0) {
-                      return (
+            // For Breakfast: show normal dining sections (Dine In, First Floor, AC Hall, Parcels) - hide section 5 (Sweets)
+            // For Sweet: remove Parcels (section 4), remove section 5, show dining areas + 250g + 500g + 1 Kg
+            const relevantSections = isSweetMatrix
+              ? sections.filter((s) => s.id !== 4 && s.id !== 5 && !s.name?.toLowerCase().includes('parcel') && !s.name?.toLowerCase().includes('sweet'))
+              : sections.filter((s) => s.id !== 5 && !s.name?.toLowerCase().includes('sweet'));
+
+            const matrixFilteredDishes = dishes.filter((dish) => {
+              if (isSweetMatrix) {
+                if (dish.categoryId !== 2 && dish.counter?.toLowerCase() !== 'sweets') return false;
+              } else {
+                if (dish.categoryId !== 1 && dish.counter?.toLowerCase() === 'sweets') return false;
+              }
+              if (matrixSearchQuery.trim()) {
+                const q = matrixSearchQuery.toLowerCase().trim();
+                const matchName = dish.name?.toLowerCase().includes(q);
+                const matchMarathi = dish.marathiName?.toLowerCase().includes(q);
+                const matchCode = dish.srNo?.toString().includes(q) || dish.id?.toString().includes(q);
+                return matchName || matchMarathi || matchCode;
+              }
+              return true;
+            });
+
+            const totalColumns = relevantSections.length + 2 + (isSweetMatrix ? 3 : 0);
+
+            return (
+              <div className="bg-white border border-stone-200 rounded-2xl shadow-xs overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-100 border-b border-slate-200 text-slate-800 font-extrabold text-[11px] uppercase tracking-wider">
+                        <th className="py-3 px-4 w-20">Code</th>
+                        <th className="py-3 px-4 min-w-[200px]">Dish Name</th>
+                        {relevantSections.map((sec) => (
+                          <th key={`sec-rate-th-${sec.id}`} className="py-3 px-4 text-center">
+                            {sec.name} (₹)
+                          </th>
+                        ))}
+                        {isSweetMatrix && (
+                          <>
+                            <th className="py-3 px-4 text-center bg-rose-50 text-rose-900 border-l border-rose-200">
+                              1 Kg (₹)
+                            </th>
+                            <th className="py-3 px-4 text-center bg-amber-50 text-amber-900">
+                              500g (₹)
+                            </th>
+                            <th className="py-3 px-4 text-center bg-amber-50 text-amber-900 border-r border-amber-200">
+                              250g (₹)
+                            </th>
+                          </>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {matrixFilteredDishes.length === 0 ? (
                         <tr>
-                          <td colSpan={sections.length + 2} className="py-8 text-center text-stone-400 font-semibold">
+                          <td colSpan={totalColumns} className="py-8 text-center text-stone-400 font-semibold">
                             No dishes found matching filter.
                           </td>
                         </tr>
-                      );
-                    }
-
-                    return matrixFilteredDishes.map((dish) => (
-                      <tr key={`matrix-d-${dish.id}`} className="hover:bg-blue-50/20">
-                        <td className="py-3 px-4 font-mono font-bold text-slate-600">#{dish.srNo || dish.id}</td>
-                        <td className="py-3 px-4">
-                          <div className="font-extrabold text-slate-900 text-xs sm:text-sm">{dish.name}</div>
-                          {dish.marathiName && (
-                            <div className="text-xs font-black text-blue-900 mt-0.5">
-                              {dish.marathiName}
-                            </div>
-                          )}
-                        </td>
-                        {sections.map((sec) => {
-                          const currentVal = dishSectionRates[dish.id]?.[sec.id] !== undefined
-                            ? dishSectionRates[dish.id][sec.id]
-                            : (dish.sectionPrices?.[sec.id] !== undefined ? dish.sectionPrices[sec.id] : '');
+                      ) : (
+                        matrixFilteredDishes.map((dish) => {
+                          const rates = dishSectionRates[dish.id] || {};
 
                           return (
-                            <td key={`matrix-input-${dish.id}-${sec.id}`} className="py-3 px-4 text-center">
-                              <input
-                                type="number"
-                                placeholder={dish.price ? dish.price.toString() : '0'}
-                                value={currentVal}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setDishSectionRates((prev) => ({
-                                    ...prev,
-                                    [dish.id]: {
-                                      ...(prev[dish.id] || {}),
-                                      [sec.id]: val
-                                    }
-                                  }));
-                                }}
-                                onBlur={(e) => {
-                                  handleSaveSingleRate(dish.id, sec.id, e.target.value);
-                                }}
-                                onKeyDown={async (e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    await handleSaveSingleRate(dish.id, sec.id, e.target.value);
-                                    const allInputs = Array.from(document.querySelectorAll('.matrix-rate-input'));
-                                    const currentIndex = allInputs.indexOf(e.target);
-                                    if (currentIndex !== -1 && currentIndex + 1 < allInputs.length) {
-                                      allInputs[currentIndex + 1].focus();
-                                      allInputs[currentIndex + 1].select();
-                                    }
-                                  }
-                                }}
-                                className="matrix-rate-input w-24 bg-slate-50 border border-slate-300 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500 rounded-lg p-1.5 text-center font-black outline-none text-xs transition-all"
-                              />
-                            </td>
+                            <tr key={`matrix-d-${dish.id}`} className="hover:bg-blue-50/20">
+                              <td className="py-3 px-4 font-mono font-bold text-slate-600">#{dish.srNo || dish.id}</td>
+                              <td className="py-3 px-4">
+                                <div className="font-extrabold text-slate-900 text-xs sm:text-sm">{dish.name}</div>
+                                {dish.marathiName && (
+                                  <div className="text-xs font-black text-blue-900 mt-0.5">
+                                    {dish.marathiName}
+                                  </div>
+                                )}
+                              </td>
+
+                              {/* Dining Areas */}
+                              {relevantSections.map((sec) => {
+                                const currentVal = rates[sec.id] !== undefined
+                                  ? rates[sec.id]
+                                  : (dish.sectionPrices?.[sec.id] !== undefined ? dish.sectionPrices[sec.id] : '');
+
+                                return (
+                                  <td key={`matrix-input-${dish.id}-${sec.id}`} className="py-3 px-4 text-center">
+                                    <input
+                                      type="number"
+                                      placeholder={dish.price ? dish.price.toString() : '0'}
+                                      value={currentVal}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setHasUnsavedMatrixChanges(true);
+                                        setDishSectionRates((prev) => ({
+                                          ...prev,
+                                          [dish.id]: {
+                                            ...(prev[dish.id] || {}),
+                                            [sec.id]: val
+                                          }
+                                        }));
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          const allInputs = Array.from(document.querySelectorAll('.matrix-rate-input'));
+                                          const currentIndex = allInputs.indexOf(e.target);
+                                          if (currentIndex !== -1 && currentIndex + 1 < allInputs.length) {
+                                            allInputs[currentIndex + 1].focus();
+                                            allInputs[currentIndex + 1].select();
+                                          }
+                                        }
+                                      }}
+                                      className="matrix-rate-input w-20 sm:w-24 bg-slate-50 border border-slate-300 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500 rounded-lg p-1.5 text-center font-black outline-none text-xs transition-all"
+                                    />
+                                  </td>
+                                );
+                              })}
+
+                              {/* Sweet 1 Kg, 500g, 250g Columns in Strict 1kg -> 500g -> 250g Order */}
+                              {isSweetMatrix && (
+                                <>
+                                  {/* 1 Kg Column (Entering 1 Kg sets 500g and 250g automatically) */}
+                                  <td className="py-3 px-4 text-center bg-rose-50/30 border-l border-rose-100">
+                                    <input
+                                      type="number"
+                                      placeholder={dish.pricePerKg || dish.variants?.find((v) => v.unit === '1 Kg' || v.unit === '1Kg')?.price || dish.sectionPrices?.[5] || (dish.price ? dish.price * 4 : '320')}
+                                      value={
+                                        rates.price1kg !== undefined
+                                          ? rates.price1kg
+                                          : (dish.pricePerKg || dish.variants?.find((v) => v.unit === '1 Kg' || v.unit === '1Kg')?.price || dish.sectionPrices?.[5] || (dish.price ? dish.price * 4 : '320'))
+                                      }
+                                      onChange={(e) => handleSweet1KgChange(dish.id, e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          const allInputs = Array.from(document.querySelectorAll('.matrix-rate-input'));
+                                          const currentIndex = allInputs.indexOf(e.target);
+                                          if (currentIndex !== -1 && currentIndex + 1 < allInputs.length) {
+                                            allInputs[currentIndex + 1].focus();
+                                            allInputs[currentIndex + 1].select();
+                                          }
+                                        }
+                                      }}
+                                      className="matrix-rate-input w-20 sm:w-24 bg-rose-50 border border-rose-300 focus:bg-white focus:border-rose-600 focus:ring-2 focus:ring-rose-500 rounded-lg p-1.5 text-center font-black outline-none text-xs transition-all text-rose-900"
+                                      title="Price for 1 Kg (entering sets 500g and 250g automatically)"
+                                    />
+                                  </td>
+
+                                  {/* 500g Column */}
+                                  <td className="py-3 px-4 text-center bg-amber-50/30">
+                                    <input
+                                      type="number"
+                                      placeholder={dish.variants?.find((v) => v.unit === '500g')?.price || (dish.price ? dish.price * 2 : '160')}
+                                      value={
+                                        rates.price500g !== undefined
+                                          ? rates.price500g
+                                          : (dish.variants?.find((v) => v.unit === '500g')?.price || (dish.price ? dish.price * 2 : ''))
+                                      }
+                                      onChange={(e) => handleSweetGramChange(dish.id, 'price500g', e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          const allInputs = Array.from(document.querySelectorAll('.matrix-rate-input'));
+                                          const currentIndex = allInputs.indexOf(e.target);
+                                          if (currentIndex !== -1 && currentIndex + 1 < allInputs.length) {
+                                            allInputs[currentIndex + 1].focus();
+                                            allInputs[currentIndex + 1].select();
+                                          }
+                                        }
+                                      }}
+                                      className="matrix-rate-input w-20 sm:w-24 bg-amber-50 border border-amber-300 focus:bg-white focus:border-amber-600 focus:ring-2 focus:ring-amber-500 rounded-lg p-1.5 text-center font-black outline-none text-xs transition-all text-amber-900"
+                                      title="Price for 500g (can be edited independently)"
+                                    />
+                                  </td>
+
+                                  {/* 250g Column */}
+                                  <td className="py-3 px-4 text-center bg-amber-50/30 border-r border-amber-100">
+                                    <input
+                                      type="number"
+                                      placeholder={dish.variants?.find((v) => v.unit === '250g')?.price || dish.price || '80'}
+                                      value={
+                                        rates.price250g !== undefined
+                                          ? rates.price250g
+                                          : (dish.variants?.find((v) => v.unit === '250g')?.price || dish.price || '')
+                                      }
+                                      onChange={(e) => handleSweetGramChange(dish.id, 'price250g', e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          const allInputs = Array.from(document.querySelectorAll('.matrix-rate-input'));
+                                          const currentIndex = allInputs.indexOf(e.target);
+                                          if (currentIndex !== -1 && currentIndex + 1 < allInputs.length) {
+                                            allInputs[currentIndex + 1].focus();
+                                            allInputs[currentIndex + 1].select();
+                                          }
+                                        }
+                                      }}
+                                      className="matrix-rate-input w-20 sm:w-24 bg-amber-50 border border-amber-300 focus:bg-white focus:border-amber-600 focus:ring-2 focus:ring-amber-500 rounded-lg p-1.5 text-center font-black outline-none text-xs transition-all text-amber-900"
+                                      title="Price for 250g (can be edited independently)"
+                                    />
+                                  </td>
+                                </>
+                              )}
+                            </tr>
                           );
-                        })}
-                      </tr>
-                    ));
-                  })()}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Add Area Modal */}
           {showAddAreaModal && (
@@ -1881,11 +2269,85 @@ export default function OwnerAdmin({
               </div>
             </div>
 
+            {/* Settle Tab Edit Button Access Control (Enable / Disable) */}
+            <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-5 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-white shadow-xs ${
+                      isSettledBillEditEnabled ? 'bg-emerald-600' : 'bg-rose-600'
+                    }`}>
+                      {isSettledBillEditEnabled ? <CheckCircle className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                    </div>
+                    <div>
+                      <h4 className="font-black text-sm text-slate-900">
+                        Settle Tab Edit Button Permission (बिल एडिट पर्याय)
+                      </h4>
+                      <div className="flex items-center space-x-2 mt-0.5">
+                        <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+                          isSettledBillEditEnabled 
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300' 
+                            : 'bg-rose-100 text-rose-800 border-rose-300'
+                        }`}>
+                          {isSettledBillEditEnabled ? 'STATUS: ABLE (सुरू)' : 'STATUS: DISABLE (बंद)'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500 font-semibold pt-1 leading-relaxed">
+                    Set whether the <strong>Edit / Resettle</strong> button in the <strong>Settle Tab</strong> is Able or Disable. Once set as Able, it will always stay able; once set as Disable, it will always stay disable.
+                  </p>
+                </div>
+              </div>
+
+              {/* Able / Disable Toggle Control */}
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleToggleEditPermission(true)}
+                  className={`py-3 px-4 rounded-xl font-black text-xs flex items-center justify-center space-x-2 transition-all cursor-pointer border-2 ${
+                    isSettledBillEditEnabled
+                      ? 'bg-emerald-600 text-white border-emerald-700 shadow-md ring-2 ring-emerald-400/40'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-900'
+                  }`}
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Able (सुरू / Enable)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleToggleEditPermission(false)}
+                  className={`py-3 px-4 rounded-xl font-black text-xs flex items-center justify-center space-x-2 transition-all cursor-pointer border-2 ${
+                    !isSettledBillEditEnabled
+                      ? 'bg-rose-600 text-white border-rose-700 shadow-md ring-2 ring-rose-400/40'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-900'
+                  }`}
+                >
+                  <Ban className="w-4 h-4" />
+                  <span>Disable (बंद / Lock)</span>
+                </button>
+              </div>
+
+              {/* Status explanation notice */}
+              <div className={`p-3 rounded-xl text-xs font-bold border ${
+                isSettledBillEditEnabled
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                  : 'bg-rose-50 border-rose-200 text-rose-900'
+              }`}>
+                {isSettledBillEditEnabled ? (
+                  <span>✓ <strong>Edit button is ABLE:</strong> The Edit button in the Settle tab is active. Staff can modify items, charges, and resettle bills.</span>
+                ) : (
+                  <span>🔒 <strong>Edit button is DISABLE:</strong> The Edit button in the Settle tab is locked and disabled. No one can edit or alter settled bills.</span>
+                )}
+              </div>
+            </div>
+
             {/* Success Feedback Banner */}
             {upiSavedToast && (
               <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 p-3.5 rounded-xl text-xs font-bold flex items-center space-x-2 animate-in fade-in">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>✓ UPI Settings saved successfully! All newly printed bills will use this UPI QR Code.</span>
+                <span>✓ Settings saved successfully! UPI configuration and Settle Tab edit permissions are updated.</span>
               </div>
             )}
 
@@ -1898,7 +2360,7 @@ export default function OwnerAdmin({
                 className="bg-neutral-900 hover:bg-black text-white font-black text-xs px-6 py-3 rounded-xl shadow-md cursor-pointer transition-all flex items-center space-x-2 disabled:opacity-40"
               >
                 <Save className="w-4 h-4 text-amber-400" />
-                <span>Save UPI Settings</span>
+                <span>Save UPI & Security Settings</span>
               </button>
             </div>
 
@@ -2140,105 +2602,13 @@ export default function OwnerAdmin({
                 </select>
               </div>
 
-              {/* Multi-Price Checkbox (Requirement 8) */}
-              <div className="bg-slate-50 border border-slate-300 rounded-xl p-3 space-y-3">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={newDishHasMultiplePrices}
-                    onChange={(e) => setNewDishHasMultiplePrices(e.target.checked)}
-                    className="w-4 h-4 text-neutral-900 rounded"
-                  />
-                  <span className="font-black text-neutral-900">
-                    Multiple Prices of One Item (By Weight / Portions in Kg)
-                  </span>
-                </label>
-
-                {newDishHasMultiplePrices ? (
-                  <div className="space-y-3 pt-1">
-                    {/* Base Per-Kg Rate Input (Requirement 8) */}
-                    <div>
-                      <label className="text-[10px] font-black text-amber-900 uppercase block mb-1">
-                        Base Rate Per Kilo (₹/Kg) *
-                      </label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 900"
-                        value={newDishPricePerKg}
-                        onChange={(e) => handleBasePricePerKgChange(e.target.value, false)}
-                        className="w-full bg-white border border-amber-400 rounded-xl px-3 py-2 text-xs font-black text-neutral-900 outline-none focus:ring-2 focus:ring-amber-600"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black text-stone-500 uppercase block">
-                          Portion Rates & Weight Options
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setNewDishVariants([...newDishVariants, { unit: '100g', price: 0 }]);
-                          }}
-                          className="bg-amber-600 hover:bg-amber-700 text-white font-black text-[10px] px-2 py-1 rounded-lg flex items-center space-x-1 cursor-pointer transition-all shadow-xs"
-                        >
-                          <Plus className="w-3 h-3" />
-                          <span>+ Add Portion</span>
-                        </button>
-                      </div>
-                      {newDishVariants.map((v, vIdx) => (
-                        <div key={`new-v-${vIdx}`} className="flex items-center space-x-2">
-                          <input
-                            type="text"
-                            placeholder="Unit (e.g. 250g)"
-                            value={v.unit || ''}
-                            onChange={(e) => {
-                              const updated = [...newDishVariants];
-                              updated[vIdx].unit = e.target.value;
-                              setNewDishVariants(updated);
-                            }}
-                            className="w-24 bg-white border border-stone-300 rounded-lg px-2.5 py-1.5 text-xs font-black text-neutral-900 outline-none focus:ring-2 focus:ring-amber-600"
-                          />
-                          <input
-                            type="number"
-                            placeholder="Price (₹)"
-                            value={v.price}
-                            onChange={(e) => {
-                              const updated = [...newDishVariants];
-                              updated[vIdx].price = e.target.value;
-                              setNewDishVariants(updated);
-                            }}
-                            className="flex-1 bg-white border border-stone-300 rounded-lg px-2.5 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-amber-600"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = newDishVariants.filter((_, idx) => idx !== vIdx);
-                              setNewDishVariants(updated);
-                            }}
-                            className="text-stone-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 cursor-pointer transition-colors"
-                            title="Delete portion rate"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <label className="text-[10px] font-black text-stone-500 uppercase block mb-1">
-                      Standard Item Price (₹) *
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 50"
-                      value={newDishPrice}
-                      onChange={(e) => setNewDishPrice(e.target.value)}
-                      className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-black text-neutral-900 outline-none"
-                    />
-                  </div>
-                )}
+              {/* Rates Managed Exclusively in Area Matrix Tab */}
+              <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-start space-x-2.5">
+                <span className="text-base select-none">📌</span>
+                <div className="text-xs text-blue-900 leading-relaxed">
+                  <span className="font-black block text-blue-950 mb-0.5">Rates Set in Area Matrix Tab Only</span>
+                  Prices for Dine In, First Floor, AC, Parcels, and Sweets (250g, 500g, 1 Kg) are configured exclusively in the <strong>Dining Area Price Matrix</strong> tab after adding the dish.
+                </div>
               </div>
             </div>
 
@@ -2303,95 +2673,14 @@ export default function OwnerAdmin({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">
-                    Standard Price (₹)
-                  </label>
-                  <input
-                    type="number"
-                    value={editingDish.price || ''}
-                    onChange={(e) => setEditingDish({ ...editingDish, price: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">
-                    Base Rate Per Kilo (₹/Kg)
-                  </label>
-                  <input
-                    type="number"
-                    value={editingDish.pricePerKg || ''}
-                    onChange={(e) => handleBasePricePerKgChange(e.target.value, true)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold outline-none"
-                  />
+              {/* Rates Managed Exclusively in Area Matrix Tab */}
+              <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-start space-x-2.5">
+                <span className="text-base select-none">📌</span>
+                <div className="text-xs text-blue-900 leading-relaxed">
+                  <span className="font-black block text-blue-950 mb-0.5">Rates Set in Area Matrix Tab Only</span>
+                  Prices for all areas (Dine In, First Floor, AC, Parcels) and sweet portion weights (250g, 500g, 1 Kg) are managed exclusively in the <strong>Dining Area Price Matrix</strong> tab.
                 </div>
               </div>
-
-              {/* Edit Variants / Portion Rates */}
-              {editingDish.hasMultiplePrices && (
-                <div className="bg-slate-50 border border-slate-300 rounded-xl p-3 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black text-stone-500 uppercase block">
-                      Portion Rates & Weight Options
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const currentVars = editingDish.variants || [];
-                        setEditingDish({
-                          ...editingDish,
-                          hasMultiplePrices: true,
-                          variants: [...currentVars, { unit: '100g', price: 0 }]
-                        });
-                      }}
-                      className="bg-amber-600 hover:bg-amber-700 text-white font-black text-[10px] px-2.5 py-1 rounded-lg flex items-center space-x-1 cursor-pointer transition-all shadow-xs"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>+ Add Portion</span>
-                    </button>
-                  </div>
-
-                  {editingDish.variants?.map((v, vIdx) => (
-                    <div key={`edit-v-${vIdx}`} className="flex items-center space-x-2">
-                      <input
-                        type="text"
-                        placeholder="Unit (e.g. 250g)"
-                        value={v.unit || ''}
-                        onChange={(e) => {
-                          const updated = [...editingDish.variants];
-                          updated[vIdx].unit = e.target.value;
-                          setEditingDish({ ...editingDish, variants: updated });
-                        }}
-                        className="w-24 bg-white border border-stone-300 rounded-lg px-2.5 py-1.5 text-xs font-black text-neutral-900 outline-none focus:ring-2 focus:ring-amber-600"
-                      />
-                      <input
-                        type="number"
-                        placeholder="Price (₹)"
-                        value={v.price !== undefined ? v.price : ''}
-                        onChange={(e) => {
-                          const updated = [...editingDish.variants];
-                          updated[vIdx].price = parseFloat(e.target.value) || 0;
-                          setEditingDish({ ...editingDish, variants: updated });
-                        }}
-                        className="flex-1 bg-white border border-stone-300 rounded-lg px-2.5 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-amber-600"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const updated = editingDish.variants.filter((_, idx) => idx !== vIdx);
-                          setEditingDish({ ...editingDish, variants: updated });
-                        }}
-                        className="text-stone-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 cursor-pointer transition-colors"
-                        title="Delete portion rate"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
             <div className="flex items-center space-x-2 pt-2 border-t border-stone-200">
@@ -2514,6 +2803,76 @@ export default function OwnerAdmin({
                 className={`py-3 ${confirmDialog.confirmColor || 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/30'} text-white font-black rounded-xl text-xs transition shadow-lg cursor-pointer`}
               >
                 {confirmDialog.confirmText || 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal to Save or Discard Rates when leaving Area Matrix */}
+      {showSubTabUnsavedModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150 select-none">
+          <div className="bg-white border border-stone-200 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <div className="flex items-center space-x-3">
+              <div className="p-3 bg-amber-100 text-amber-700 rounded-2xl">
+                <AlertTriangle className="w-7 h-7" />
+              </div>
+              <div>
+                <h3 className="font-black text-lg text-neutral-900">
+                  Save Changes to Rates?
+                </h3>
+                <p className="text-xs font-bold text-stone-500">
+                  दर बदल जतन करायचे आहेत का?
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-stone-600 leading-relaxed font-semibold">
+              You have modified rates in the Area Rates Matrix that have not been saved yet. Would you like to save these new rates or discard the changes before switching tabs?
+            </p>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  await handleSaveAllMatrixRates();
+                  setShowSubTabUnsavedModal(false);
+                  if (pendingSubTab) {
+                    setActiveAdminSubTab(pendingSubTab);
+                    setPendingSubTab(null);
+                  }
+                }}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs transition shadow-lg shadow-emerald-600/20 cursor-pointer flex items-center justify-center space-x-2"
+              >
+                <Save className="w-4 h-4" />
+                <span>Save Rates & Continue (दर जतन करा)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleDiscardMatrixChanges();
+                  setShowSubTabUnsavedModal(false);
+                  if (pendingSubTab) {
+                    setActiveAdminSubTab(pendingSubTab);
+                    setPendingSubTab(null);
+                  }
+                }}
+                className="w-full py-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-black rounded-xl text-xs transition border border-rose-200 cursor-pointer flex items-center justify-center space-x-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Discard Changes (बदल रद्द करा)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSubTabUnsavedModal(false);
+                  setPendingSubTab(null);
+                }}
+                className="w-full py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-600 font-bold rounded-xl text-xs transition cursor-pointer"
+              >
+                Stay on Matrix Tab (इथेच थांबा)
               </button>
             </div>
           </div>

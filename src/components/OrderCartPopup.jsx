@@ -157,6 +157,7 @@ export default function OrderCartPopup({
       finalTotal: finalGrandTotal,
       grandTotal: finalGrandTotal,
       paymentDetails,
+      paymentMode: paymentDetails.mode,
       createdAt: new Date().toISOString(),
       isPrinted: isPrint
     };

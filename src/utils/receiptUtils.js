@@ -925,7 +925,24 @@ export async function printThermalReceipt(billData, options = {}) {
           </div>
 
           <div class="total-col">
-            ${hasExtraLines ? `
+            ${billData.isPreOrderSettlement ? `
+              <div style="font-size: 10px; font-weight: 700; color: #334155; display: flex; justify-content: space-between; width: 100%; margin-bottom: 2px;">
+                <span>Order Total:</span><span>₹${Number(billData.orderTotal || subtotal).toFixed(2)}</span>
+              </div>
+              ${billData.discount > 0 ? `
+              <div style="font-size: 10px; font-weight: 700; color: #dc2626; display: flex; justify-content: space-between; width: 100%; margin-bottom: 2px;">
+                <span>Discount:</span><span>-₹${Number(billData.discount).toFixed(2)}</span>
+              </div>` : ''}
+              ${billData.advancePaid > 0 ? `
+              <div style="font-size: 10px; font-weight: 700; color: #166534; display: flex; justify-content: space-between; width: 100%; margin-bottom: 2px;">
+                <span>Advance Paid:</span><span>-₹${Number(billData.advancePaid).toFixed(2)}</span>
+              </div>` : ''}
+              <div class="dashed-line" style="margin: 2px 0 3px 0;"></div>
+              <div class="total-line">
+                <span class="total-label">Balance Paid:</span>
+                <span class="total-val">₹${typeof grandTotal === 'number' ? grandTotal.toFixed(2) : Number(grandTotal).toFixed(2)}</span>
+              </div>
+            ` : hasExtraLines ? `
               <div style="font-size: 10px; font-weight: 700; color: #334155; display: flex; justify-content: space-between; width: 100%; margin-bottom: 2px;">
                 <span>Subtotal:</span><span>₹${Number(subtotal).toFixed(2)}</span>
               </div>
@@ -950,11 +967,16 @@ export async function printThermalReceipt(billData, options = {}) {
                 <span>Service Charge:</span><span>+₹${serviceCharge.toFixed(2)}</span>
               </div>` : ''}
               <div class="dashed-line" style="margin: 2px 0 3px 0;"></div>
-            ` : ''}
-            <div class="total-line">
-              <span class="total-label">Total:</span>
-              <span class="total-val">₹${typeof grandTotal === 'number' ? grandTotal.toFixed(2) : Number(grandTotal).toFixed(2)}</span>
-            </div>
+              <div class="total-line">
+                <span class="total-label">Total:</span>
+                <span class="total-val">₹${typeof grandTotal === 'number' ? grandTotal.toFixed(2) : Number(grandTotal).toFixed(2)}</span>
+              </div>
+            ` : `
+              <div class="total-line">
+                <span class="total-label">Total:</span>
+                <span class="total-val">₹${typeof grandTotal === 'number' ? grandTotal.toFixed(2) : Number(grandTotal).toFixed(2)}</span>
+              </div>
+            `}
             <div class="dashed-line" style="margin: 4px 0;"></div>
             <div class="thank-you-text">Thank You! Visit Again!</div>
           </div>
@@ -992,8 +1014,10 @@ export async function printPreOrderReceipt(preOrder, options = {}) {
   const customerPhone = preOrder.customerPhone || '-';
 
   const totalAmount = parseFloat(preOrder.totalAmount || preOrder.total || 0) || 0;
+  const discountAmount = parseFloat(preOrder.discount || 0) || 0;
+  const subtotalAmount = preOrder.subtotal !== undefined ? parseFloat(preOrder.subtotal) : (totalAmount + discountAmount);
   const advancePayment = parseFloat(preOrder.advancePayment || 0) || 0;
-  const balanceAmount = parseFloat(preOrder.balanceAmount !== undefined ? preOrder.balanceAmount : (totalAmount - advancePayment)) || 0;
+  const balanceAmount = parseFloat(preOrder.balanceAmount !== undefined ? preOrder.balanceAmount : Math.max(0, totalAmount - advancePayment)) || 0;
   const paymentMode = preOrder.advancePaymentMode || preOrder.paymentMode || 'Cash';
 
   const items = preOrder.items || [];
@@ -1256,16 +1280,26 @@ export async function printPreOrderReceipt(preOrder, options = {}) {
         <div class="dashed-line"></div>
 
         <div class="financial-box">
+          ${discountAmount > 0 ? `
+            <div class="fin-row" style="color: #475569;">
+              <span>Subtotal (एकूण):</span>
+              <span>₹${subtotalAmount.toFixed(2)}</span>
+            </div>
+            <div class="fin-row" style="color: #b91c1c;">
+              <span>Discount (सवलत):</span>
+              <span>-₹${discountAmount.toFixed(2)}</span>
+            </div>
+          ` : ''}
           <div class="fin-row fin-total">
-            <span>Total Order Amount:</span>
+            <span>Total Order Amount (निव्वळ एकूण):</span>
             <span>₹${totalAmount.toFixed(2)}</span>
           </div>
           <div class="fin-row fin-advance">
-            <span>Advance Paid (${paymentMode}):</span>
+            <span>Advance Paid (${paymentMode}) (अ‍ॅडव्हान्स):</span>
             <span>₹${advancePayment.toFixed(2)}</span>
           </div>
           <div class="fin-row fin-balance">
-            <span>BALANCE TO PAY:</span>
+            <span>BALANCE TO PAY (शिल्लक देणे):</span>
             <span>₹${balanceAmount.toFixed(2)}</span>
           </div>
         </div>

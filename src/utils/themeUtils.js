@@ -24,6 +24,18 @@ export const getSectionTheme = (secName) => {
       filterActive: 'bg-indigo-600 text-white shadow-sm'
     };
   }
+  if (lname.includes('sweet')) {
+    return {
+      headerBadge: 'bg-amber-50 border-amber-200 text-amber-800',
+      runningCard: 'bg-amber-600 text-white border-amber-700 hover:bg-amber-700 shadow-md',
+      runningBadge: 'bg-amber-800 text-amber-100',
+      runningSplitBtn: 'bg-amber-800/80 text-amber-100 hover:bg-amber-900 border-amber-600',
+      runningBorder: 'border-amber-500',
+      runningPrice: 'text-amber-200',
+      runningMins: 'text-amber-100',
+      filterActive: 'bg-amber-600 text-white shadow-sm'
+    };
+  }
   if (lname.includes('parcel') || lname.includes('takeaway')) {
     return {
       headerBadge: 'bg-blue-50 border-blue-200 text-blue-800',

@@ -21,12 +21,28 @@ import OwnerAdmin from './components/OwnerAdmin';
 import StockManagement from './components/StockManagement';
 import ServerMonitorPanel from './components/ServerMonitorPanel';
 import PreOrderManagement from './components/PreOrderManagement';
+import OtherRecords from './components/OtherRecords';
+import { checkPreOrderAlert } from './db/db';
 import { formatItemQtyDisplay, getPrintDishName } from './utils/receiptUtils';
-import { checkPreOrderAlert, playAlertChime } from './db/db';
-import { ShieldCheck, Lock, X, Check, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, Lock, X, Check, ChevronDown, ChevronUp, AlertTriangle, RotateCcw, Save } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('pos'); // 'pos' | 'settle' | 'stock' | 'server' | 'admin'
+  const [adminHasUnsavedMatrix, setAdminHasUnsavedMatrix] = useState(false);
+  const matrixActionsRef = useRef(null);
+  const [pendingTabNavigation, setPendingTabNavigation] = useState(null);
+  const [showTabUnsavedModal, setShowTabUnsavedModal] = useState(false);
+
+  // Tab navigation guard: prompts user to save or discard before switching main tabs if Matrix has unsaved rates
+  const handleRequestTab = (targetTab) => {
+    if (targetTab === activeTab) return;
+    if (activeTab === 'admin' && adminHasUnsavedMatrix) {
+      setPendingTabNavigation(targetTab);
+      setShowTabUnsavedModal(true);
+      return;
+    }
+    setActiveTab(targetTab);
+  };
   const [isServerConnected, setIsServerConnected] = useState(true);
   const [offlineQueueCount, setOfflineQueueCount] = useState(0);
 
@@ -68,6 +84,22 @@ export default function App() {
   const [rawMaterials, setRawMaterials] = useState(DEFAULT_INITIAL_DATA.rawMaterials);
   const [recipes, setRecipes] = useState(DEFAULT_INITIAL_DATA.recipes);
   const [stockMode, setStockMode] = useState('raw_material_wise');
+  // Settle Tab Edit Button Access Control (Persisted to localStorage & Dexie/Server db.systemSettings)
+  const [isSettledBillEditEnabled, setIsSettledBillEditEnabled] = useState(() => {
+    return localStorage.getItem('karuna_settled_bill_edit_enabled') !== 'false';
+  });
+
+  // Other Records Count for Header Badge
+  const [otherRecordsCount, setOtherRecordsCount] = useState(() => {
+    try {
+      const saved = localStorage.getItem('karuna_other_records');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed.length;
+      }
+    } catch (e) {}
+    return 4;
+  });
 
   // Cart State & Active Table State
   const [cartItems, setCartItems] = useState([]);
@@ -167,6 +199,11 @@ export default function App() {
     if (target.systemSettings?.stockMode) {
       setStockMode(target.systemSettings.stockMode);
       localStorage.setItem('karuna_stock_mode', target.systemSettings.stockMode);
+    }
+    if (target.systemSettings?.settledBillEditEnabled !== undefined) {
+      const isEnabled = Boolean(target.systemSettings.settledBillEditEnabled);
+      setIsSettledBillEditEnabled(isEnabled);
+      localStorage.setItem('karuna_settled_bill_edit_enabled', String(isEnabled));
     }
   };
 
@@ -708,6 +745,10 @@ export default function App() {
 
   // Update Settled Bill
   const handleUpdateSettledBill = async (updatedBill, changeDescription) => {
+    if (!isSettledBillEditEnabled) {
+      console.warn('Bill update blocked: settled bill editing is disabled by owner in UPI Settings.');
+      return;
+    }
     const finalAmount = updatedBill.finalTotal !== undefined ? updatedBill.finalTotal : (updatedBill.total || 0);
     const pMode = updatedBill.paymentMode || updatedBill.paymentDetails?.mode || 'Cash';
     await db.bills.update(updatedBill.id, {
@@ -736,6 +777,21 @@ export default function App() {
       timestamp: new Date().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'medium' }),
       changeDescription
     });
+  };
+
+  // Toggle Settle Tab Edit Permission from Owner Admin (UPI Tab)
+  const handleToggleSettledBillEdit = async (enabled) => {
+    setIsSettledBillEditEnabled(enabled);
+    localStorage.setItem('karuna_settled_bill_edit_enabled', String(enabled));
+    try {
+      await db.systemSettings.put({
+        id: 1,
+        settledBillEditEnabled: enabled,
+        lastSyncTime: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('Error saving settledBillEditEnabled setting:', err);
+    }
   };
 
   // Owner Admin Handlers
@@ -810,6 +866,46 @@ export default function App() {
   };
 
   const handleSaveRecipeMapping = async (recipeData) => {
+    if (recipeData.ingredients && Array.isArray(recipeData.ingredients)) {
+      const dishId = recipeData.dishId;
+      const baseQty = parseFloat(recipeData.baseQty) || 1;
+      const baseUnit = recipeData.unit || 'Kg';
+      const dishName = recipeData.dishName || '';
+      const tableBaseQty = (recipeData.tableBaseQty !== undefined && recipeData.tableBaseQty !== null && recipeData.tableBaseQty !== '')
+        ? parseFloat(recipeData.tableBaseQty)
+        : null;
+      const tableUnit = recipeData.tableUnit || null;
+
+      // Remove existing recipes for this dish to prevent duplicates
+      const existingForDish = recipes.filter((r) => r && String(r.dishId) === String(dishId));
+      for (const r of existingForDish) {
+        try {
+          await db.recipes.delete(r.id);
+        } catch (e) {}
+      }
+
+      // Add each ingredient row
+      for (const ing of recipeData.ingredients) {
+        if (!ing.rawMaterialId && !ing.rawMaterialName) continue;
+        await db.recipes.add({
+          dishId: dishId,
+          dishName: dishName,
+          baseQty: baseQty,
+          unit: baseUnit,
+          tableBaseQty: tableBaseQty,
+          tableUnit: tableUnit,
+          rawMaterialId: ing.rawMaterialId,
+          rawMaterialName: ing.rawMaterialName || '',
+          qtyRequired: parseFloat(ing.qtyRequired) || 0,
+          tableQtyRequired: (ing.tableQtyRequired !== undefined && ing.tableQtyRequired !== null && ing.tableQtyRequired !== '')
+            ? parseFloat(ing.tableQtyRequired)
+            : null
+        });
+      }
+      syncStateFromCache();
+      return;
+    }
+
     const rmName = (recipeData.rawMaterialName || '').trim().toLowerCase();
     const existing = recipes.find(
       (r) => String(r.dishId) === String(recipeData.dishId) &&
@@ -830,6 +926,16 @@ export default function App() {
         ...recipeData,
         baseQty: recipeData.baseQty || 1
       });
+    }
+    syncStateFromCache();
+  };
+
+  const handleDeleteDishRecipe = async (dishId) => {
+    const existingForDish = recipes.filter((r) => r && String(r.dishId) === String(dishId));
+    for (const r of existingForDish) {
+      try {
+        await db.recipes.delete(r.id);
+      } catch (e) {}
     }
     syncStateFromCache();
   };
@@ -903,20 +1009,161 @@ export default function App() {
 
   const urgentOrdersCount = urgentOrders.length;
 
-  const prevUrgentCountRef = useRef(0);
-  useEffect(() => {
-    if (urgentOrdersCount > 0 && urgentOrdersCount > prevUrgentCountRef.current) {
-      playAlertChime();
-    }
-    prevUrgentCountRef.current = urgentOrdersCount;
-  }, [urgentOrdersCount]);
-
   const handleAddPreOrder = async (orderData) => {
-    return await db.preOrders.add(orderData);
+    const advance = parseFloat(orderData.advancePayment || 0);
+    const total = parseFloat(orderData.totalAmount || 0);
+    const isFullyPaid = Boolean(
+      orderData.isFullPayment ||
+      orderData.fullPaymentPaid ||
+      (total > 0 && advance >= total)
+    );
+
+    const newId = await db.preOrders.add({
+      ...orderData,
+      status: isFullyPaid ? 'confirmed' : 'pending',
+      paymentStatus: isFullyPaid ? 'fully_paid' : (advance > 0 ? 'advance_paid' : 'unpaid'),
+      isFullPayment: isFullyPaid,
+      fullPaymentPaid: isFullyPaid,
+      balanceAmount: isFullyPaid ? 0 : Math.max(0, total - advance),
+      deliveryStatus: orderData.deliveryStatus || 'pending'
+    });
+
+    // Requirement:
+    // "in pre order tab when a order is placed then that order should not show in settle tab because its payment is pending when it is settled fully then only it should settle"
+    // "and also if a customer pay full payment of order then give an option while taking order then that order should shown in settle other waise those order who's payment is pending that order should not show in settle tab"
+    if (isFullyPaid) {
+      try {
+        const advMode = orderData.advancePaymentMode || 'Cash';
+        const isCash = advMode.toLowerCase().includes('cash');
+        const settledBillPayload = {
+          tableNo: `Pre-Order: ${orderData.orderNo || ''}`,
+          sectionName: 'Pre-Orders (Settled)',
+          sectionId: 4,
+          customerName: orderData.customerName,
+          customerPhone: orderData.customerPhone,
+          isPreOrderSettlement: true,
+          isPreOrderFullPayment: true,
+          preOrderId: newId,
+          preOrderNo: orderData.orderNo,
+          items: (orderData.items || []).map((item) => ({
+            ...item,
+            qty: item.qty || 1,
+            price: item.price || 0,
+            total: (parseFloat(item.price) || 0) * (parseFloat(item.qty) || 1),
+            isParcel: true
+          })),
+          subtotal: orderData.subtotal || total,
+          discount: orderData.discount || 0,
+          discountAmount: orderData.discount || 0,
+          total: total,
+          finalTotal: total,
+          grandTotal: total,
+          advancePaid: total,
+          paymentMode: advMode,
+          paymentDetails: {
+            mode: advMode,
+            cash: isCash ? total : 0,
+            online: !isCash ? total : 0,
+            card: advMode === 'Card' ? total : 0,
+            advancePaid: total,
+            fullPayment: true
+          },
+          counter: activeCounter,
+          createdAt: orderData.createdAt || new Date().toISOString(),
+          settledAt: new Date().toISOString(),
+          notes: `Pre-Order ${orderData.orderNo} 100% full payment received at booking. Event Date: ${orderData.deliveryDate} ${orderData.deliveryTime || ''}`
+        };
+
+        const settledResult = await db.settleBill(settledBillPayload);
+        if (settledResult?.bill) {
+          await db.preOrders.update(newId, {
+            settledBillInvoiceNo: settledResult.bill.invoiceNo || '',
+            settledBillId: settledResult.bill.id,
+            settledAt: new Date().toISOString()
+          });
+        }
+      } catch (err) {
+        console.error('Error settling full-payment pre-order bill:', err);
+      }
+    } else {
+      // Payment is pending (balance > 0).
+      // DO NOT settle into db.bills so it NEVER appears in the Settle tab!
+    }
+
+    return newId;
   };
 
   const handleUpdatePreOrder = async (orderId, updatedFields) => {
-    return await db.preOrders.update(orderId, updatedFields);
+    await db.preOrders.update(orderId, updatedFields);
+
+    const existingOrder = preOrders.find((o) => String(o.id) === String(orderId));
+    if (!existingOrder) return;
+
+    const merged = { ...existingOrder, ...updatedFields };
+    const advance = parseFloat(merged.advancePayment || 0);
+    const total = parseFloat(merged.totalAmount || 0);
+    const isFullyPaid = Boolean(
+      merged.isFullPayment ||
+      merged.fullPaymentPaid ||
+      (total > 0 && advance >= total)
+    );
+
+    // If order was updated to full payment and not yet settled, settle it into bills!
+    if (isFullyPaid && !existingOrder.settledBillId && !existingOrder.settledBillInvoiceNo) {
+      try {
+        const advMode = merged.advancePaymentMode || 'Cash';
+        const isCash = advMode.toLowerCase().includes('cash');
+        const settledBillPayload = {
+          tableNo: `Pre-Order: ${merged.orderNo || ''}`,
+          sectionName: 'Pre-Orders (Settled)',
+          sectionId: 4,
+          customerName: merged.customerName,
+          customerPhone: merged.customerPhone,
+          isPreOrderSettlement: true,
+          isPreOrderFullPayment: true,
+          preOrderId: orderId,
+          preOrderNo: merged.orderNo,
+          items: (merged.items || []).map((item) => ({
+            ...item,
+            qty: item.qty || 1,
+            price: item.price || 0,
+            total: (parseFloat(item.price) || 0) * (parseFloat(item.qty) || 1),
+            isParcel: true
+          })),
+          subtotal: merged.subtotal || total,
+          discount: merged.discount || 0,
+          discountAmount: merged.discount || 0,
+          total: total,
+          finalTotal: total,
+          grandTotal: total,
+          advancePaid: total,
+          paymentMode: advMode,
+          paymentDetails: {
+            mode: advMode,
+            cash: isCash ? total : 0,
+            online: !isCash ? total : 0,
+            card: advMode === 'Card' ? total : 0,
+            advancePaid: total,
+            fullPayment: true
+          },
+          counter: activeCounter,
+          createdAt: merged.createdAt || new Date().toISOString(),
+          settledAt: new Date().toISOString(),
+          notes: `Pre-Order ${merged.orderNo} updated to full payment.`
+        };
+
+        const settledResult = await db.settleBill(settledBillPayload);
+        if (settledResult?.bill) {
+          await db.preOrders.update(orderId, {
+            settledBillInvoiceNo: settledResult.bill.invoiceNo || '',
+            settledBillId: settledResult.bill.id,
+            settledAt: new Date().toISOString()
+          });
+        }
+      } catch (err) {
+        console.error('Error settling pre-order on full payment update:', err);
+      }
+    }
   };
 
   const handleDeletePreOrder = async (orderId) => {
@@ -927,15 +1174,22 @@ export default function App() {
     if (!preOrder) return;
     const finalTotal = parseFloat(preOrder.totalAmount || 0);
     const advance = parseFloat(preOrder.advancePayment || 0);
-    const balance = parseFloat(preOrder.balanceAmount !== undefined ? preOrder.balanceAmount : (finalTotal - advance));
+    const discount = parseFloat(preOrder.discount || 0);
+    const subtotal = preOrder.subtotal !== undefined ? parseFloat(preOrder.subtotal) : (finalTotal + discount);
+    const balance = parseFloat(preOrder.balanceAmount !== undefined ? preOrder.balanceAmount : Math.max(0, finalTotal - advance));
+    const isCash = (balancePaymentMode || '').toLowerCase().includes('cash');
 
+    // Requirement: When settled fully, then only it should settle into final bill!
     const billPayload = {
       tableNo: `Pre-Order: ${preOrder.orderNo || ''}`,
       customerName: preOrder.customerName,
       customerPhone: preOrder.customerPhone,
       pax: 'Bulk',
-      sectionName: 'Pre-Orders',
+      sectionName: 'Pre-Orders (Settled)',
       sectionId: 4,
+      isPreOrderSettlement: true,
+      preOrderId: preOrder.id,
+      preOrderNo: preOrder.orderNo,
       items: (preOrder.items || []).map((item) => ({
         ...item,
         qty: item.qty || 1,
@@ -943,27 +1197,40 @@ export default function App() {
         total: (parseFloat(item.price) || 0) * (parseFloat(item.qty) || 1),
         isParcel: true
       })),
-      subtotal: finalTotal,
-      total: finalTotal,
-      finalTotal: finalTotal,
-      grandTotal: finalTotal,
+      orderTotal: finalTotal,
+      subtotal: subtotal,
+      discount: discount,
+      discountAmount: discount,
+      advancePaid: advance,
+      advanceBillInvoiceNo: preOrder.advanceBillInvoiceNo || null,
+      total: balance > 0 ? balance : finalTotal, // Remaining payment collected on settlement day
+      finalTotal: balance > 0 ? balance : finalTotal,
+      grandTotal: balance > 0 ? balance : finalTotal,
       paymentMode: balancePaymentMode,
       paymentDetails: {
         mode: balancePaymentMode,
+        cash: isCash ? (balance > 0 ? balance : finalTotal) : 0,
+        online: !isCash ? (balance > 0 ? balance : finalTotal) : 0,
+        card: balancePaymentMode === 'Card' ? (balance > 0 ? balance : finalTotal) : 0,
+        orderTotal: finalTotal,
         advancePaid: advance,
         advanceMode: preOrder.advancePaymentMode || 'Cash',
         balancePaid: balance,
         balanceMode: balancePaymentMode
       },
-      notes: `Pre-Order ${preOrder.orderNo}. Advance: ₹${advance} (${preOrder.advancePaymentMode || 'Cash'}), Balance: ₹${balance} (${balancePaymentMode}). Event Date: ${preOrder.deliveryDate} ${preOrder.deliveryTime || ''}`
+      counter: activeCounter,
+      createdAt: new Date().toISOString(), // Today's settlement date
+      notes: `Pre-Order ${preOrder.orderNo} final settlement. Remaining balance collected today: ₹${balance} (${balancePaymentMode}). Advance of ₹${advance} recorded on booking. Event Date: ${preOrder.deliveryDate} ${preOrder.deliveryTime || ''}`
     };
 
     const settledResult = await db.settleBill(billPayload);
 
     await db.preOrders.update(preOrder.id, {
       status: 'completed',
+      deliveryStatus: 'delivered',
       settledAt: new Date().toISOString(),
       settledBillInvoiceNo: settledResult?.bill?.invoiceNo || '',
+      settledBillId: settledResult?.bill?.id || null,
       balanceCollected: balance,
       balanceCollectedMode: balancePaymentMode
     });
@@ -977,9 +1244,10 @@ export default function App() {
       {(!activeTable || activeTab !== 'pos') && !isHeaderHidden && (
         <Header
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          setActiveTab={handleRequestTab}
           pendingCartCount={pendingCartCount}
           urgentPreOrdersCount={urgentOrdersCount}
+          otherRecordsCount={otherRecordsCount}
           activeCounter={activeCounter}
           onSelectCounter={handleSelectCounter}
           isServerConnected={isServerConnected}
@@ -1017,7 +1285,7 @@ export default function App() {
           </div>
           <div className="flex items-center space-x-2 shrink-0">
             <button
-              onClick={() => setActiveTab('preorder')}
+              onClick={() => handleRequestTab('preorder')}
               className="px-3 py-1 bg-white text-orange-900 hover:bg-orange-50 font-black text-xs rounded-xl shadow-xs transition cursor-pointer"
             >
               Open Pre-Order Tab →
@@ -1075,7 +1343,7 @@ export default function App() {
             onSelectTable={handleSelectTable}
             onSaveTableOrder={handleSaveTableOrder}
             onOpenAddTableModal={() => setIsAddTableModalOpen(true)}
-            onNavigateToSettled={() => setActiveTab('settle')}
+            onNavigateToSettled={() => handleRequestTab('settle')}
             onOpenOrderPopupForTable={(tbl) => {
               if (tbl) {
                 const targetTable = tables.find((t) => String(t.id) === String(tbl.id)) || tbl;
@@ -1098,6 +1366,8 @@ export default function App() {
             onClearCart={() => setCartItems([])}
             onSettleBill={handleSettleBill}
             printLanguage={printLanguage}
+            isSettledBillEditEnabled={isSettledBillEditEnabled}
+            preOrders={preOrders}
           />
         )}
 
@@ -1123,6 +1393,7 @@ export default function App() {
             billLogs={billLogs}
             onUpdateSettledBill={handleUpdateSettledBill}
             printLanguage={printLanguage}
+            isSettledBillEditEnabled={isSettledBillEditEnabled}
           />
         )}
 
@@ -1138,8 +1409,16 @@ export default function App() {
             onUpdateRawMaterial={handleUpdateRawMaterial}
             onDeleteRawMaterial={handleDeleteRawMaterial}
             onSaveRecipeMapping={handleSaveRecipeMapping}
+            onDeleteDishRecipe={handleDeleteDishRecipe}
             onUpdateDish={handleUpdateDish}
             onSyncCache={syncStateFromCache}
+          />
+        )}
+
+        {activeTab === 'other' && (
+          <OtherRecords
+            printLanguage={printLanguage}
+            onRecordsChange={(updatedRecords) => setOtherRecordsCount(updatedRecords.length)}
           />
         )}
 
@@ -1162,6 +1441,7 @@ export default function App() {
             tables={tables}
             bills={bills}
             billLogs={billLogs}
+            preOrders={preOrders}
             onAddDish={handleAddDish}
             onUpdateDish={handleUpdateDish}
             onDeleteDish={handleDeleteDish}
@@ -1175,6 +1455,12 @@ export default function App() {
             onBulkUpdatePrices={handleBulkUpdatePrices}
             onUpdateSettledBill={handleUpdateSettledBill}
             printLanguage={printLanguage}
+            isSettledBillEditEnabled={isSettledBillEditEnabled}
+            onToggleSettledBillEdit={handleToggleSettledBillEdit}
+            onMatrixUnsavedChange={setAdminHasUnsavedMatrix}
+            onRegisterMatrixActions={(actions) => {
+              matrixActionsRef.current = actions;
+            }}
           />
         )}
 
@@ -1259,6 +1545,82 @@ export default function App() {
         activeTable={activeTable}
         onSettleBill={handleSettleBill}
       />
+
+      {/* Modal to Save or Discard Area Matrix Rates when leaving Admin Tab */}
+      {showTabUnsavedModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150 select-none">
+          <div className="bg-white border border-stone-200 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <div className="flex items-center space-x-3">
+              <div className="p-3 bg-amber-100 text-amber-700 rounded-2xl">
+                <AlertTriangle className="w-7 h-7" />
+              </div>
+              <div>
+                <h3 className="font-black text-lg text-neutral-900">
+                  Save Changes to Rates?
+                </h3>
+                <p className="text-xs font-bold text-stone-500">
+                  दर बदल जतन करायचे आहेत का?
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-stone-600 leading-relaxed font-semibold">
+              You have modified rates in the Area Rates Matrix that have not been saved yet. Would you like to save these new rates or discard the changes before switching tabs?
+            </p>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (matrixActionsRef.current?.save) {
+                    await matrixActionsRef.current.save();
+                  }
+                  setAdminHasUnsavedMatrix(false);
+                  setShowTabUnsavedModal(false);
+                  if (pendingTabNavigation) {
+                    setActiveTab(pendingTabNavigation);
+                    setPendingTabNavigation(null);
+                  }
+                }}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs transition shadow-lg shadow-emerald-600/20 cursor-pointer flex items-center justify-center space-x-2"
+              >
+                <Save className="w-4 h-4" />
+                <span>Save Rates & Continue (दर जतन करा)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (matrixActionsRef.current?.discard) {
+                    matrixActionsRef.current.discard();
+                  }
+                  setAdminHasUnsavedMatrix(false);
+                  setShowTabUnsavedModal(false);
+                  if (pendingTabNavigation) {
+                    setActiveTab(pendingTabNavigation);
+                    setPendingTabNavigation(null);
+                  }
+                }}
+                className="w-full py-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-black rounded-xl text-xs transition border border-rose-200 cursor-pointer flex items-center justify-center space-x-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Discard Changes (बदल रद्द करा)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTabUnsavedModal(false);
+                  setPendingTabNavigation(null);
+                }}
+                className="w-full py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-600 font-bold rounded-xl text-xs transition cursor-pointer"
+              >
+                Stay on Matrix Tab (इथेच थांबा)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

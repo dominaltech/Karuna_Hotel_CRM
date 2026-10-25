@@ -19,7 +19,8 @@ import {
   ZoomIn,
   ZoomOut,
   Languages,
-  CalendarClock
+  CalendarClock,
+  ClipboardList
 } from 'lucide-react';
 import { getServerIp, setServerIp } from '../db/db';
 
@@ -35,6 +36,7 @@ export default function Header({
   setActiveTab,
   pendingCartCount,
   urgentPreOrdersCount = 0,
+  otherRecordsCount = 0,
   activeCounter = 'Counter 1 (Breakfast & Snacks)',
   onSelectCounter,
   isServerConnected = true,
@@ -86,6 +88,14 @@ export default function Header({
       icon: Package,
       activeColor: 'bg-amber-600 text-white shadow-md shadow-amber-200',
       inactiveColor: 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+    },
+    {
+      id: 'other',
+      label: 'Other',
+      icon: ClipboardList,
+      activeColor: 'bg-teal-600 text-white shadow-md shadow-teal-200',
+      inactiveColor: 'bg-teal-50 text-teal-700 hover:bg-teal-100',
+      badge: otherRecordsCount > 0 ? otherRecordsCount : null
     },
     {
       id: 'server',

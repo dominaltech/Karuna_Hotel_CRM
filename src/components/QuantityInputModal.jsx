@@ -299,7 +299,7 @@ export default function QuantityInputModal({
                     : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-300'
                 }`}
               >
-                {isKgItem ? `${pVal}k` : pVal}
+                {isKgItem ? (pVal < 1 ? `${Math.round(pVal * 1000)}g` : `${pVal} Kg`) : pVal}
               </button>
             ))}
           </div>

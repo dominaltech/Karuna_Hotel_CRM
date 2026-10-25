@@ -27,7 +27,8 @@ import {
   RotateCcw,
   Edit2,
   Info,
-  History
+  History,
+  Sparkles
 } from 'lucide-react';
 import { db, cleanAndDeduplicateRecipes } from '../db/db';
 
@@ -41,11 +42,27 @@ export default function StockManagement({
   onUpdateRawMaterial,
   onDeleteRawMaterial,
   onSaveRecipeMapping,
+  onDeleteDishRecipe,
   onUpdateDish,
   onSyncCache
 }) {
-  // Option 2 (Raw Material-Wise): 'raw_inward' (1. आलेला कच्चा माल) | 'raw_remaining' (2. शिल्लक कच्चा माल)
+  // Option 2 (Raw Material-Wise): 'raw_inward' (1. आलेला कच्चा माल) | 'raw_remaining' (2. शिल्लक कच्चा माल) | 'recipes' (3. रेसिपी / डिश मॅपिंग)
   const [activeStockSubTab, setActiveStockSubTab] = useState('raw_inward');
+
+  // Recipe Mapping Sub-Tab State
+  const [recipeSearchQuery, setRecipeSearchQuery] = useState('');
+  const [recipeCategoryFilter, setRecipeCategoryFilter] = useState('all');
+  const [recipeModalOpen, setRecipeModalOpen] = useState(false);
+  const [selectedDishId, setSelectedDishId] = useState('');
+  const [modalDishCategoryFilter, setModalDishCategoryFilter] = useState('all');
+  const [modalDishSearchQuery, setModalDishSearchQuery] = useState('');
+  const [recipeBaseQty, setRecipeBaseQty] = useState('1');
+  const [recipeBaseUnit, setRecipeBaseUnit] = useState('Kg');
+  const [recipeTableBaseQty, setRecipeTableBaseQty] = useState('1');
+  const [recipeTableBaseUnit, setRecipeTableBaseUnit] = useState('Plate');
+  const [recipeIngredients, setRecipeIngredients] = useState([
+    { id: 'ing-init-1', rawMaterialId: '', qtyRequired: '1', tableQtyRequired: '' }
+  ]);
 
   // Raw Material Only Mode State & Modals
   const [rawSearchQuery, setRawSearchQuery] = useState('');
@@ -320,6 +337,299 @@ export default function StockManagement({
 
 
 
+  // =========================================================================
+  // RECIPE MAPPING HELPERS & HANDLERS
+  // =========================================================================
+  // Helper: check if dish is sweet item
+  const isDishSweetItem = (dish) => {
+    if (!dish) return false;
+    return Boolean(
+      dish.hasMultiplePrices ||
+      dish.categoryId === 2 ||
+      (dish.categoryName && dish.categoryName.toLowerCase().includes('sweet')) ||
+      (dish.counter && dish.counter.toLowerCase().includes('sweet')) ||
+      (dish.unit && (dish.unit.toLowerCase().includes('kg') || dish.unit.toLowerCase().includes('g'))) ||
+      (dish.name && (dish.name.toLowerCase().includes('(by kg)') || dish.name.toLowerCase().includes('/kg') || dish.name.toLowerCase().includes(' kg')))
+    );
+  };
+
+  const groupedRecipes = useMemo(() => {
+    const groups = {};
+    for (const r of recipes || []) {
+      if (!r || !r.dishId) continue;
+      const key = String(r.dishId);
+      if (!groups[key]) {
+        const dish = (dishes || []).find((d) => d && String(d.id) === key);
+        const cat = (categories || []).find((c) => c && c.id === dish?.categoryId);
+        const isSweet = isDishSweetItem(dish);
+        groups[key] = {
+          dishId: r.dishId,
+          dishName: r.dishName || dish?.name || `Dish #${r.dishId}`,
+          marathiName: dish?.marathiName || '',
+          categoryId: dish?.categoryId || 1,
+          categoryName: cat?.name || '',
+          baseQty: r.baseQty || 1,
+          unit: r.unit || (isSweet ? 'Kg' : 'Plate'),
+          tableBaseQty: r.tableBaseQty !== undefined && r.tableBaseQty !== null ? r.tableBaseQty : (isSweet ? 1 : null),
+          tableUnit: r.tableUnit || (isSweet ? 'Plate' : null),
+          isSweet: isSweet,
+          ingredients: []
+        };
+      }
+      const rm = (rawMaterials || []).find((m) => m && String(m.id) === String(r.rawMaterialId));
+      groups[key].ingredients.push({
+        ...r,
+        rawMaterialId: r.rawMaterialId,
+        rawMaterialName: r.rawMaterialName || rm?.name || `Material #${r.rawMaterialId}`,
+        rawMaterialUnit: rm?.unit || r.unit || 'Kg',
+        qtyRequired: parseFloat(r.qtyRequired) || 0,
+        tableQtyRequired: (r.tableQtyRequired !== undefined && r.tableQtyRequired !== null && r.tableQtyRequired !== '')
+          ? parseFloat(r.tableQtyRequired)
+          : null
+      });
+    }
+    return Object.values(groups);
+  }, [recipes, dishes, categories, rawMaterials]);
+
+  const filteredRecipes = useMemo(() => {
+    let list = groupedRecipes;
+    if (recipeCategoryFilter === 'sweet') {
+      list = list.filter((gr) => gr.isSweet);
+    } else if (recipeCategoryFilter === 'kitchen') {
+      list = list.filter((gr) => !gr.isSweet);
+    } else if (recipeCategoryFilter !== 'all') {
+      list = list.filter((gr) => String(gr.categoryId) === String(recipeCategoryFilter));
+    }
+    if (recipeSearchQuery.trim()) {
+      const q = recipeSearchQuery.toLowerCase().trim();
+      list = list.filter((gr) =>
+        gr.dishName.toLowerCase().includes(q) ||
+        (gr.marathiName && gr.marathiName.toLowerCase().includes(q)) ||
+        gr.ingredients.some((ing) => (ing.rawMaterialName || '').toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [groupedRecipes, recipeCategoryFilter, recipeSearchQuery]);
+
+  const handleOpenRecipeModal = (group = null) => {
+    setModalDishCategoryFilter('all');
+    setModalDishSearchQuery('');
+    if (group) {
+      const dish = (dishes || []).find((d) => String(d.id) === String(group.dishId));
+      const isSweet = isDishSweetItem(dish) || group.isSweet;
+
+      setSelectedDishId(String(group.dishId));
+      setRecipeBaseQty(String(group.baseQty || 1));
+      setRecipeBaseUnit(group.unit || (isSweet ? 'Kg' : 'Plate'));
+      setRecipeTableBaseQty(String(group.tableBaseQty || 1));
+      setRecipeTableBaseUnit(group.tableUnit || 'Plate');
+      setRecipeIngredients(
+        (group.ingredients || []).map((ing, idx) => ({
+          id: `ing-${Date.now()}-${idx}`,
+          rawMaterialId: String(ing.rawMaterialId || ''),
+          qtyRequired: String(ing.qtyRequired || 1),
+          tableQtyRequired: ing.tableQtyRequired !== undefined && ing.tableQtyRequired !== null ? String(ing.tableQtyRequired) : (isSweet ? '0.1' : '')
+        }))
+      );
+    } else {
+      const mappedDishIds = new Set((recipes || []).map((r) => r && String(r.dishId)));
+      const unmapped = (dishes || []).find((d) => !mappedDishIds.has(String(d.id))) || dishes[0];
+      const initialDishId = unmapped ? String(unmapped.id) : (dishes[0] ? String(dishes[0].id) : '');
+      const isSweet = isDishSweetItem(unmapped);
+
+      setSelectedDishId(initialDishId);
+      setRecipeBaseQty('1');
+      setRecipeBaseUnit(isSweet ? 'Kg' : 'Plate');
+      setRecipeTableBaseQty('1');
+      setRecipeTableBaseUnit('Plate');
+      setRecipeIngredients([
+        {
+          id: `ing-${Date.now()}-0`,
+          rawMaterialId: rawMaterials[0] ? String(rawMaterials[0].id) : '',
+          qtyRequired: '1',
+          tableQtyRequired: isSweet ? '0.1' : ''
+        }
+      ]);
+    }
+    setRecipeModalOpen(true);
+  };
+
+  const handleSelectDishChange = (dishId) => {
+    setSelectedDishId(dishId);
+    const dish = (dishes || []).find((d) => String(d.id) === String(dishId));
+    const isSweet = isDishSweetItem(dish);
+    const existing = groupedRecipes.find((g) => String(g.dishId) === String(dishId));
+
+    if (existing) {
+      setRecipeBaseQty(String(existing.baseQty || 1));
+      setRecipeBaseUnit(existing.unit || (isSweet ? 'Kg' : 'Plate'));
+      setRecipeTableBaseQty(String(existing.tableBaseQty || 1));
+      setRecipeTableBaseUnit(existing.tableUnit || 'Plate');
+      setRecipeIngredients(
+        (existing.ingredients || []).map((ing, idx) => ({
+          id: `ing-${Date.now()}-${idx}`,
+          rawMaterialId: String(ing.rawMaterialId || ''),
+          qtyRequired: String(ing.qtyRequired || 1),
+          tableQtyRequired: ing.tableQtyRequired !== undefined && ing.tableQtyRequired !== null ? String(ing.tableQtyRequired) : (isSweet ? '0.1' : '')
+        }))
+      );
+    } else {
+      setRecipeBaseQty('1');
+      setRecipeBaseUnit(isSweet ? 'Kg' : 'Plate');
+      setRecipeTableBaseQty('1');
+      setRecipeTableBaseUnit('Plate');
+      setRecipeIngredients((prev) =>
+        prev.map((i) => ({
+          ...i,
+          tableQtyRequired: isSweet && (!i.tableQtyRequired || i.tableQtyRequired === '') ? '0.1' : i.tableQtyRequired
+        }))
+      );
+    }
+  };
+
+  const handleAddIngredientRow = () => {
+    const usedRmIds = new Set(recipeIngredients.map((i) => String(i.rawMaterialId)));
+    const unusedRm = (rawMaterials || []).find((m) => !usedRmIds.has(String(m.id))) || rawMaterials[0];
+    const dish = (dishes || []).find((d) => String(d.id) === String(selectedDishId));
+    const isSweet = isDishSweetItem(dish);
+
+    setRecipeIngredients((prev) => [
+      ...prev,
+      {
+        id: `ing-${Date.now()}-${prev.length}`,
+        rawMaterialId: unusedRm ? String(unusedRm.id) : '',
+        qtyRequired: '1',
+        tableQtyRequired: isSweet ? '0.1' : ''
+      }
+    ]);
+  };
+
+  const handleRemoveIngredientRow = (ingId) => {
+    if (recipeIngredients.length <= 1) {
+      showToast('At least one raw material ingredient is required', 'error');
+      return;
+    }
+    setRecipeIngredients((prev) => prev.filter((i) => i.id !== ingId));
+  };
+
+  const handleUpdateIngredient = (ingId, field, value) => {
+    setRecipeIngredients((prev) => prev.map((i) => i.id === ingId ? { ...i, [field]: value } : i));
+  };
+
+  const handleSaveRecipeMappingEntity = async () => {
+    if (!selectedDishId) {
+      showToast('Please select a dish', 'error');
+      return;
+    }
+    const baseQty = parseFloat(recipeBaseQty);
+    if (isNaN(baseQty) || baseQty <= 0) {
+      showToast('Please enter a valid base quantity greater than 0', 'error');
+      return;
+    }
+
+    const dish = (dishes || []).find((d) => String(d.id) === String(selectedDishId));
+    const isSweet = isDishSweetItem(dish);
+
+    if (isSweet) {
+      const tableBaseQtyNum = parseFloat(recipeTableBaseQty);
+      if (isNaN(tableBaseQtyNum) || tableBaseQtyNum <= 0) {
+        showToast('Please enter a valid table plate base quantity (e.g. 1 Plate)', 'error');
+        return;
+      }
+    }
+
+    const validIngredients = recipeIngredients.filter((i) => i.rawMaterialId && parseFloat(i.qtyRequired) > 0);
+    if (validIngredients.length === 0) {
+      showToast('Please add at least one raw material with a valid quantity', 'error');
+      return;
+    }
+
+    const seenRms = new Set();
+    for (const ing of validIngredients) {
+      if (seenRms.has(ing.rawMaterialId)) {
+        showToast('Duplicate raw material selected. Please combine them into one row.', 'error');
+        return;
+      }
+      seenRms.add(ing.rawMaterialId);
+    }
+
+    const dishName = dish?.name || `Dish #${selectedDishId}`;
+    const tableBaseQtyVal = isSweet ? (parseFloat(recipeTableBaseQty) || 1) : null;
+    const tableUnitVal = isSweet ? recipeTableBaseUnit : null;
+
+    const payload = {
+      dishId: selectedDishId,
+      dishName: dishName,
+      baseQty: baseQty,
+      unit: recipeBaseUnit,
+      tableBaseQty: tableBaseQtyVal,
+      tableUnit: tableUnitVal,
+      ingredients: validIngredients.map((ing) => {
+        const rm = (rawMaterials || []).find((m) => String(m.id) === String(ing.rawMaterialId));
+        return {
+          rawMaterialId: ing.rawMaterialId,
+          rawMaterialName: rm ? rm.name : '',
+          qtyRequired: parseFloat(ing.qtyRequired) || 0,
+          tableQtyRequired: isSweet
+            ? (ing.tableQtyRequired !== undefined && ing.tableQtyRequired !== '' && !isNaN(parseFloat(ing.tableQtyRequired))
+                ? parseFloat(ing.tableQtyRequired)
+                : null)
+            : null
+        };
+      })
+    };
+
+    try {
+      if (typeof onSaveRecipeMapping === 'function') {
+        await onSaveRecipeMapping(payload);
+      } else {
+        const existingForDish = (recipes || []).filter((r) => r && String(r.dishId) === String(selectedDishId));
+        for (const r of existingForDish) {
+          try { await db.recipes.delete(r.id); } catch (e) {}
+        }
+        for (const ing of payload.ingredients) {
+          await db.recipes.add({
+            dishId: selectedDishId,
+            dishName: dishName,
+            baseQty: baseQty,
+            unit: recipeBaseUnit,
+            tableBaseQty: payload.tableBaseQty,
+            tableUnit: payload.tableUnit,
+            rawMaterialId: ing.rawMaterialId,
+            rawMaterialName: ing.rawMaterialName,
+            qtyRequired: ing.qtyRequired,
+            tableQtyRequired: ing.tableQtyRequired
+          });
+        }
+      }
+
+      if (typeof onSyncCache === 'function') onSyncCache();
+      showToast(`✓ Recipe mapping saved for "${dishName}"!`);
+      setRecipeModalOpen(false);
+    } catch (err) {
+      console.error('Error saving recipe mapping:', err);
+      showToast(`Error: ${err.message}`, 'error');
+    }
+  };
+
+  const handleDeleteRecipeMappingEntity = async (dishId, dishName) => {
+    if (!window.confirm(`Are you sure you want to delete the recipe mapping for "${dishName}"?`)) return;
+    try {
+      if (typeof onDeleteDishRecipe === 'function') {
+        await onDeleteDishRecipe(dishId);
+      } else {
+        const existingForDish = (recipes || []).filter((r) => r && String(r.dishId) === String(dishId));
+        for (const r of existingForDish) {
+          try { await db.recipes.delete(r.id); } catch (e) {}
+        }
+      }
+      if (typeof onSyncCache === 'function') onSyncCache();
+      showToast(`✓ Deleted recipe mapping for "${dishName}"`);
+    } catch (err) {
+      showToast(`Error: ${err.message}`, 'error');
+    }
+  };
+
   // Filter Raw Materials for Raw Material-Wise Mode
   const filteredRawMaterials = useMemo(() => {
     return (rawMaterials || []).filter((rm) => {
@@ -330,7 +640,7 @@ export default function StockManagement({
         const matchesMarathi = (rm.marathiName || '').toLowerCase().includes(q);
         if (!matchesName && !matchesMarathi) return false;
       }
-      const qty = parseFloat(rm.quantity) || 0;
+      const qty = parseFloat(rm.quantity !== undefined && rm.quantity !== null ? rm.quantity : (rm.inwardQty || 0)) || 0;
       const min = parseFloat(rm.minThreshold) || 2;
       if (rawStatusFilter === 'in' && qty <= min) return false;
       if (rawStatusFilter === 'low' && (qty <= 0 || qty > min)) return false;
@@ -375,13 +685,13 @@ export default function StockManagement({
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-bold mt-1">
-                1. Inward: Record incoming raw materials • 2. Remaining: See available quantities &amp; update remaining stock
+                1. Inward: Record incoming raw materials • 2. Remaining: See available quantities • 3. Recipe: Auto-reduce raw materials on dish sale
               </p>
             </div>
           </div>
         </div>
 
-        {/* 2 Master Sub-Tabs Switcher */}
+        {/* 3 Master Sub-Tabs Switcher */}
         <div className="flex items-center space-x-2 bg-white border border-slate-300 rounded-2xl p-1.5 shadow-sm mr-12">
           <button
             onClick={() => setActiveStockSubTab('raw_inward')}
@@ -416,6 +726,23 @@ export default function StockManagement({
               {rawMaterials.filter((m) => (parseFloat(m.quantity) || 0) > 0).length} In Stock
             </span>
           </button>
+
+          <button
+            onClick={() => setActiveStockSubTab('recipes')}
+            className={`px-5 py-2.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center space-x-2 ${
+              activeStockSubTab === 'recipes'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-102'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            <ChefHat className="w-4 h-4" />
+            <span>3. Recipe Mapping (रेसिपी / डिश मॅपिंग)</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+              activeStockSubTab === 'recipes' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+            }`}>
+              {groupedRecipes.length} Recipes
+            </span>
+          </button>
         </div>
       </div>
 
@@ -427,72 +754,126 @@ export default function StockManagement({
         <div className="space-y-4">
           
           {/* Raw Materials Toolbar: Search, Status Filter & Add Raw Material */}
+          {/* Raw Materials / Recipes Toolbar */}
           <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-xs flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              
-              {/* Search Box */}
-              <div className="relative min-w-[220px] max-w-xs">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Search raw material name..."
-                  value={rawSearchQuery}
-                  onChange={(e) => setRawSearchQuery(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-8 py-2 text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-600"
-                />
-                {rawSearchQuery && (
+            {activeStockSubTab === 'recipes' ? (
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Search Box for Recipes */}
+                <div className="relative min-w-[240px] max-w-sm">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search dish or ingredient in recipes..."
+                    value={recipeSearchQuery}
+                    onChange={(e) => setRecipeSearchQuery(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-8 py-2 text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-600"
+                  />
+                  {recipeSearchQuery && (
+                    <button
+                      onClick={() => setRecipeSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Category Filter for Recipes */}
+                <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl text-xs font-black">
                   <button
-                    onClick={() => setRawSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    type="button"
+                    onClick={() => setRecipeCategoryFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      recipeCategoryFilter === 'all' ? 'bg-indigo-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200'
+                    }`}
                   >
-                    <X className="w-3.5 h-3.5" />
+                    All ({groupedRecipes.length})
                   </button>
-                )}
+                  <button
+                    type="button"
+                    onClick={() => setRecipeCategoryFilter('2')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      recipeCategoryFilter === '2' ? 'bg-rose-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Sweets (मिठाई)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRecipeCategoryFilter('1')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      recipeCategoryFilter === '1' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Breakfast (नाश्ता)
+                  </button>
+                </div>
               </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Search Box */}
+                <div className="relative min-w-[220px] max-w-xs">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search raw material name..."
+                    value={rawSearchQuery}
+                    onChange={(e) => setRawSearchQuery(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-8 py-2 text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                  {rawSearchQuery && (
+                    <button
+                      onClick={() => setRawSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
 
-              {/* Status Filter */}
-              <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl text-xs font-black">
-                <button
-                  type="button"
-                  onClick={() => setRawStatusFilter('all')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                    rawStatusFilter === 'all' ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  All ({rawMaterials.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRawStatusFilter('in')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                    rawStatusFilter === 'in' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  In Stock
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRawStatusFilter('low')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                    rawStatusFilter === 'low' ? 'bg-amber-500 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  Low Stock
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRawStatusFilter('out')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                    rawStatusFilter === 'out' ? 'bg-rose-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  Out of Stock
-                </button>
+                {/* Status Filter */}
+                <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl text-xs font-black">
+                  <button
+                    type="button"
+                    onClick={() => setRawStatusFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      rawStatusFilter === 'all' ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    All ({rawMaterials.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRawStatusFilter('in')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      rawStatusFilter === 'in' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    In Stock
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRawStatusFilter('low')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      rawStatusFilter === 'low' ? 'bg-amber-500 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Low Stock
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRawStatusFilter('out')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      rawStatusFilter === 'out' ? 'bg-rose-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Out of Stock
+                  </button>
+                </div>
               </div>
+            )}
 
-            </div>
-
-            {/* Quick Actions: Reset All Stock & Add New Raw Material Button (Rendered ONLY in Inward tab) */}
+            {/* Quick Actions: Inward actions vs Recipe actions */}
             {activeStockSubTab === 'raw_inward' && (
               <div className="flex items-center space-x-2">
                 <button
@@ -512,6 +893,19 @@ export default function StockManagement({
                 >
                   <Plus className="w-4 h-4" />
                   <span>+ Add New Raw Material (नवीन कच्चा माल)</span>
+                </button>
+              </div>
+            )}
+
+            {activeStockSubTab === 'recipes' && (
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenRecipeModal(null)}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-md shadow-indigo-600/30 transition-all cursor-pointer flex items-center space-x-1.5 hover:scale-102"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Create Recipe Mapping (नवीन रेसिपी जोडा)</span>
                 </button>
               </div>
             )}
@@ -606,8 +1000,10 @@ export default function StockManagement({
                   {filteredRawMaterials.map((rm) => {
                     const inwardQty = parseFloat(rm.inwardQty !== undefined && rm.inwardQty !== null ? rm.inwardQty : (rm.quantity || 0)) || 0;
                     const remainingQty = parseFloat(rm.remainingQty !== undefined && rm.remainingQty !== null ? rm.remainingQty : 0) || 0;
-                    // Core Logic: (inward raw item - remaining raw item = available raw item)
-                    const availableQty = Math.max(0, Math.round((inwardQty - remainingQty) * 1000) / 1000);
+                    // Available quantity: uses rm.quantity which auto-decrements on sales, or (inwardQty - remainingQty)
+                    const availableQty = (rm.quantity !== undefined && rm.quantity !== null)
+                      ? Math.round(parseFloat(rm.quantity) * 1000) / 1000
+                      : Math.max(0, Math.round((inwardQty - remainingQty) * 1000) / 1000);
                     const minThreshold = parseFloat(rm.minThreshold) || 2;
                     const isOut = availableQty <= 0;
                     const isLow = availableQty <= minThreshold && !isOut;
@@ -755,8 +1151,10 @@ export default function StockManagement({
                   {filteredRawMaterials.map((rm) => {
                     const inwardQty = parseFloat(rm.inwardQty !== undefined && rm.inwardQty !== null ? rm.inwardQty : (rm.quantity || 0)) || 0;
                     const remainingQty = parseFloat(rm.remainingQty !== undefined && rm.remainingQty !== null ? rm.remainingQty : 0) || 0;
-                    // Core Logic: (inward raw item - remaining raw item = available raw item)
-                    const availableQty = Math.max(0, Math.round((inwardQty - remainingQty) * 1000) / 1000);
+                    // Available quantity: uses rm.quantity which auto-decrements on sales, or (inwardQty - remainingQty)
+                    const availableQty = (rm.quantity !== undefined && rm.quantity !== null)
+                      ? Math.round(parseFloat(rm.quantity) * 1000) / 1000
+                      : Math.max(0, Math.round((inwardQty - remainingQty) * 1000) / 1000);
                     const minThreshold = parseFloat(rm.minThreshold) || 2;
                     const isOut = availableQty <= 0;
                     const isLow = availableQty <= minThreshold && !isOut;
@@ -920,6 +1318,358 @@ export default function StockManagement({
                           >
                             <ArrowDownCircle className="w-3 h-3" />
                             <span>Go to Inward Stock</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* SUB-TAB 3: RECIPE MAPPING (रेसिपी / डिश मॅपिंग)                            */}
+          {/* ========================================================================= */}
+          {activeStockSubTab === 'recipes' && (
+            <div className="space-y-4 animate-in fade-in duration-150">
+              
+              {/* Guide Banner */}
+              <div className="bg-gradient-to-r from-indigo-900 via-purple-900 to-slate-900 text-white rounded-2xl p-4 shadow-md flex items-start space-x-3.5 border border-indigo-700/50">
+                <div className="p-2.5 bg-indigo-500/20 text-indigo-300 rounded-xl mt-0.5">
+                  <ChefHat className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm text-white">
+                    Step 3: Dish &amp; Raw Material Recipe Mapping (रेसिपी मॅपिंग - विक्रीवर आपोआप साठा कमी करा)
+                  </h3>
+                  <p className="text-xs text-indigo-200 font-semibold mt-0.5 leading-relaxed">
+                    Select a dish with base quantity (e.g. 1 Kg Gulab Jamun or 1 Plate Puri Bhaji), and add raw materials with required deduction quantities using the <strong>+</strong> button.
+                    Whenever a bill is settled at POS, raw material stock will <strong>automatically reduce in real-time</strong> proportional to the sold quantity.
+                  </p>
+                </div>
+              </div>
+
+              {/* Stat Summary Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                    Mapped Dishes
+                  </span>
+                  <span className="text-2xl font-black text-indigo-600 mt-1 block">
+                    {groupedRecipes.length}
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-semibold">Configured Recipes</span>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                    Sweets Recipes
+                  </span>
+                  <span className="text-2xl font-black text-rose-600 mt-1 block">
+                    {groupedRecipes.filter((g) => g.categoryId === 2 || g.unit === 'Kg').length}
+                  </span>
+                  <span className="text-[11px] text-rose-700 font-semibold">Kg / Grams Based</span>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                    Kitchen &amp; Meals
+                  </span>
+                  <span className="text-2xl font-black text-emerald-600 mt-1 block">
+                    {groupedRecipes.filter((g) => g.categoryId !== 2 && g.unit !== 'Kg').length}
+                  </span>
+                  <span className="text-[11px] text-emerald-700 font-semibold">Portion / Plate Based</span>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                    Linked Raw Materials
+                  </span>
+                  <span className="text-2xl font-black text-amber-600 mt-1 block">
+                    {new Set((recipes || []).map((r) => r && String(r.rawMaterialId))).size}
+                  </span>
+                  <span className="text-[11px] text-amber-700 font-semibold">Active Ingredients</span>
+                </div>
+              </div>
+
+              {/* Theme Filter & Search Bar */}
+              {(() => {
+                const mappedDishIds = new Set((recipes || []).map((r) => r && String(r.dishId)));
+                const unmappedDishes = (dishes || []).filter((d) => d && !mappedDishIds.has(String(d.id)));
+
+                return (
+                  <div className="space-y-3">
+                    <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+                      
+                      {/* Theme Filter Pills */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setRecipeCategoryFilter('all')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center space-x-1.5 ${
+                            recipeCategoryFilter === 'all'
+                              ? 'bg-slate-900 text-white shadow-xs'
+                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          <span>सर्व (All Recipes)</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
+                            recipeCategoryFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                          }`}>
+                            {groupedRecipes.length}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setRecipeCategoryFilter('sweet')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center space-x-1.5 ${
+                            recipeCategoryFilter === 'sweet'
+                              ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs shadow-amber-300'
+                              : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200'
+                          }`}
+                        >
+                          <span>🍬 मिठाई (Sweets)</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-extrabold ${
+                            recipeCategoryFilter === 'sweet' ? 'bg-black/20 text-white' : 'bg-amber-200 text-amber-900'
+                          }`}>
+                            {groupedRecipes.filter((g) => g.isSweet).length}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setRecipeCategoryFilter('kitchen')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center space-x-1.5 ${
+                            recipeCategoryFilter === 'kitchen'
+                              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-xs shadow-emerald-300'
+                              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200'
+                          }`}
+                        >
+                          <span>🍳 नाश्ता / किचन (Kitchen)</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-extrabold ${
+                            recipeCategoryFilter === 'kitchen' ? 'bg-black/20 text-white' : 'bg-emerald-200 text-emerald-900'
+                          }`}>
+                            {groupedRecipes.filter((g) => !g.isSweet).length}
+                          </span>
+                        </button>
+                      </div>
+
+                      {/* Search Bar & Action Buttons */}
+                      <div className="flex items-center space-x-2 flex-1 sm:max-w-md ml-auto">
+                        <div className="relative flex-1">
+                          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            value={recipeSearchQuery}
+                            onChange={(e) => setRecipeSearchQuery(e.target.value)}
+                            placeholder="डिश किंवा कच्चा माल शोधा (Search...)"
+                            className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"
+                          />
+                          {recipeSearchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setRecipeSearchQuery('')}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenRecipeModal(null)}
+                          className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-black text-xs rounded-xl shadow-md shadow-indigo-200 cursor-pointer flex items-center space-x-1.5 whitespace-nowrap transition active:scale-98"
+                        >
+                          <Plus className="w-4 h-4 stroke-[2.5]" />
+                          <span>+ Map Recipe</span>
+                        </button>
+                      </div>
+
+                    </div>
+
+                    {/* Themed Unmapped Items Banner */}
+                    {unmappedDishes.length > 0 && (
+                      <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-3 flex items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center space-x-2.5">
+                          <span className="text-base">💡</span>
+                          <div>
+                            <span className="font-black text-amber-950">
+                              {unmappedDishes.length} डिशेस मॅपिंग बाकी आहेत ({unmappedDishes.length} menu items unmapped)
+                            </span>
+                            <span className="text-[11px] text-amber-800 font-medium block">
+                              उदा. {unmappedDishes.slice(0, 3).map((d) => d.name).join(', ')}{unmappedDishes.length > 3 ? '...' : ''}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (unmappedDishes[0]) {
+                              handleOpenRecipeModal(null);
+                              setSelectedDishId(String(unmappedDishes[0].id));
+                            } else {
+                              handleOpenRecipeModal(null);
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs rounded-xl shadow-xs transition cursor-pointer shrink-0"
+                        >
+                          Map Next Dish →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Recipe Cards Grid */}
+              {filteredRecipes.length === 0 ? (
+                <div className="bg-white border-2 border-dashed border-slate-300 rounded-3xl p-10 text-center space-y-3">
+                  <ChefHat className="w-10 h-10 text-slate-300 mx-auto" />
+                  <h4 className="font-black text-sm text-slate-800">No Recipe Mappings Found</h4>
+                  <p className="text-xs text-slate-500 font-semibold max-w-md mx-auto">
+                    Click "+ Map Recipe" above to map your dish (e.g. Gulab Jamun 1 Kg to Sugar 1 Kg &amp; Mawa 0.5 Kg) for automatic stock decrement on sales.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenRecipeModal(null)}
+                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl shadow-md cursor-pointer transition-all"
+                  >
+                    + Create Recipe Mapping
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4">
+                  {filteredRecipes.map((gr) => {
+                    const isSweet = Boolean(gr.isSweet || gr.categoryId === 2 || gr.unit === 'Kg' || (gr.tableBaseQty && gr.tableUnit));
+                    
+                    const cardTheme = isSweet ? {
+                      wrapper: 'bg-gradient-to-br from-amber-50/90 via-orange-50/50 to-yellow-50/80 border-2 border-amber-300 hover:border-amber-500 shadow-amber-100/50 hover:shadow-md',
+                      badge: 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border border-amber-600 shadow-2xs',
+                      title: 'text-amber-950 group-hover:text-amber-800',
+                      subTitle: 'text-amber-800/80',
+                      deductionBox: 'bg-white/90 border border-amber-200/90 shadow-2xs',
+                      ingRow: 'bg-amber-50/70 border border-amber-200/60 text-amber-950',
+                      ruleBox: 'bg-amber-100/80 border border-amber-200 text-amber-950',
+                      editBtn: 'bg-amber-100/90 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                    } : {
+                      wrapper: 'bg-gradient-to-br from-emerald-50/90 via-teal-50/50 to-slate-50 border-2 border-emerald-300 hover:border-emerald-500 shadow-emerald-100/50 hover:shadow-md',
+                      badge: 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white border border-emerald-700 shadow-2xs',
+                      title: 'text-emerald-950 group-hover:text-emerald-800',
+                      subTitle: 'text-emerald-800/80',
+                      deductionBox: 'bg-white/90 border border-emerald-200/90 shadow-2xs',
+                      ingRow: 'bg-emerald-50/70 border border-emerald-200/60 text-emerald-950',
+                      ruleBox: 'bg-emerald-100/80 border border-emerald-200 text-emerald-950',
+                      editBtn: 'bg-emerald-100/90 hover:bg-emerald-200 text-emerald-900 border border-emerald-300'
+                    };
+
+                    return (
+                      <div
+                        key={`recipe-group-${gr.dishId}`}
+                        className={`rounded-3xl p-4 shadow-xs transition-all flex flex-col justify-between group ${cardTheme.wrapper}`}
+                      >
+                        <div>
+                          {/* Top Row: Category badge & Base portion */}
+                          <div className="flex items-center justify-between flex-wrap gap-1 mb-2">
+                            <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-lg ${cardTheme.badge}`}>
+                              {isSweet ? '🍬 मिठाई / Sweets' : (gr.categoryName ? `🍳 ${gr.categoryName}` : '🍳 Kitchen Dish')}
+                            </span>
+                            <div className="flex items-center space-x-1">
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-900 border border-indigo-200" title="Parcel Base">
+                                पार्सल: {gr.baseQty} {gr.unit}
+                              </span>
+                              {isSweet && (
+                                <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 border border-emerald-200" title="Table Base">
+                                  टेबल: {gr.tableBaseQty || 1} {gr.tableUnit || 'Plate'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Dish Name */}
+                          <h4 className={`font-black text-base transition-colors ${cardTheme.title}`}>
+                            {gr.dishName}
+                          </h4>
+                          {gr.marathiName && (
+                            <p className={`text-xs font-bold mt-0.5 ${cardTheme.subTitle}`}>{gr.marathiName}</p>
+                          )}
+
+                          {/* Ingredients Deduction List */}
+                          <div className={`rounded-2xl p-3 my-3 border space-y-2 ${cardTheme.deductionBox}`}>
+                            <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center justify-between border-b border-slate-200/80 pb-1.5">
+                              <span>Raw Materials ({gr.ingredients.length}):</span>
+                              <span className="font-mono">{isSweet ? 'Parcel vs Table' : `Per ${gr.baseQty} ${gr.unit}`}</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {gr.ingredients.map((ing, idx) => (
+                                <div
+                                  key={`ing-row-${gr.dishId}-${idx}`}
+                                  className={`flex items-center justify-between text-xs py-1.5 px-2.5 rounded-xl border shadow-2xs ${cardTheme.ingRow}`}
+                                >
+                                  <div className="flex items-center space-x-1.5">
+                                    <span className={isSweet ? 'text-amber-600 font-black' : 'text-emerald-600 font-black'}>•</span>
+                                    <span className="font-extrabold text-slate-800">
+                                      {ing.rawMaterialName}
+                                    </span>
+                                  </div>
+                                  <div className="text-right flex items-center space-x-2">
+                                    <div>
+                                      <span className="text-[9px] text-indigo-600 font-bold block">पार्सल ({gr.baseQty} {gr.unit}):</span>
+                                      <span className="font-black text-rose-600">
+                                        -{ing.qtyRequired} <span className="text-[10px] font-bold text-slate-500">{ing.rawMaterialUnit}</span>
+                                      </span>
+                                    </div>
+                                    {isSweet && ing.tableQtyRequired !== undefined && ing.tableQtyRequired !== null && (
+                                      <div className="border-l border-slate-300 pl-2">
+                                        <span className="text-[9px] text-emerald-700 font-bold block">टेबल ({gr.tableBaseQty || 1} {gr.tableUnit || 'Plate'}):</span>
+                                        <span className="font-black text-emerald-600">
+                                          -{ing.tableQtyRequired} <span className="text-[10px] font-bold text-slate-500">{ing.rawMaterialUnit}</span>
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Automatic Formula Note */}
+                          <div className={`p-2.5 rounded-xl border text-[10px] space-y-0.5 ${cardTheme.ruleBox}`}>
+                            <span className="font-black block">⚡ Auto Decrement Rule:</span>
+                            {isSweet ? (
+                              <p className="font-medium">
+                                पार्सल/काउंटर: १ किलो / ५०० ग्रॅम / २५० ग्रॅम वजनानुसार कमी • टेबल: १ प्लेट विक्रीवर टेबल बेस प्रमाणात कमी!
+                              </p>
+                            ) : (
+                              <p className="font-medium">
+                                Selling N plates automatically reduces N × recipe quantity
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Card Bottom Actions: Edit & Delete */}
+                        <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-200/80 mt-3">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenRecipeModal(gr)}
+                            className={`font-black text-xs py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-1 ${cardTheme.editBtn}`}
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                            <span>Edit Recipe</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRecipeMappingEntity(gr.dishId, gr.dishName)}
+                            className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-black text-xs py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Delete</span>
                           </button>
                         </div>
                       </div>
@@ -1394,17 +2144,38 @@ export default function StockManagement({
                   className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-xs"
                 >
                   <div className="space-y-0.5">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-black text-amber-800 text-sm">
-                        {log.remainingQty} {viewLogsModal.rm.unit || 'Kg'} Remaining
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200/80 font-bold text-slate-700">
-                        {log.mode === 'add' ? `Added +${log.amountEntered}` : 'Set'}
-                      </span>
-                    </div>
-                    <div className="text-[11px] font-bold text-emerald-700">
-                      Available Stock: {log.usedQty !== undefined ? log.usedQty : '—'} {viewLogsModal.rm.unit || 'Kg'}
-                    </div>
+                    {log.mode === 'sale_deduct' ? (
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-black text-rose-700 text-sm bg-rose-100/80 px-2 py-0.5 rounded-lg border border-rose-200">
+                            -{log.amountEntered} {viewLogsModal.rm.unit || 'Kg'} Sold
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 font-black text-indigo-800">
+                            POS Sale
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-bold text-slate-800 mt-1">
+                          Dish: <span className="text-slate-900 font-black">{log.dishName}</span> {log.soldAmount ? `(${log.soldAmount} sold)` : ''}
+                        </div>
+                        <div className="text-[10px] font-extrabold text-emerald-700">
+                          Stock Left: {log.remainingQty} {viewLogsModal.rm.unit || 'Kg'} {log.invoiceNo ? `• Bill #${log.invoiceNo}` : ''}
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-black text-amber-800 text-sm">
+                            {log.remainingQty} {viewLogsModal.rm.unit || 'Kg'} Remaining
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200/80 font-bold text-slate-700">
+                            {log.mode === 'add' ? `Added +${log.amountEntered}` : 'Set'}
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-bold text-emerald-700 mt-0.5">
+                          Available Stock: {log.usedQty !== undefined ? log.usedQty : '—'} {viewLogsModal.rm.unit || 'Kg'}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="text-right text-[11px] font-mono text-slate-400">
                     {formatLogTime(log.date || log.timestamp)}
@@ -1423,6 +2194,567 @@ export default function StockManagement({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 9: CREATE / EDIT RECIPE MAPPING MODAL                                */}
+      {/* ========================================================================= */}
+      {recipeModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          {(() => {
+            const currentDish = (dishes || []).find((d) => String(d.id) === String(selectedDishId));
+            const isSweetDish = isDishSweetItem(currentDish);
+
+            const modalFilteredDishes = (dishes || []).filter((d) => {
+              if (!d) return false;
+              const isSw = isDishSweetItem(d);
+              if (modalDishCategoryFilter === 'sweet' && !isSw) return false;
+              if (modalDishCategoryFilter === 'kitchen' && isSw) return false;
+              if (modalDishSearchQuery.trim()) {
+                const q = modalDishSearchQuery.toLowerCase().trim();
+                const matchName = (d.name || '').toLowerCase().includes(q);
+                const matchMr = (d.marathiName || '').toLowerCase().includes(q);
+                const matchSr = String(d.srNo || '').includes(q);
+                return matchName || matchMr || matchSr;
+              }
+              return true;
+            });
+
+            const modalTheme = isSweetDish ? {
+              header: 'bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white border-amber-500 shadow-md shadow-amber-900/10',
+              iconBg: 'bg-amber-400/30 text-amber-100',
+              title: '🍬 मिठाई रेसिपी मॅपिंग (Sweets Recipe Mapping)',
+              subtitle: 'पार्सलमध्ये किलोने आणि टेबलवर प्लेटने स्वयंचलित साठा कपात',
+              badge: 'Dual Base: Kg & Plate',
+              cardBg: 'bg-gradient-to-br from-amber-50/70 via-orange-50/40 to-yellow-50/60 border-amber-300',
+              saveBtn: 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-md shadow-amber-400/40',
+              selectFocus: 'focus:ring-amber-500 border-amber-300 bg-amber-50/40',
+              previewBg: 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 border-amber-300'
+            } : {
+              header: 'bg-gradient-to-r from-emerald-700 via-teal-700 to-slate-800 text-white border-emerald-600 shadow-md shadow-emerald-900/10',
+              iconBg: 'bg-emerald-400/30 text-emerald-100',
+              title: '🍳 नाश्ता / किचन रेसिपी मॅपिंग (Kitchen Recipe Mapping)',
+              subtitle: 'डिश विक्रीवर प्रमाणानुसार कच्चा माल आपोआप कमी करा',
+              badge: 'Per Plate Base',
+              cardBg: 'bg-gradient-to-br from-emerald-50/70 via-teal-50/40 to-slate-50/60 border-emerald-300',
+              saveBtn: 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-md shadow-emerald-400/40',
+              selectFocus: 'focus:ring-emerald-500 border-emerald-300 bg-emerald-50/40',
+              previewBg: 'bg-gradient-to-br from-emerald-50 via-teal-50 to-slate-50 border-emerald-300'
+            };
+
+            return (
+              <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150 max-h-[92vh] flex flex-col">
+                
+                {/* Dynamic Themed Modal Header */}
+                <div className={`p-4 flex items-center justify-between border-b ${modalTheme.header}`}>
+                  <div className="flex items-center space-x-3">
+                    <div className={`p-2.5 rounded-2xl ${modalTheme.iconBg}`}>
+                      {isSweetDish ? <Sparkles className="w-5 h-5 text-amber-200" /> : <ChefHat className="w-5 h-5 text-emerald-200" />}
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <h3 className="font-black text-sm text-white">
+                          {modalTheme.title}
+                        </h3>
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-black/25 text-white">
+                          {modalTheme.badge}
+                        </span>
+                      </div>
+                      <p className="text-xs text-white/80 font-medium">
+                        {modalTheme.subtitle}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setRecipeModalOpen(false)}
+                    className="text-white/80 hover:text-white p-1 rounded-xl hover:bg-white/10 cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Modal Body */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-4 pr-3">
+                  
+                  {/* Themed Dish Selection Area */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black text-slate-500 uppercase">
+                        1. Select Menu Dish (डिश निवडा) *
+                      </label>
+                      
+                      {/* Category Theme Quick Chips */}
+                      <div className="flex items-center space-x-1">
+                        <button
+                          type="button"
+                          onClick={() => setModalDishCategoryFilter('all')}
+                          className={`px-2 py-0.5 rounded-lg text-[10px] font-black cursor-pointer transition ${
+                            modalDishCategoryFilter === 'all'
+                              ? 'bg-slate-900 text-white'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          सर्व ({dishes.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setModalDishCategoryFilter('sweet')}
+                          className={`px-2 py-0.5 rounded-lg text-[10px] font-black cursor-pointer transition ${
+                            modalDishCategoryFilter === 'sweet'
+                              ? 'bg-amber-600 text-white'
+                              : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
+                          }`}
+                        >
+                          🍬 मिठाई ({dishes.filter(d => isDishSweetItem(d)).length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setModalDishCategoryFilter('kitchen')}
+                          className={`px-2 py-0.5 rounded-lg text-[10px] font-black cursor-pointer transition ${
+                            modalDishCategoryFilter === 'kitchen'
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                          }`}
+                        >
+                          🍳 नाश्ता ({dishes.filter(d => !isDishSweetItem(d)).length})
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Dish Search Input */}
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={modalDishSearchQuery}
+                        onChange={(e) => setModalDishSearchQuery(e.target.value)}
+                        placeholder="डिश शोधा... (उदा. Gulab Jamun, Poha, Misal)"
+                        className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+                      />
+                      {modalDishSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setModalDishSearchQuery('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Dropdown Select with Formatted Options */}
+                    <select
+                      value={selectedDishId}
+                      onChange={(e) => handleSelectDishChange(e.target.value)}
+                      className={`w-full border-2 rounded-xl px-3 py-2 text-xs font-black text-slate-900 outline-none cursor-pointer transition ${modalTheme.selectFocus}`}
+                    >
+                      <option value="" disabled>-- Select a Dish ({modalFilteredDishes.length} available) --</option>
+                      {modalFilteredDishes.map((d) => {
+                        const isSw = isDishSweetItem(d);
+                        return (
+                          <option key={`opt-dish-${d.id}`} value={String(d.id)}>
+                            {d.srNo ? `#${d.srNo} ` : ''}{d.name} {d.marathiName ? `(${d.marathiName})` : ''} — {isSw ? '🍬 मिठाई / Sweets' : '🍳 नाश्ता / Kitchen'}
+                          </option>
+                        );
+                      })}
+                    </select>
+
+                    {/* Currently Active Themed Dish Banner */}
+                    {currentDish && (
+                      <div className={`p-3 rounded-2xl border-2 flex items-center justify-between transition-all ${modalTheme.cardBg}`}>
+                        <div className="flex items-center space-x-2.5">
+                          <span className="text-xl">{isSweetDish ? '🍬' : '🍳'}</span>
+                          <div>
+                            <h4 className={`font-black text-sm ${isSweetDish ? 'text-amber-950' : 'text-emerald-950'}`}>
+                              {currentDish.srNo ? `#${currentDish.srNo} ` : ''}{currentDish.name}
+                            </h4>
+                            {currentDish.marathiName && (
+                              <p className={`text-xs font-bold ${isSweetDish ? 'text-amber-800' : 'text-emerald-800'}`}>
+                                {currentDish.marathiName}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg border block ${
+                            isSweetDish
+                              ? 'bg-amber-200/80 text-amber-900 border-amber-300'
+                              : 'bg-emerald-200/80 text-emerald-900 border-emerald-300'
+                          }`}>
+                            {isSweetDish ? 'मिठाई (Sweets Theme)' : 'किचन (Kitchen Theme)'}
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-500 mt-0.5 block">
+                            {isSweetDish ? 'Parcel vs Table Base' : 'Plate / Portion Base'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Base Quantity and Unit Setters */}
+                  {isSweetDish ? (
+                    <div className="space-y-2.5">
+                      <div className="flex items-center space-x-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs font-black">
+                        <span>🍬 मिठाई आयटम (दोन पद्धतींनी विक्री): पार्सलमध्ये किलोने आणि टेबलवर प्लेटने</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        {/* Setter 1: Parcel / Sweets Counter Base (Kg) */}
+                        <div className="bg-indigo-50/70 p-3 rounded-2xl border border-indigo-200 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-black text-indigo-900 uppercase">
+                              1. पार्सल / काउंटर (वजन) *
+                            </label>
+                            <span className="text-[9px] font-bold bg-indigo-200 text-indigo-800 px-1.5 py-0.5 rounded">
+                              Parcel Base
+                            </span>
+                          </div>
+                          <div className="flex space-x-2">
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0.1"
+                              value={recipeBaseQty}
+                              onChange={(e) => setRecipeBaseQty(e.target.value)}
+                              placeholder="1"
+                              className="w-1/2 bg-white border border-indigo-300 rounded-xl px-2.5 py-1.5 text-xs font-black text-slate-900 outline-none focus:ring-2 focus:ring-indigo-600 text-center"
+                            />
+                            <select
+                              value={recipeBaseUnit}
+                              onChange={(e) => setRecipeBaseUnit(e.target.value)}
+                              className="w-1/2 bg-white border border-indigo-300 rounded-xl px-2 py-1.5 text-xs font-black text-slate-900 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer"
+                            >
+                              <option value="Kg">Kg (किलो)</option>
+                              <option value="Gm">Gm (ग्रॅम)</option>
+                            </select>
+                          </div>
+                          <span className="text-[9px] text-indigo-600 font-bold block">
+                            उदा. १ किलो विक्रीसाठी
+                          </span>
+                        </div>
+
+                        {/* Setter 2: Dining Table Base (Plate) */}
+                        <div className="bg-emerald-50/70 p-3 rounded-2xl border border-emerald-200 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-black text-emerald-900 uppercase">
+                              2. डायनिंग टेबल (प्लेट प्रमाण) *
+                            </label>
+                            <span className="text-[9px] font-bold bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded">
+                              Table Base
+                            </span>
+                          </div>
+                          <div className="flex space-x-2">
+                            <input
+                              type="number"
+                              step="1"
+                              min="1"
+                              value={recipeTableBaseQty}
+                              onChange={(e) => setRecipeTableBaseQty(e.target.value)}
+                              placeholder="1"
+                              className="w-1/2 bg-white border border-emerald-300 rounded-xl px-2.5 py-1.5 text-xs font-black text-slate-900 outline-none focus:ring-2 focus:ring-emerald-600 text-center"
+                            />
+                            <select
+                              value={recipeTableBaseUnit}
+                              onChange={(e) => setRecipeTableBaseUnit(e.target.value)}
+                              className="w-1/2 bg-white border border-emerald-300 rounded-xl px-2 py-1.5 text-xs font-black text-slate-900 outline-none focus:ring-2 focus:ring-emerald-600 cursor-pointer"
+                            >
+                              <option value="Plate">Plate (प्लेट)</option>
+                              <option value="Portion">Portion (पोर्शन)</option>
+                              <option value="Pcs">Pcs (नग)</option>
+                            </select>
+                          </div>
+                          <span className="text-[9px] text-emerald-700 font-bold block">
+                            उदा. १ प्लेट टेबलवर खाण्यासाठी
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Regular Item Base Setter (Plate, Cup, etc.) */
+                    <div className="grid grid-cols-2 gap-3 bg-emerald-50/50 p-3 rounded-2xl border border-emerald-200">
+                      <div>
+                        <label className="text-[10px] font-black text-emerald-900 uppercase block mb-1">
+                          Dish Base Quantity (डिशचे प्रमाण) *
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0.1"
+                          value={recipeBaseQty}
+                          onChange={(e) => setRecipeBaseQty(e.target.value)}
+                          placeholder="e.g. 1"
+                          className="w-full bg-white border border-emerald-300 rounded-xl px-3 py-2 text-xs font-black text-slate-900 outline-none focus:ring-2 focus:ring-emerald-600"
+                        />
+                        <span className="text-[9px] text-emerald-700 font-bold block mt-0.5">
+                          उदा. १ प्लेट किंवा १ कप
+                        </span>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-black text-emerald-900 uppercase block mb-1">
+                          Base Unit (एकक) *
+                        </label>
+                        <select
+                          value={recipeBaseUnit}
+                          onChange={(e) => setRecipeBaseUnit(e.target.value)}
+                          className="w-full bg-white border border-emerald-300 rounded-xl px-3 py-2 text-xs font-black text-slate-900 outline-none focus:ring-2 focus:ring-emerald-600 cursor-pointer"
+                        >
+                          <option value="Plate">Plate (प्लेट)</option>
+                          <option value="Cup">Cup (कप / वाटी)</option>
+                          <option value="Portion">Portion (पोर्शन)</option>
+                          <option value="Pcs">Pcs (नग)</option>
+                          <option value="Kg">Kg (किलो)</option>
+                          <option value="Gm">Gm (ग्रॅम)</option>
+                          <option value="Liter">Liter (लिटर)</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Raw Materials to Deduct with Dynamic Rows & '+' Button */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider block">
+                        Raw Materials to Reduce (कमी करावयाचा कच्चा माल) *
+                      </label>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        isSweetDish ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                      }`}>
+                        {recipeIngredients.length} Ingredients
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {recipeIngredients.map((ing, idx) => {
+                        const selectedRm = (rawMaterials || []).find((m) => String(m.id) === String(ing.rawMaterialId));
+                        const rmUnit = selectedRm?.unit || 'Kg';
+
+                        return (
+                          <div
+                            key={ing.id || `ing-row-${idx}`}
+                            className={`border p-3 rounded-2xl space-y-2 transition-all ${
+                              isSweetDish
+                                ? 'bg-amber-50/40 border-amber-200 hover:border-amber-300'
+                                : 'bg-emerald-50/40 border-emerald-200 hover:border-emerald-300'
+                            }`}
+                          >
+                            <div className="flex items-center space-x-2">
+                              {/* Material Dropdown */}
+                              <div className="flex-1">
+                                <select
+                                  value={ing.rawMaterialId}
+                                  onChange={(e) => handleUpdateIngredient(ing.id, 'rawMaterialId', e.target.value)}
+                                  className={`w-full bg-white border rounded-xl px-2.5 py-1.5 text-xs font-black text-slate-900 outline-none cursor-pointer transition ${
+                                    isSweetDish ? 'border-amber-300 focus:ring-2 focus:ring-amber-500' : 'border-emerald-300 focus:ring-2 focus:ring-emerald-500'
+                                  }`}
+                                >
+                                  <option value="" disabled>-- Select Raw Material --</option>
+                                  {(rawMaterials || []).map((rm) => (
+                                    <option key={`rm-opt-${rm.id}`} value={String(rm.id)}>
+                                      {rm.name} {rm.marathiName ? `(${rm.marathiName})` : ''} ({rm.unit || 'Kg'})
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {/* Delete Row Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveIngredientRow(ing.id)}
+                                disabled={recipeIngredients.length <= 1}
+                                className="text-slate-400 hover:text-rose-600 p-1.5 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                title="Remove this ingredient row"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+
+                            {isSweetDish ? (
+                              /* Dual Quantity Inputs for Sweet Item */
+                              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-amber-200/60">
+                                <div className="flex items-center space-x-1.5 bg-indigo-50/70 p-1.5 rounded-xl border border-indigo-200">
+                                  <span className="text-[10px] font-black text-indigo-900 whitespace-nowrap">
+                                    पार्सल ({recipeBaseQty} {recipeBaseUnit}):
+                                  </span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0.001"
+                                    value={ing.qtyRequired}
+                                    onChange={(e) => handleUpdateIngredient(ing.id, 'qtyRequired', e.target.value)}
+                                    placeholder="उदा. 1"
+                                    className="w-full bg-white border border-indigo-300 rounded-lg px-2 py-1 text-xs font-black text-slate-900 outline-none focus:ring-2 focus:ring-indigo-600 text-center"
+                                  />
+                                  <span className="text-[10px] font-black text-indigo-800">
+                                    {rmUnit}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center space-x-1.5 bg-emerald-50/70 p-1.5 rounded-xl border border-emerald-200">
+                                  <span className="text-[10px] font-black text-emerald-900 whitespace-nowrap">
+                                    टेबल ({recipeTableBaseQty} {recipeTableBaseUnit}):
+                                  </span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0.001"
+                                    value={ing.tableQtyRequired !== undefined && ing.tableQtyRequired !== null ? ing.tableQtyRequired : ''}
+                                    onChange={(e) => handleUpdateIngredient(ing.id, 'tableQtyRequired', e.target.value)}
+                                    placeholder="उदा. 0.1"
+                                    className="w-full bg-white border border-emerald-300 rounded-lg px-2 py-1 text-xs font-black text-slate-900 outline-none focus:ring-2 focus:ring-emerald-600 text-center"
+                                  />
+                                  <span className="text-[10px] font-black text-emerald-800">
+                                    {rmUnit}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              /* Single Quantity Input for Regular Item */
+                              <div className="flex items-center justify-between pt-1 border-t border-emerald-200/60">
+                                <span className="text-[10px] font-black text-emerald-900">
+                                  प्रमाण प्रति {recipeBaseQty} {recipeBaseUnit}:
+                                </span>
+                                <div className="flex items-center space-x-2">
+                                  <input
+                                    type="number"
+                                    step="0.05"
+                                    min="0.01"
+                                    value={ing.qtyRequired}
+                                    onChange={(e) => handleUpdateIngredient(ing.id, 'qtyRequired', e.target.value)}
+                                    placeholder="Qty"
+                                    className="w-24 bg-white border border-emerald-300 rounded-xl px-2.5 py-1 text-xs font-black text-slate-900 outline-none focus:ring-2 focus:ring-emerald-600 text-center"
+                                  />
+                                  <span className="text-[10px] font-black px-2 py-1 rounded-lg bg-emerald-100 text-emerald-800">
+                                    {rmUnit}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* '+' Button to Add More Raw Materials to reduce */}
+                    <button
+                      type="button"
+                      onClick={handleAddIngredientRow}
+                      className={`w-full py-2.5 border-2 border-dashed font-black text-xs rounded-2xl transition-all cursor-pointer flex items-center justify-center space-x-1.5 shadow-2xs ${
+                        isSweetDish
+                          ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300 hover:border-amber-400'
+                          : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300 hover:border-emerald-400'
+                      }`}
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>+ Add Another Raw Material (आणखी कच्चा माल जोडा)</span>
+                    </button>
+                  </div>
+
+                  {/* Dynamic Live Reduction Example Box */}
+                  {(() => {
+                    const dishLabel = currentDish?.name || 'Selected Dish';
+                    const bQty = parseFloat(recipeBaseQty) || 1;
+                    const validIngs = recipeIngredients.filter((i) => i.rawMaterialId && parseFloat(i.qtyRequired) > 0);
+
+                    return (
+                      <div className={`p-3.5 rounded-2xl border text-xs space-y-1.5 ${modalTheme.previewBg}`}>
+                        <div className={`flex items-center space-x-1.5 font-black ${isSweetDish ? 'text-amber-950' : 'text-emerald-950'}`}>
+                          <Sparkles className={`w-4 h-4 ${isSweetDish ? 'text-amber-600' : 'text-emerald-600'}`} />
+                          <span>कसा साठा कमी होईल? (Automatic Stock Decrement Preview):</span>
+                        </div>
+
+                        {validIngs.length === 0 ? (
+                          <p className="text-slate-500 font-medium text-[11px]">
+                            Select a dish and add raw materials to see live deduction calculation.
+                          </p>
+                        ) : (
+                          <div className="space-y-1 text-[11px] font-bold text-slate-700">
+                            {isSweetDish ? (
+                              <>
+                                <div className="flex items-center justify-between text-indigo-900 font-extrabold">
+                                  <span>• १ किलो विक्रीवर (पार्सल / काउंटर):</span>
+                                  <span>
+                                    {validIngs.map((i) => {
+                                      const rm = (rawMaterials || []).find((m) => String(m.id) === String(i.rawMaterialId));
+                                      const deduct = Math.round((1 / bQty) * (parseFloat(i.qtyRequired) || 0) * 1000) / 1000;
+                                      return `${rm?.name || 'Item'}: -${deduct} ${rm?.unit || 'Kg'}`;
+                                    }).join(', ')}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between text-blue-800">
+                                  <span>• ५०० ग्रॅम विक्रीवर (पार्सल / काउंटर):</span>
+                                  <span>
+                                    {validIngs.map((i) => {
+                                      const rm = (rawMaterials || []).find((m) => String(m.id) === String(i.rawMaterialId));
+                                      const deduct = Math.round((0.5 / bQty) * (parseFloat(i.qtyRequired) || 0) * 1000) / 1000;
+                                      return `${rm?.name || 'Item'}: -${deduct} ${rm?.unit || 'Kg'}`;
+                                    }).join(', ')}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between text-emerald-800 font-black">
+                                  <span>• १ प्लेट विक्रीवर (डायनिंग टेबल):</span>
+                                  <span>
+                                    {validIngs.map((i) => {
+                                      const rm = (rawMaterials || []).find((m) => String(m.id) === String(i.rawMaterialId));
+                                      const tDeduct = parseFloat(i.tableQtyRequired) || (Math.round((0.1 / bQty) * (parseFloat(i.qtyRequired) || 0) * 1000) / 1000);
+                                      return `${rm?.name || 'Item'}: -${tDeduct} ${rm?.unit || 'Kg'}`;
+                                    }).join(', ')}
+                                  </span>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex items-center justify-between text-emerald-950 font-extrabold">
+                                  <span>• १ {recipeBaseUnit} विक्रीवर ({dishLabel}):</span>
+                                  <span>
+                                    {validIngs.map((i) => {
+                                      const rm = (rawMaterials || []).find((m) => String(m.id) === String(i.rawMaterialId));
+                                      const deduct = Math.round((1 / bQty) * (parseFloat(i.qtyRequired) || 0) * 1000) / 1000;
+                                      return `${rm?.name || 'Item'}: -${deduct} ${rm?.unit || 'Kg'}`;
+                                    }).join(', ')}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between text-emerald-800">
+                                  <span>• २ {recipeBaseUnit} विक्रीवर:</span>
+                                  <span>
+                                    {validIngs.map((i) => {
+                                      const rm = (rawMaterials || []).find((m) => String(m.id) === String(i.rawMaterialId));
+                                      const deduct = Math.round((2 / bQty) * (parseFloat(i.qtyRequired) || 0) * 1000) / 1000;
+                                      return `${rm?.name || 'Item'}: -${deduct} ${rm?.unit || 'Kg'}`;
+                                    }).join(', ')}
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Themed Modal Actions */}
+                <div className="flex items-center space-x-2 p-4 border-t border-slate-200 bg-slate-50">
+                  <button
+                    type="button"
+                    onClick={() => setRecipeModalOpen(false)}
+                    className="flex-1 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-xs py-2.5 rounded-xl cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveRecipeMappingEntity}
+                    disabled={!selectedDishId || recipeIngredients.filter((i) => i.rawMaterialId && parseFloat(i.qtyRequired) > 0).length === 0}
+                    className={`flex-1 font-black text-xs py-2.5 rounded-xl cursor-pointer disabled:opacity-40 transition-all ${modalTheme.saveBtn}`}
+                  >
+                    Save Recipe Mapping (रेसिपी सेव्ह करा)
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 

@@ -39,6 +39,9 @@ const testRecipe = {
 // Set server/db state
 import { getAllData } from '../server/db.js';
 const state = getAllData();
+state.dishes = state.dishes.filter(d => d && d.id !== 9991);
+state.rawMaterials = state.rawMaterials.filter(m => m && m.id !== 8881);
+state.recipes = state.recipes.filter(r => r && r.id !== 7771 && r.dishId !== 9991);
 state.dishes.push(testDish);
 state.rawMaterials.push(testSugar);
 state.recipes.push(testRecipe);
@@ -108,6 +111,11 @@ assert.strictEqual(testDish.accumulatedSold, 0.5, 'Accumulated sold should be 0.
 
 console.log('Recipe currentStock:', testRecipe.currentStock, '(Expected: 18.5 - 2 batches = 1.0 kg Sugar deducted!)');
 assert.strictEqual(testRecipe.currentStock, 18.5, 'Raw material should deduct 2 * 0.5 = 1.0 kg');
+
+// Clean up test records
+state.dishes = state.dishes.filter(d => d && d.id !== 9991);
+state.rawMaterials = state.rawMaterials.filter(m => m && m.id !== 8881);
+state.recipes = state.recipes.filter(r => r && r.id !== 7771 && r.dishId !== 9991);
 
 console.log('\n✅ ALL FULL-BATCH STOCK LOGIC TESTS PASSED PERFECTLY!');
 process.exit(0);

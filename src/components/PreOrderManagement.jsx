@@ -25,10 +25,15 @@ import {
   AlertCircle,
   Copy,
   Receipt,
-  RotateCcw
+  RotateCcw,
+  Camera,
+  Image as ImageIcon,
+  Upload,
+  Eye,
+  Download
 } from 'lucide-react';
 import { printPreOrderReceipt, formatReceiptDate, formatItemQtyDisplay, getPrintDishName } from '../utils/receiptUtils';
-import { generatePreOrderNumber, checkPreOrderAlert, playAlertChime } from '../db/db';
+import { generatePreOrderNumber, checkPreOrderAlert } from '../db/db';
 import QuantityInputModal from './QuantityInputModal';
 
 export default function PreOrderManagement({
@@ -71,10 +76,23 @@ export default function PreOrderManagement({
 
   const [deliveryDate, setDeliveryDate] = useState(getTomorrowDateStr());
   const [deliveryTime, setDeliveryTime] = useState('11:00');
+  const [discount, setDiscount] = useState('');
   const [advancePayment, setAdvancePayment] = useState('');
   const [advancePaymentMode, setAdvancePaymentMode] = useState('Cash');
+  const [isFullPayment, setIsFullPayment] = useState(false);
   const [orderNotes, setOrderNotes] = useState('');
+  const [attachedImages, setAttachedImages] = useState([]);
+  const [viewingImage, setViewingImage] = useState(null);
   const [formError, setFormError] = useState('');
+
+  // Keyboard Enter navigation refs for rapid form entry
+  const customerNameInputRef = useRef(null);
+  const customerPhoneInputRef = useRef(null);
+  const deliveryDateInputRef = useRef(null);
+  const deliveryTimeInputRef = useRef(null);
+  const discountInputRef = useRef(null);
+  const advancePaymentInputRef = useRef(null);
+  const orderNotesInputRef = useRef(null);
 
   // Custom bulk item modal / popover
   const [isCustomItemOpen, setIsCustomItemOpen] = useState(false);
@@ -98,8 +116,8 @@ export default function PreOrderManagement({
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Live financial calculations
-  const totalAmount = useMemo(() => {
+  // Live financial calculations (Subtotal, Discount, Net Total, Advance, Balance)
+  const subtotalAmount = useMemo(() => {
     return cartItems.reduce((sum, item) => {
       const price = parseFloat(item.price) || 0;
       const qty = parseFloat(item.qty) || 1;
@@ -107,8 +125,41 @@ export default function PreOrderManagement({
     }, 0);
   }, [cartItems]);
 
+  const discountNum = Math.max(0, parseFloat(discount) || 0);
+  const totalAmount = Math.max(0, subtotalAmount - discountNum);
   const advanceNum = parseFloat(advancePayment) || 0;
   const balanceAmount = Math.max(0, totalAmount - advanceNum);
+
+  // Toggle 100% Full Payment Option
+  const handleToggleFullPayment = () => {
+    if (!isFullPayment) {
+      setIsFullPayment(true);
+      if (totalAmount > 0) {
+        setAdvancePayment(String(totalAmount));
+      }
+    } else {
+      setIsFullPayment(false);
+      setAdvancePayment('');
+    }
+  };
+
+  // Handle Advance Payment input with auto-detection of full payment
+  const handleAdvanceInputChange = (val) => {
+    setAdvancePayment(val);
+    const num = parseFloat(val) || 0;
+    if (totalAmount > 0 && num >= totalAmount) {
+      setIsFullPayment(true);
+    } else {
+      setIsFullPayment(false);
+    }
+  };
+
+  // Keep full payment in sync if total changes while full payment is toggled on
+  useEffect(() => {
+    if (isFullPayment && totalAmount > 0) {
+      setAdvancePayment(String(totalAmount));
+    }
+  }, [totalAmount, isFullPayment]);
 
   // Filtered menu dishes for item selection
   const filteredDishes = useMemo(() => {
@@ -128,10 +179,15 @@ export default function PreOrderManagement({
     });
   }, [dishes, activeTabCatId, dishSearchQuery]);
 
-  // Enriched Pre-Orders with Alert Status & Stats (Strictly Upcoming - Excludes Completed & Cancelled)
+  // Enriched Pre-Orders with Alert Status & Stats (Strictly Upcoming - Excludes Delivered & Cancelled)
   const upcomingPreOrders = useMemo(() => {
     return (preOrders || [])
-      .filter((order) => order && order.status !== 'completed' && order.status !== 'cancelled')
+      .filter((order) => {
+        if (!order || order.status === 'cancelled') return false;
+        if (order.status === 'completed' && order.deliveryStatus === 'delivered') return false;
+        if (order.status === 'completed' && !order.isFullPayment && order.settledAt) return false;
+        return true;
+      })
       .map((order) => {
         const alertInfo = checkPreOrderAlert(order.deliveryDate);
         return {
@@ -315,6 +371,49 @@ export default function PreOrderManagement({
     setCartItems((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Handle Image Upload & Compression
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    files.forEach((file) => {
+      if (!file.type || !file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1200;
+          let width = img.width;
+          let height = img.height;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          setAttachedImages((prev) => [...prev, compressedDataUrl]);
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+
+  // Remove attached image
+  const handleRemoveImage = (index) => {
+    setAttachedImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
   // Reset Form
   const handleResetForm = () => {
     setCartItems([]);
@@ -322,9 +421,12 @@ export default function PreOrderManagement({
     setCustomerPhone('');
     setDeliveryDate(getTomorrowDateStr());
     setDeliveryTime('11:00');
+    setDiscount('');
     setAdvancePayment('');
+    setIsFullPayment(false);
     setAdvancePaymentMode('Cash');
     setOrderNotes('');
+    setAttachedImages([]);
     setFormError('');
     setEditingOrderId(null);
     setCurrentView('list');
@@ -338,9 +440,12 @@ export default function PreOrderManagement({
     setCustomerPhone(order.customerPhone || '');
     setDeliveryDate(order.deliveryDate || getTomorrowDateStr());
     setDeliveryTime(order.deliveryTime || '11:00');
+    setDiscount(order.discount !== undefined && order.discount !== '' ? String(order.discount) : '');
     setAdvancePayment(String(order.advancePayment || ''));
+    setIsFullPayment(Boolean(order.isFullPayment || order.fullPaymentPaid || (order.balanceAmount === 0 && (parseFloat(order.advancePayment) || 0) >= (parseFloat(order.totalAmount) || 0))));
     setAdvancePaymentMode(order.advancePaymentMode || 'Cash');
     setOrderNotes(order.notes || '');
+    setAttachedImages(Array.isArray(order.images) ? order.images : (order.image ? [order.image] : []));
     setFormError('');
     setCurrentView('create');
   };
@@ -350,24 +455,26 @@ export default function PreOrderManagement({
     setFormError('');
 
     if (cartItems.length === 0) {
-      setFormError('Please select at least one item for this bulk order!');
+      setFormError('कृपया या बल्क ऑर्डरसाठी किमान एक पदार्थ निवडा! (Please select at least one item)');
       return;
     }
 
     if (!customerName.trim()) {
-      setFormError('Please enter the customer name!');
+      setFormError('कृपया ग्राहकाचे पूर्ण नाव टाका! (Please enter customer name)');
       return;
     }
 
     if (!customerPhone.trim()) {
-      setFormError('Please enter a valid customer contact number!');
+      setFormError('कृपया ग्राहकाचा १० अंकी मोबाईल नंबर टाका! (Please enter 10-digit mobile number)');
       return;
     }
 
     if (!deliveryDate) {
-      setFormError('Please select the delivery/order date!');
+      setFormError('कृपया डिलिव्हरी / ऑर्डर तारीख निवडा! (Please select delivery date)');
       return;
     }
+
+    const isOrderFullyPaid = Boolean(isFullPayment || (totalAmount > 0 && advanceNum >= totalAmount));
 
     const orderData = {
       orderNo: editingOrderId ? (preOrders.find((o) => o.id === editingOrderId)?.orderNo || generatePreOrderNumber()) : generatePreOrderNumber(),
@@ -376,12 +483,19 @@ export default function PreOrderManagement({
       deliveryDate: deliveryDate,
       deliveryTime: deliveryTime || '11:00',
       items: cartItems,
+      subtotal: subtotalAmount,
+      discount: discountNum,
       totalAmount: totalAmount,
-      advancePayment: advanceNum,
+      advancePayment: isOrderFullyPaid ? totalAmount : advanceNum,
       advancePaymentMode: advancePaymentMode,
-      balanceAmount: balanceAmount,
+      balanceAmount: isOrderFullyPaid ? 0 : balanceAmount,
+      isFullPayment: isOrderFullyPaid,
+      fullPaymentPaid: isOrderFullyPaid,
+      paymentStatus: isOrderFullyPaid ? 'fully_paid' : (advanceNum > 0 ? 'advance_paid' : 'unpaid'),
+      images: attachedImages,
       notes: orderNotes.trim(),
-      status: 'pending',
+      status: isOrderFullyPaid ? 'confirmed' : 'pending',
+      deliveryStatus: 'pending',
       bookedByCounter: activeCounter,
       updatedAt: new Date().toISOString()
     };
@@ -541,7 +655,7 @@ export default function PreOrderManagement({
                     type="text"
                     value={dishSearchQuery}
                     onChange={(e) => setDishSearchQuery(e.target.value)}
-                    placeholder="Search menu dish by name, Marathi name or number..."
+                    placeholder="मेनू पदार्थ नाव, मराठी नाव किंवा नंबरने शोधा... (Search menu dish)"
                     className="w-full pl-9 pr-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white"
                   />
                   {dishSearchQuery && (
@@ -561,7 +675,7 @@ export default function PreOrderManagement({
                   title="Add custom item not listed in regular menu (e.g. Special Box, Buffet Item)"
                 >
                   <Plus className="w-3.5 h-3.5 text-amber-700" />
-                  <span>+ Custom Bulk Item</span>
+                  <span>+ सानुकूल पदार्थ (+ Custom Item)</span>
                 </button>
               </div>
 
@@ -738,7 +852,7 @@ export default function PreOrderManagement({
                         }}
                         className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl transition cursor-pointer"
                       >
-                        Add Custom Weight
+                        वजन जोडा (Add Weight)
                       </button>
                     </div>
                   </div>
@@ -752,7 +866,7 @@ export default function PreOrderManagement({
                 <div className="bg-white border border-slate-200 rounded-3xl p-5 w-full max-w-sm shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                     <h3 className="text-sm font-black text-slate-900">
-                      Add Custom Bulk / Catering Item
+                      नवीन सानुकूल पदार्थ जोडा (Add Custom Item)
                     </h3>
                     <button
                       onClick={() => setIsCustomItemOpen(false)}
@@ -765,14 +879,14 @@ export default function PreOrderManagement({
                   <form onSubmit={handleAddCustomItem} className="space-y-3">
                     <div>
                       <label className="text-[10px] font-extrabold text-slate-500 uppercase block mb-1">
-                        Item Description:
+                        पदार्थाचे नाव / तपशील (Item Name):
                       </label>
                       <input
                         type="text"
                         required
                         value={customItemName}
                         onChange={(e) => setCustomItemName(e.target.value)}
-                        placeholder="e.g., Special Mawa Barfi 10Kg Box"
+                        placeholder="उदा. स्पेशल मावा बर्फी १० किलो बॉक्स"
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500"
                       />
                     </div>
@@ -780,19 +894,19 @@ export default function PreOrderManagement({
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-[10px] font-extrabold text-slate-500 uppercase block mb-1">
-                          Unit / Pack:
+                          एकक / युनिट (Unit):
                         </label>
                         <input
                           type="text"
                           value={customItemUnit}
                           onChange={(e) => setCustomItemUnit(e.target.value)}
-                          placeholder="e.g. Kg, Box, Pack"
+                          placeholder="उदा. किलो (Kg), बॉक्स, पॅक"
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500"
                         />
                       </div>
                       <div>
                         <label className="text-[10px] font-extrabold text-slate-500 uppercase block mb-1">
-                          Quantity:
+                          नग / प्रमाण (Quantity):
                         </label>
                         <input
                           type="number"
@@ -807,7 +921,7 @@ export default function PreOrderManagement({
 
                     <div>
                       <label className="text-[10px] font-extrabold text-slate-500 uppercase block mb-1">
-                        Total Price per Unit (₹):
+                        दर / किंमत प्रति युनिट (Rate ₹):
                       </label>
                       <input
                         type="number"
@@ -815,7 +929,7 @@ export default function PreOrderManagement({
                         required
                         value={customItemPrice}
                         onChange={(e) => setCustomItemPrice(e.target.value)}
-                        placeholder="Rate in ₹"
+                        placeholder="किंमत ₹ मध्ये टाका"
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500"
                       />
                     </div>
@@ -826,13 +940,13 @@ export default function PreOrderManagement({
                         onClick={() => setIsCustomItemOpen(false)}
                         className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
                       >
-                        Cancel
+                        रद्द करा (Cancel)
                       </button>
                       <button
                         type="submit"
                         className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs rounded-xl shadow-sm transition cursor-pointer"
                       >
-                        Add Item
+                        पदार्थ जोडा (Add Item)
                       </button>
                     </div>
                   </form>
@@ -843,15 +957,15 @@ export default function PreOrderManagement({
           </div>
 
           {/* RIGHT SECTION: Cart + Customer Info + Financial Calculation */}
-          <div className="w-96 md:w-[420px] bg-white flex flex-col border-l border-slate-200 shrink-0 overflow-y-auto">
+          <div className="w-full md:w-[500px] lg:w-[580px] xl:w-[640px] 2xl:w-[700px] bg-white flex flex-col border-l border-slate-200 shrink-0 overflow-y-auto shadow-sm">
             
             {/* Cart Header */}
-            <div className="p-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
-              <div className="flex items-center space-x-2">
-                <span className="font-black text-xs text-slate-900 uppercase tracking-wider">
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
+              <div className="flex items-center space-x-2.5">
+                <span className="font-black text-sm text-slate-900 uppercase tracking-wider">
                   Bulk Order Cart
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-100 text-orange-800">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-orange-100 text-orange-800">
                   {cartItems.length} Item{cartItems.length !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -859,17 +973,18 @@ export default function PreOrderManagement({
                 <button
                   type="button"
                   onClick={() => setCartItems([])}
-                  className="text-[10px] font-bold text-rose-600 hover:text-rose-800 cursor-pointer"
+                  className="text-xs font-bold text-rose-600 hover:text-rose-800 cursor-pointer flex items-center gap-1 transition"
                 >
-                  Clear All
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Clear All</span>
                 </button>
               )}
             </div>
 
             {/* Selected Items Scrollable List */}
-            <div className="max-h-56 overflow-y-auto p-3 space-y-2 border-b border-slate-200 bg-white shrink-0">
+            <div className="max-h-60 overflow-y-auto p-3.5 space-y-2 border-b border-slate-200 bg-white shrink-0">
               {cartItems.length === 0 ? (
-                <div className="py-8 text-center text-slate-400">
+                <div className="py-7 text-center text-slate-400">
                   <FileText className="w-8 h-8 mx-auto mb-1.5 opacity-40 text-slate-400" />
                   <p className="text-xs font-bold">No items added yet</p>
                   <p className="text-[10px] text-slate-400">Click on menu dishes or add custom items</p>
@@ -880,46 +995,46 @@ export default function PreOrderManagement({
                   return (
                     <div
                       key={`pre-cart-${item.id}-${idx}`}
-                      className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 flex items-center justify-between text-xs"
+                      className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between text-xs hover:border-slate-300 transition"
                     >
-                      <div className="flex-1 pr-2">
-                        <div className="font-bold text-slate-900 truncate">
+                      <div className="flex-1 pr-3">
+                        <div className="font-bold text-slate-900 text-sm truncate">
                           {getPrintDishName(item, printLanguage)}
                         </div>
-                        <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5">
-                          <span>{item.unit}</span>
+                        <div className="text-xs text-slate-500 font-mono flex items-center gap-2 mt-0.5">
+                          <span className="bg-slate-200/80 text-slate-700 px-1.5 py-0.5 rounded text-[11px] font-bold">{item.unit}</span>
                           <span>•</span>
                           <span>₹{item.price} each</span>
                         </div>
                       </div>
 
                       {/* Quantity Controls */}
-                      <div className="flex items-center space-x-1">
+                      <div className="flex items-center space-x-1.5">
                         <button
                           onClick={() => handleUpdateQty(idx, -1)}
-                          className="w-5 h-5 rounded-md bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-700 cursor-pointer"
+                          className="w-7 h-7 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-700 cursor-pointer text-sm transition"
                         >
                           -
                         </button>
-                        <span className="w-7 text-center font-black text-xs text-slate-900">
+                        <span className="w-9 text-center font-black text-sm text-slate-900">
                           {item.qty}
                         </span>
                         <button
                           onClick={() => handleUpdateQty(idx, 1)}
-                          className="w-5 h-5 rounded-md bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-700 cursor-pointer"
+                          className="w-7 h-7 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-700 cursor-pointer text-sm transition"
                         >
                           +
                         </button>
                         <button
                           onClick={() => handleRemoveCartItem(idx)}
-                          className="p-1 text-slate-300 hover:text-rose-600 transition ml-1 cursor-pointer"
+                          className="p-1.5 text-slate-300 hover:text-rose-600 transition ml-1 cursor-pointer rounded-lg hover:bg-rose-50"
                           title="Remove item"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
 
-                      <div className="w-16 text-right font-black text-slate-900">
+                      <div className="w-20 text-right font-black text-sm text-slate-900 font-mono">
                         ₹{itemSubtotal.toFixed(0)}
                       </div>
                     </div>
@@ -929,185 +1044,401 @@ export default function PreOrderManagement({
             </div>
 
             {/* CUSTOMER & EVENT DETAILS FORM (As explicitly required by user) */}
-            <div className="p-4 space-y-3.5 flex-1">
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                <User className="w-3.5 h-3.5 text-orange-600" />
+            <div className="p-4 space-y-4 flex-1">
+              <div className="text-[11px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                <User className="w-4 h-4 text-orange-600" />
                 <span>Customer & Schedule Information</span>
               </div>
 
-              {/* Customer Name */}
-              <div>
-                <label className="text-[11px] font-extrabold text-slate-700 block mb-1">
-                  Customer Name <span className="text-rose-500">*</span>:
-                </label>
-                <div className="relative">
-                  <User className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    required
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="Enter Customer Full Name (e.g. Ramesh Patil)"
-                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white"
-                  />
-                </div>
-              </div>
-
-              {/* Customer Phone */}
-              <div>
-                <label className="text-[11px] font-extrabold text-slate-700 block mb-1">
-                  Phone / Mobile Number <span className="text-rose-500">*</span>:
-                </label>
-                <div className="relative">
-                  <Phone className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="tel"
-                    maxLength={10}
-                    required
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, ''))}
-                    placeholder="Enter 10-Digit Mobile Number"
-                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white"
-                  />
-                </div>
-              </div>
-
-              {/* Date of Order & Time of Delivery */}
-              <div className="grid grid-cols-2 gap-2.5">
+              {/* ROW 1: Customer Name & Mobile Number (Perfect 2-Column Alignment) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {/* Customer Name */}
                 <div>
-                  <label className="text-[11px] font-extrabold text-slate-700 block mb-1">
-                    Date of Order (Event) <span className="text-rose-500">*</span>:
+                  <label className="text-[11px] font-extrabold text-slate-700 flex items-center justify-between mb-1.5 h-5">
+                    <span>ग्राहकाचे नाव (Customer Name) <span className="text-rose-500">*</span>:</span>
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      ref={customerNameInputRef}
+                      type="text"
+                      required
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          customerPhoneInputRef.current?.focus();
+                        }
+                      }}
+                      placeholder="उदा. रमेश पाटील (Enter Full Name)"
+                      className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition"
+                    />
+                  </div>
+                </div>
+
+                {/* Customer Phone */}
+                <div>
+                  <label className="text-[11px] font-extrabold text-slate-700 flex items-center justify-between mb-1.5 h-5">
+                    <span>मोबाईल नंबर (Phone Number) <span className="text-rose-500">*</span>:</span>
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      ref={customerPhoneInputRef}
+                      type="tel"
+                      maxLength={10}
+                      required
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, ''))}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          deliveryDateInputRef.current?.focus();
+                        }
+                      }}
+                      placeholder="१० अंकी मोबाईल नंबर (उदा. 9876543210)"
+                      className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* ROW 2: Date of Order & Time of Delivery (Perfect 2-Column Alignment) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="text-[11px] font-extrabold text-slate-700 flex items-center justify-between mb-1.5 h-5">
+                    <span>डिलिव्हरी तारीख (Delivery Date) <span className="text-rose-500">*</span>:</span>
                   </label>
                   <div className="relative">
                     <input
+                      ref={deliveryDateInputRef}
                       type="date"
                       required
                       value={deliveryDate}
                       onChange={(e) => setDeliveryDate(e.target.value)}
-                      className="w-full px-2.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          deliveryTimeInputRef.current?.focus();
+                        }
+                      }}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-extrabold text-slate-700 block mb-1">
-                    Delivery / Pickup Time:
+                  <label className="text-[11px] font-extrabold text-slate-700 flex items-center justify-between mb-1.5 h-5">
+                    <span>डिलिव्हरी / पिकअप वेळ (Time):</span>
                   </label>
                   <div className="relative">
                     <input
+                      ref={deliveryTimeInputRef}
                       type="time"
                       value={deliveryTime}
                       onChange={(e) => setDeliveryTime(e.target.value)}
-                      className="w-full px-2.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          discountInputRef.current?.focus();
+                        }
+                      }}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Time quick chips */}
-              <div className="flex items-center space-x-1 overflow-x-auto pb-1">
-                {timePresets.map((t) => (
+              <div className="flex items-center space-x-1.5 overflow-x-auto pb-1">
+                {[
+                  { label: 'सकाळ (08:00 AM)', value: '08:00' },
+                  { label: 'सकाळ (11:00 AM)', value: '11:00' },
+                  { label: 'दुपार (01:00 PM)', value: '13:00' },
+                  { label: 'संध्याकाळ (04:30 PM)', value: '16:30' },
+                  { label: 'संध्याकाळ (07:00 PM)', value: '19:00' },
+                  { label: 'रात्री (08:30 PM)', value: '20:30' }
+                ].map((t) => (
                   <button
                     key={t.value}
                     type="button"
                     onClick={() => setDeliveryTime(t.value)}
-                    className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold whitespace-nowrap border transition cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold whitespace-nowrap border transition cursor-pointer ${
                       deliveryTime === t.value
-                        ? 'bg-orange-600 text-white border-orange-600'
+                        ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
                         : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
                     }`}
                   >
-                    {t.label.split(' ')[0]} {t.label.split(' ')[1]}
+                    {t.label}
                   </button>
                 ))}
               </div>
 
-              {/* Advance Payment & Payment Mode */}
-              <div className="grid grid-cols-2 gap-2.5">
+              {/* ROW 3: Discount & Advance Payment (With Perfectly Matched Header Heights & Alignments) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 items-end">
                 <div>
-                  <label className="text-[11px] font-extrabold text-slate-700 block mb-1">
-                    Advance Payment (₹):
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5 h-6">
+                    <label className="text-[11px] font-extrabold text-slate-700">
+                      सवलत / डिस्काउंट (Discount ₹):
+                    </label>
+                  </div>
                   <div className="relative">
-                    <IndianRupee className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <IndianRupee className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
+                      ref={discountInputRef}
                       type="number"
                       step="1"
                       min="0"
-                      value={advancePayment}
-                      onChange={(e) => setAdvancePayment(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white"
+                      value={discount}
+                      onChange={(e) => setDiscount(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          advancePaymentInputRef.current?.focus();
+                        }
+                      }}
+                      placeholder="उदा. १०० (Discount)"
+                      className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-extrabold text-slate-700 block mb-1">
-                    Advance Payment Mode:
+                  <div className="flex items-center justify-between mb-1.5 h-6">
+                    <label className="text-[11px] font-extrabold text-slate-700">
+                      अ‍ॅडव्हान्स (Advance ₹):
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleToggleFullPayment}
+                      className={`text-[10px] font-black px-2 py-0.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
+                        isFullPayment
+                          ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                          : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
+                      }`}
+                      title="Customer pays full order amount now"
+                    >
+                      <span>⚡</span>
+                      <span>{isFullPayment ? '✓ १००% पूर्ण भरणा' : '१००% पूर्ण भरणा (Full Pay)'}</span>
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <IndianRupee className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      ref={advancePaymentInputRef}
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={advancePayment}
+                      onChange={(e) => handleAdvanceInputChange(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          orderNotesInputRef.current?.focus();
+                        }
+                      }}
+                      placeholder="उदा. ५०० (Advance)"
+                      className={`w-full pl-9 pr-3 py-2.5 border rounded-xl text-xs font-mono font-bold outline-none transition ${
+                        isFullPayment
+                          ? 'bg-emerald-50/70 border-emerald-400 text-emerald-950 focus:ring-2 focus:ring-emerald-500'
+                          : 'bg-slate-50 border-slate-300 text-slate-900 focus:ring-2 focus:ring-orange-500 focus:bg-white'
+                      }`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* ROW 4: Full Payment vs Pending Payment Option Banner */}
+              <div
+                onClick={handleToggleFullPayment}
+                className={`p-3.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer ${
+                  isFullPayment
+                    ? 'bg-emerald-50 border-emerald-400 text-emerald-950 shadow-xs ring-1 ring-emerald-300'
+                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={isFullPayment}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      handleToggleFullPayment();
+                    }}
+                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <div>
+                    <span className="text-xs font-black flex items-center gap-1.5">
+                      <span>ग्राहकाने पूर्ण भरणा केला (Customer Paid Full Payment)</span>
+                      {isFullPayment && (
+                        <span className="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-md font-extrabold">
+                          ✓ Settle Tab मध्ये नोंद
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-[11px] text-slate-500 block mt-0.5 leading-snug">
+                      {isFullPayment
+                        ? '✓ हे बिल थेट Settle Tab मध्ये जमा होईल (This bill will be shown directly in Settle Tab)'
+                        : 'पेमेंट बाकी असल्यास हे बिल Settle Tab मध्ये दिसणार नाही (Pending pre-orders are hidden from Settle Tab until fully settled)'}
+                    </span>
+                  </div>
+                </div>
+                <span className={`text-[10px] font-black px-3 py-1.5 rounded-lg shrink-0 ml-2 ${
+                  isFullPayment ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-200 text-slate-700'
+                }`}>
+                  {isFullPayment ? 'पूर्ण भरणा (Full)' : 'पेंडिंग (Pending)'}
+                </span>
+              </div>
+
+              {/* ROW 5: Payment Mode & Special Instructions in a 2-Column Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="text-[11px] font-extrabold text-slate-700 block mb-1.5">
+                    {isFullPayment ? 'पेमेंट प्रकार (Payment Mode):' : 'अ‍ॅडव्हान्स पेमेंट प्रकार (Advance Mode):'}
                   </label>
                   <select
                     value={advancePaymentMode}
                     onChange={(e) => setAdvancePaymentMode(e.target.value)}
-                    className="w-full px-2.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500"
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500"
                   >
-                    <option value="Cash">Cash (रोख)</option>
-                    <option value="UPI / QR">UPI / QR Code</option>
-                    <option value="Card">Debit / Credit Card</option>
-                    <option value="Bank Transfer">Bank Transfer / NEFT</option>
+                    <option value="Cash">रोख (Cash)</option>
+                    <option value="UPI / QR">ऑनलाईन UPI / QR कोड</option>
+                    <option value="Card">डेबिट / क्रेडिट कार्ड</option>
+                    <option value="Bank Transfer">बँक ट्रान्सफर / NEFT</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-extrabold text-slate-700 block mb-1.5">
+                    विशेष सूचना (Special Instructions):
+                  </label>
+                  <input
+                    ref={orderNotesInputRef}
+                    type="text"
+                    value={orderNotes}
+                    onChange={(e) => setOrderNotes(e.target.value)}
+                    placeholder="उदा. वाढदिवस पार्टी, १ किलो पॅकिंग..."
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition"
+                  />
                 </div>
               </div>
 
-              {/* Special Notes / Occasion */}
-              <div>
-                <label className="text-[11px] font-extrabold text-slate-700 block mb-1">
-                  Event / Special Instructions (Optional):
-                </label>
-                <textarea
-                  rows={2}
-                  value={orderNotes}
-                  onChange={(e) => setOrderNotes(e.target.value)}
-                  placeholder="e.g. Birthday party, 1kg packaging, deliver to hotel lobby..."
-                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white"
-                />
+              {/* Attach Reference Photos / Images (Req 2) */}
+              <div className="pt-2 border-t border-slate-200">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-[11px] font-extrabold text-slate-700 flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-orange-600" />
+                    <span>ऑर्डर संदर्भ फोटो जोडा (Attach Order Photos):</span>
+                  </label>
+                  <span className="text-[10px] text-slate-500 font-bold">
+                    {attachedImages.length} फोटो जोडले
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <label
+                    htmlFor="preorder-image-input"
+                    className="flex items-center justify-center space-x-2 px-3 py-2.5 bg-orange-50 hover:bg-orange-100 border border-dashed border-orange-300 rounded-xl text-orange-700 font-bold text-xs cursor-pointer transition active:scale-98"
+                  >
+                    <Upload className="w-4 h-4 text-orange-600" />
+                    <span>+ फोटो / इमेज अपलोड करा (Upload Reference Images)</span>
+                  </label>
+                  <input
+                    type="file"
+                    id="preorder-image-input"
+                    accept="image/*"
+                    multiple
+                    capture="environment"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                  />
+
+                  {attachedImages.length > 0 && (
+                    <div className="flex items-center gap-2 overflow-x-auto p-2 bg-slate-50 border border-slate-200 rounded-xl">
+                      {attachedImages.map((imgSrc, imgIdx) => (
+                        <div key={`img-att-${imgIdx}`} className="relative group shrink-0">
+                          <img
+                            src={imgSrc}
+                            alt={`Order Ref ${imgIdx + 1}`}
+                            onClick={() => setViewingImage(imgSrc)}
+                            className="w-16 h-16 object-cover rounded-lg border border-slate-300 hover:border-orange-500 cursor-pointer shadow-xs transition"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(imgIdx)}
+                            className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-600 hover:bg-rose-700 text-white rounded-full flex items-center justify-center text-[10px] shadow-sm cursor-pointer"
+                            title="Remove photo"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                          <div
+                            onClick={() => setViewingImage(imgSrc)}
+                            className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white cursor-pointer transition"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[10px] text-slate-400">
+                    केटरिंग ऑर्डर, केक डिझाइन, मिठाई बॉक्स किंवा सॅम्पलचा फोटो जोडा. हा फोटो या ऑर्डरसोबत कायम राहील.
+                  </p>
+                </div>
               </div>
 
               {/* Form Validation Notice */}
               {formError && (
-                <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center space-x-2">
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center space-x-2">
                   <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
                   <span>{formError}</span>
                 </div>
               )}
 
-              {/* REAL-TIME BALANCE AMOUNT CALCULATION (Exact user requirement) */}
-              <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-4 text-white shadow-xl space-y-2 border border-slate-700">
+              {/* REAL-TIME BALANCE AMOUNT CALCULATION */}
+              <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-4 text-white shadow-xl space-y-2.5 border border-slate-700">
                 <div className="flex items-center justify-between text-xs text-slate-300">
-                  <span>Total Order Amount:</span>
+                  <span>एकूण ऑर्डर रक्कम (Subtotal):</span>
                   <span className="font-mono font-bold text-sm text-white">
+                    ₹{subtotalAmount.toFixed(2)}
+                  </span>
+                </div>
+
+                {discountNum > 0 && (
+                  <div className="flex items-center justify-between text-xs text-rose-300">
+                    <span>सवलत / डिस्काउंट (Discount):</span>
+                    <span className="font-mono font-bold text-sm">
+                      - ₹{discountNum.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between text-xs text-amber-300 font-bold">
+                  <span>निव्वळ एकूण रक्कम (Net Total):</span>
+                  <span className="font-mono text-sm text-amber-300">
                     ₹{totalAmount.toFixed(2)}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between text-xs text-emerald-400">
-                  <span>Advance Received:</span>
+                  <span>जमा अ‍ॅडव्हान्स (Advance Paid):</span>
                   <span className="font-mono font-bold text-sm">
                     - ₹{advanceNum.toFixed(2)}
                   </span>
                 </div>
 
-                <div className="pt-2 border-t border-slate-700 flex items-center justify-between">
+                <div className="pt-2.5 border-t border-slate-700 flex items-center justify-between">
                   <div>
                     <span className="text-[10px] font-black tracking-wider uppercase text-slate-400 block">
-                      Balance Amount Due:
+                      शिल्लक देय रक्कम (Balance Due):
                     </span>
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md inline-block mt-0.5 ${
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md inline-block mt-0.5 ${
                       balanceAmount === 0
-                        ? 'bg-emerald-500/20 text-emerald-400'
-                        : 'bg-rose-500/20 text-rose-300 animate-pulse'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-rose-500/20 text-rose-300 animate-pulse border border-rose-500/30'
                     }`}>
-                      {balanceAmount === 0 ? '✓ Fully Paid' : 'Pending to Collect on Delivery'}
+                      {balanceAmount === 0 ? '✓ पूर्ण भरणा झाला (Fully Paid)' : 'डिलिव्हरीच्या वेळी जमा करणे बाकी (Pending on Delivery)'}
                     </span>
                   </div>
                   <div className="text-right">
@@ -1119,23 +1450,23 @@ export default function PreOrderManagement({
               </div>
 
               {/* Booking Action Buttons */}
-              <div className="grid grid-cols-2 gap-2 pt-1">
+              <div className="grid grid-cols-2 gap-3 pt-1">
                 <button
                   type="button"
                   onClick={() => handleSavePreOrder(false)}
-                  className="py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black transition cursor-pointer flex items-center justify-center space-x-1.5 shadow-sm active:scale-98"
+                  className="py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black transition cursor-pointer flex items-center justify-center space-x-2 shadow-sm active:scale-98"
                 >
                   <Check className="w-4 h-4 text-emerald-400" />
-                  <span>Save Booking</span>
+                  <span>ऑर्डर जतन करा (Save)</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleSavePreOrder(true)}
-                  className="py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-black transition cursor-pointer flex items-center justify-center space-x-1.5 shadow-md shadow-orange-300 active:scale-98"
+                  className="py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-black transition cursor-pointer flex items-center justify-center space-x-2 shadow-md shadow-orange-300 active:scale-98"
                 >
                   <Printer className="w-4 h-4" />
-                  <span>Save & Print Slip</span>
+                  <span>जतन करा & पावती छापा (Save & Print)</span>
                 </button>
               </div>
 
@@ -1406,8 +1737,8 @@ export default function PreOrderManagement({
                       {/* Status Badges */}
                       <div className="flex items-center space-x-2">
                         {isCompleted && (
-                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-emerald-100 text-emerald-800">
-                            ✓ Completed & Settled
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            ✓ Completed & Delivered
                           </span>
                         )}
                         {isCancelled && (
@@ -1416,15 +1747,26 @@ export default function PreOrderManagement({
                           </span>
                         )}
                         {!isCompleted && !isCancelled && (
-                          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-black ${
-                            isTomorrow
-                              ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                              : isToday
-                              ? 'bg-rose-100 text-rose-800 border border-rose-300'
-                              : 'bg-indigo-100 text-indigo-800'
-                          }`}>
-                            {isTomorrow ? 'Due Tomorrow' : isToday ? 'Due Today' : isOverdue ? 'Overdue' : 'Confirmed'}
-                          </span>
+                          <>
+                            {(order.isFullPayment || balance === 0) ? (
+                              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1 shadow-2xs">
+                                <span>✓ १००% भरणा (Full Paid - Settled)</span>
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-amber-100 text-amber-800 border border-amber-300 inline-flex items-center gap-1 shadow-2xs">
+                                <span>बाकी देय: ₹{balance.toFixed(0)} (Pending)</span>
+                              </span>
+                            )}
+                            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-black ${
+                              isTomorrow
+                                ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                : isToday
+                                ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                : 'bg-indigo-100 text-indigo-800'
+                            }`}>
+                              {isTomorrow ? 'Due Tomorrow' : isToday ? 'Due Today' : isOverdue ? 'Overdue' : 'Confirmed'}
+                            </span>
+                          </>
                         )}
 
                         <span className="text-[11px] text-slate-400 font-mono">
@@ -1477,19 +1819,33 @@ export default function PreOrderManagement({
                       {/* Financials Column */}
                       <div className="bg-white rounded-lg p-2.5 border border-slate-200 flex flex-col justify-between">
                         <div className="space-y-1">
-                          <div className="flex justify-between text-slate-500">
-                            <span>Total Amount:</span>
+                          {parseFloat(order.discount || 0) > 0 && (
+                            <div className="flex justify-between text-slate-500 text-[11px]">
+                              <span>एकूण (Subtotal):</span>
+                              <span className="font-bold text-slate-700 font-mono">
+                                ₹{(order.subtotal ? parseFloat(order.subtotal) : (total + parseFloat(order.discount || 0))).toFixed(0)}
+                              </span>
+                            </div>
+                          )}
+                          {parseFloat(order.discount || 0) > 0 && (
+                            <div className="flex justify-between text-rose-600 text-[11px] font-bold">
+                              <span>सवलत (Discount):</span>
+                              <span className="font-mono">-₹{parseFloat(order.discount || 0).toFixed(0)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-slate-600">
+                            <span>{parseFloat(order.discount || 0) > 0 ? 'निव्वळ एकूण (Net Total):' : 'एकूण रक्कम (Total):'}</span>
                             <span className="font-bold text-slate-900 font-mono">₹{total.toFixed(0)}</span>
                           </div>
                           <div className="flex justify-between text-emerald-700">
-                            <span>Advance Paid ({order.advancePaymentMode || 'Cash'}):</span>
+                            <span>अ‍ॅडव्हान्स जमा ({order.advancePaymentMode || 'Cash'}):</span>
                             <span className="font-bold font-mono">₹{advance.toFixed(0)}</span>
                           </div>
                         </div>
 
                         <div className="pt-1.5 border-t border-slate-100 flex justify-between items-center mt-1">
                           <span className="font-extrabold text-slate-700 text-xs">
-                            Balance Due:
+                            शिल्लक रक्कम (Balance Due):
                           </span>
                           <span className={`text-base font-black font-mono ${
                             balance === 0 ? 'text-emerald-600' : 'text-rose-600'
@@ -1501,11 +1857,40 @@ export default function PreOrderManagement({
 
                     </div>
 
+                    {/* Attached Reference Images (if any) */}
+                    {order.images && order.images.length > 0 && (
+                      <div className="bg-amber-50/70 border border-amber-200/70 rounded-xl p-2.5 flex flex-col gap-1.5">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
+                          <ImageIcon className="w-3.5 h-3.5 text-amber-600" />
+                          <span>जोडलेले फोटो / संदर्भ डिझाईन ({order.images.length} Attached Photos):</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2 pt-0.5">
+                          {order.images.map((imgSrc, imgIdx) => (
+                            <div
+                              key={imgIdx}
+                              onClick={() => setViewingImage(imgSrc)}
+                              className="relative group w-14 h-14 rounded-lg overflow-hidden border border-amber-300 bg-white cursor-pointer hover:shadow-md hover:scale-105 transition"
+                              title="फोटो मोठा करून पाहण्यासाठी क्लिक करा (Click to enlarge photo)"
+                            >
+                              <img
+                                src={imgSrc}
+                                alt={`Ref ${imgIdx + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                                <Eye className="w-4 h-4 text-white" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Bottom Actions Bar */}
                     <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                       
                       <div className="flex items-center space-x-1.5 text-xs text-slate-500">
-                        <span>Terminal: {order.bookedByCounter || 'Master'}</span>
+                        <span>काउंटर: {order.bookedByCounter || 'Master'}</span>
                         {order.settledBillInvoiceNo && (
                           <span className="text-emerald-700 font-mono font-bold">
                             • Settled Bill #{order.settledBillInvoiceNo}
@@ -1520,7 +1905,7 @@ export default function PreOrderManagement({
                           className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
                         >
                           <Printer className="w-3.5 h-3.5" />
-                          <span>Print Slip</span>
+                          <span>पावती छापा (Print Slip)</span>
                         </button>
 
                         {/* Edit Pre-Order (only if pending) */}
@@ -1530,22 +1915,40 @@ export default function PreOrderManagement({
                             className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
-                            <span>Edit</span>
+                            <span>बदल करा (Edit)</span>
                           </button>
                         )}
 
-                        {/* Settle / Convert to POS Bill (when collecting remaining balance) */}
+                        {/* Settle / Convert to POS Bill (when collecting remaining balance) OR Mark Delivered if fully paid */}
                         {!isCompleted && !isCancelled && (
-                          <button
-                            onClick={() => {
-                              setSettleModalOrder(order);
-                              setSettlePaymentMode('Cash');
-                            }}
-                            className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-xs transition cursor-pointer"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Collect & Settle Bill</span>
-                          </button>
+                          (order.isFullPayment || balance === 0) ? (
+                            <button
+                              onClick={async () => {
+                                await onUpdatePreOrder(order.id, {
+                                  status: 'completed',
+                                  deliveryStatus: 'delivered',
+                                  deliveredAt: new Date().toISOString()
+                                });
+                                showToast(`Pre-Order ${order.orderNo} डिलिव्हरी पूर्ण झाली! (Delivered)`);
+                              }}
+                              className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-xs transition cursor-pointer"
+                              title="Full payment already settled in Settle Tab. Click to complete delivery."
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>✓ डिलिव्हरी पूर्ण करा (Mark Delivered)</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setSettleModalOrder(order);
+                                setSettlePaymentMode('Cash');
+                              }}
+                              className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-xs transition cursor-pointer"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>शिल्लक जमा करा (Settle Bill)</span>
+                            </button>
+                          )
                         )}
 
                         {/* Cancel order */}
@@ -1587,10 +1990,10 @@ export default function PreOrderManagement({
                 </div>
                 <div>
                   <h3 className="font-black text-sm text-slate-900">
-                    Settle Pre-Order to POS Bill
+                    ऑर्डर पूर्ण करून बिल सेटल करा (Settle Pre-Order)
                   </h3>
                   <p className="text-[11px] text-slate-500 font-mono">
-                    Order No: {settleModalOrder.orderNo}
+                    ऑर्डर क्र. (Order No): {settleModalOrder.orderNo}
                   </p>
                 </div>
               </div>
@@ -1605,23 +2008,39 @@ export default function PreOrderManagement({
             {/* Financial summary breakdown */}
             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-2 text-xs">
               <div className="flex justify-between text-slate-600">
-                <span>Customer Name:</span>
+                <span>ग्राहकाचे नाव (Customer Name):</span>
                 <span className="font-bold text-slate-900">{settleModalOrder.customerName}</span>
               </div>
+              {parseFloat(settleModalOrder.discount || 0) > 0 && (
+                <>
+                  <div className="flex justify-between text-slate-600">
+                    <span>एकूण रक्कम (Subtotal):</span>
+                    <span className="font-mono font-bold text-slate-700">
+                      ₹{(parseFloat(settleModalOrder.subtotal || 0) || (parseFloat(settleModalOrder.totalAmount || 0) + parseFloat(settleModalOrder.discount || 0))).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-rose-600 font-bold">
+                    <span>सवलत (Discount):</span>
+                    <span className="font-mono">
+                      -₹{parseFloat(settleModalOrder.discount || 0).toFixed(2)}
+                    </span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between text-slate-600">
-                <span>Total Order Amount:</span>
+                <span>निव्वळ एकूण रक्कम (Order Total):</span>
                 <span className="font-mono font-bold text-slate-900">
                   ₹{parseFloat(settleModalOrder.totalAmount || 0).toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between text-emerald-700">
-                <span>Advance Already Received:</span>
+                <span>आधी मिळालेला अ‍ॅडव्हान्स (Advance Paid):</span>
                 <span className="font-mono font-bold">
                   ₹{parseFloat(settleModalOrder.advancePayment || 0).toFixed(2)}
                 </span>
               </div>
               <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-sm">
-                <span className="font-black text-slate-900">Balance to Collect:</span>
+                <span className="font-black text-slate-900">शिल्लक रक्कम (Balance to Collect):</span>
                 <span className="font-mono font-black text-xl text-rose-600">
                   ₹{parseFloat(settleModalOrder.balanceAmount !== undefined ? settleModalOrder.balanceAmount : (settleModalOrder.totalAmount - settleModalOrder.advancePayment)).toFixed(2)}
                 </span>
@@ -1631,28 +2050,33 @@ export default function PreOrderManagement({
             {/* Payment Mode for Balance */}
             <div>
               <label className="text-[11px] font-extrabold text-slate-700 block mb-1.5">
-                Balance Payment Received Via:
+                शिल्लक रक्कम कोणत्या प्रकारे घेतली? (Balance Payment Mode):
               </label>
               <div className="grid grid-cols-2 gap-2">
-                {['Cash', 'UPI / QR', 'Card', 'Bank Transfer'].map((mode) => (
+                {[
+                  { id: 'Cash', label: 'रोख (Cash)' },
+                  { id: 'UPI / QR', label: 'UPI / QR कोड' },
+                  { id: 'Card', label: 'कार्ड (Card)' },
+                  { id: 'Bank Transfer', label: 'बँक ट्रान्सफर' }
+                ].map((mode) => (
                   <button
-                    key={mode}
+                    key={mode.id}
                     type="button"
-                    onClick={() => setSettlePaymentMode(mode)}
+                    onClick={() => setSettlePaymentMode(mode.id)}
                     className={`py-2 rounded-xl text-xs font-black transition cursor-pointer border ${
-                      settlePaymentMode === mode
+                      settlePaymentMode === mode.id
                         ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
                         : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
                     }`}
                   >
-                    {mode}
+                    {mode.label}
                   </button>
                 ))}
               </div>
             </div>
 
             <p className="text-[10px] text-slate-500 leading-tight">
-              Settling this pre-order will generate a formal POS receipt, deduct raw material stock, record revenue in today's accounting reports, and mark this booking as Completed.
+              नोंद: ऑर्डर सेटल केल्यावर उर्वरित शिल्लक रक्कम आजच्या विक्रीमध्ये नोंदवली जाईल आणि किचन इन्व्हेंटरीमधून स्टॉक वजा केला जाईल.
             </p>
 
             <div className="grid grid-cols-2 gap-2 pt-2">
@@ -1661,15 +2085,61 @@ export default function PreOrderManagement({
                 onClick={() => setSettleModalOrder(null)}
                 className="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition cursor-pointer"
               >
-                Cancel
+                रद्द करा (Cancel)
               </button>
               <button
                 type="button"
                 onClick={handleConfirmSettleBill}
                 className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs transition cursor-pointer shadow-md shadow-emerald-200"
               >
-                Confirm & Settle Bill
+                बिल सेटल करा (Confirm Settle)
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Fullscreen Image Viewer */}
+      {viewingImage && (
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setViewingImage(null)}
+        >
+          <div 
+            className="relative max-w-3xl w-full max-h-[90vh] bg-slate-900 rounded-3xl overflow-hidden shadow-2xl flex flex-col border border-slate-700"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-3 bg-slate-800 text-white border-b border-slate-700">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-amber-400" />
+                <span className="text-xs font-bold">संदर्भ फोटो / डिझाईन (Reference Photo)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={viewingImage}
+                  download="preorder-reference-image.jpg"
+                  className="flex items-center gap-1.5 px-3 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-bold transition"
+                  title="फोटो डाउनलोड करा (Download)"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>डाउनलोड</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setViewingImage(null)}
+                  className="p-1 text-slate-400 hover:text-white rounded-lg transition cursor-pointer"
+                  title="बंद करा (Close)"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto flex items-center justify-center p-4 bg-black/50 min-h-[300px]">
+              <img
+                src={viewingImage}
+                alt="Pre-Order Reference"
+                className="max-w-full max-h-[75vh] object-contain rounded-xl shadow-lg border border-slate-800"
+              />
             </div>
           </div>
         </div>

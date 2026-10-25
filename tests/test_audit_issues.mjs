@@ -212,3 +212,4 @@ console.log('\nTest 8: Settled bill resettle preserves paymentMode & finalTotal.
 }
 
 console.log('\n🎉 ALL 8 AUDITED ISSUES SUCCESSFULLY RESOLVED AND VERIFIED PASSING!\n');
+process.exit(0);
