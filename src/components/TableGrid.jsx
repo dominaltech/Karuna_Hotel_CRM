@@ -28,41 +28,8 @@ import { printThermalReceipt } from '../utils/receiptUtils';
 import { getSectionTheme } from '../utils/themeUtils';
 export { getSectionTheme };
 
-const ZOOM_STEPS = [100, 125, 150, 175, 200];
-
-const getGridColsClass = (zoomPercent) => {
-  switch (zoomPercent) {
-    case 100:
-      return 'grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2.5';
-    case 125:
-      return 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3';
-    case 150:
-      return 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5';
-    case 175:
-      return 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4';
-    case 200:
-      return 'grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5';
-    default:
-      return 'grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2.5';
-  }
-};
-
-const getCardHeightClass = (zoomPercent) => {
-  switch (zoomPercent) {
-    case 100:
-      return 'min-h-[135px] p-2.5 text-xs';
-    case 125:
-      return 'min-h-[155px] p-3.5 text-sm';
-    case 150:
-      return 'min-h-[185px] p-4 text-base';
-    case 175:
-      return 'min-h-[210px] p-5 text-lg';
-    case 200:
-      return 'min-h-[245px] p-6 text-xl';
-    default:
-      return 'min-h-[135px] p-2.5 text-xs';
-  }
-};
+const getGridColsClass = () => 'grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2.5';
+const getCardHeightClass = () => 'min-h-[135px] p-2.5 text-xs';
 
 // Natural alphanumeric comparator: D1, D1-A, D1-B, D2, D2-A, D3 ... D10
 const sortTablesNaturally = (tableA, tableB) => {
@@ -82,7 +49,6 @@ const getLocalDateStr = (dateObjOrStr) => {
 };
 
 export default function TableGrid({
-  currentZoom: propZoom = 100,
   tables,
   sections,
   settledBillsCount,
@@ -114,7 +80,7 @@ export default function TableGrid({
     }
   }, [initialAreaFilter]);
   const [openStatusDropdownTableId, setOpenStatusDropdownTableId] = useState(null);
-  const currentZoom = propZoom || 100;
+  const currentZoom = 100;
 
   // Resettle & Edit Bill Modal States
   const [selectedBill, setSelectedBill] = useState(null);

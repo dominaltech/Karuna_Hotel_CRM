@@ -3182,21 +3182,103 @@ export const DEFAULT_INITIAL_DATA = {
 };
 
 // --- Dynamic Server IP & Networking ---
-export function getServerIp() {
-  if (typeof window !== 'undefined') {
+export function getServerConfig() {
+  const isBrowser = typeof window !== 'undefined';
+  const pageIsHttps = isBrowser && window.location.protocol === 'https:';
+
+  let raw = '';
+  if (isBrowser) {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('server')) return params.get('server').trim();
-
-    const saved = localStorage.getItem('karuna_server_ip');
-    if (saved && saved.trim() !== '' && saved !== 'isServer' && saved !== '10.40.145.195') {
-      return saved.trim();
-    }
-
-    if (window.location.hostname && window.location.hostname !== '') {
-      return window.location.hostname;
+    if (params.get('server')) {
+      raw = params.get('server').trim();
+    } else {
+      const saved = localStorage.getItem('karuna_server_ip');
+      if (saved && saved.trim() !== '' && saved !== 'isServer' && saved !== '10.40.145.195') {
+        raw = saved.trim();
+      } else if (window.location.hostname && window.location.hostname !== '') {
+        raw = window.location.hostname;
+      }
     }
   }
-  return '127.0.0.1';
+
+  if (!raw) raw = '127.0.0.1';
+
+  let hostname = raw;
+  let port = '';
+  let path = '';
+  let isExplicitHttps = false;
+
+  // Check if raw starts with protocol (e.g. http://, https://, ws://, wss://)
+  if (/^https?:\/\//i.test(raw) || /^wss?:\/\//i.test(raw)) {
+    try {
+      const norm = raw.replace(/^ws:\/\//i, 'http://').replace(/^wss:\/\//i, 'https://');
+      const parsed = new URL(norm);
+      isExplicitHttps = raw.startsWith('https://') || raw.startsWith('wss://');
+      hostname = parsed.hostname;
+      port = parsed.port;
+      path = parsed.pathname !== '/' ? parsed.pathname.replace(/\/$/, '') : '';
+    } catch (e) {
+      hostname = raw;
+    }
+  } else {
+    // If raw is "host:port" or "host:port/path"
+    if (hostname.includes(':')) {
+      const parts = hostname.split(':');
+      hostname = parts[0];
+      const rest = parts.slice(1).join(':');
+      if (rest.includes('/')) {
+        const pParts = rest.split('/');
+        port = pParts[0];
+        path = '/' + pParts.slice(1).join('/');
+      } else {
+        port = rest;
+      }
+    } else if (hostname.includes('/')) {
+      const parts = hostname.split('/');
+      hostname = parts[0];
+      path = '/' + parts.slice(1).join('/');
+    }
+  }
+
+  hostname = (hostname || '127.0.0.1').trim();
+
+  // If the web page was loaded over HTTPS, browsers unconditionally block unencrypted HTTP/WS (Mixed Content).
+  // In that case, we MUST use secure protocols (WSS / HTTPS).
+  const isSecure = pageIsHttps || isExplicitHttps;
+
+  const isLocalOrIp = hostname === 'localhost' || hostname === '127.0.0.1' || /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname);
+
+  if (!port) {
+    if (isLocalOrIp || !isSecure) {
+      port = '3001';
+    } else {
+      // Public domain on HTTPS: default to standard 443 (empty port) unless user specified
+      port = '';
+    }
+  }
+
+  const portSuffix = port ? `:${port}` : '';
+  const httpProto = isSecure ? 'https:' : 'http:';
+  const wsProto = isSecure ? 'wss:' : 'ws:';
+
+  const cleanPath = path ? (path.startsWith('/') ? path : `/${path}`) : '';
+  const apiBase = `${httpProto}//${hostname}${portSuffix}${cleanPath}/api`.replace(/\/+/g, '/').replace(':/', '://');
+  const wsUrl = `${wsProto}//${hostname}${portSuffix}${cleanPath}`.replace(/\/+$/, '');
+
+  return {
+    raw,
+    hostname,
+    port,
+    isSecure,
+    pageIsHttps,
+    isLocalOrIp,
+    apiBase,
+    wsUrl
+  };
+}
+
+export function getServerIp() {
+  return getServerConfig().hostname;
 }
 
 export function setServerIp(ip) {
@@ -3214,15 +3296,11 @@ export function setServerIp(ip) {
 }
 
 export const getApiBase = () => {
-  const ip = getServerIp();
-  const port = 3001;
-  return `http://${ip}:${port}/api`;
+  return getServerConfig().apiBase;
 };
 
 export const getWsUrl = () => {
-  const ip = getServerIp();
-  const port = 3001;
-  return `ws://${ip}:${port}`;
+  return getServerConfig().wsUrl;
 };
 
 // In-Memory Synchronized Cache
@@ -3488,11 +3566,11 @@ export function initWebSocketSync(forceReconnect = false) {
   }
 
   try {
-    console.log('🔄 Connecting to Master Database Server over LAN:', wsUrl);
+    console.log('🔄 Connecting to Master Database Server:', wsUrl);
     wsClient = new WebSocket(wsUrl);
 
     wsClient.onopen = async () => {
-      console.log('🟢 Connected to Master Database Server over LAN:', wsUrl);
+      console.log('🟢 Connected to Master Database Server:', wsUrl);
       setConnectionStatus(true);
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
@@ -3531,12 +3609,20 @@ export function initWebSocketSync(forceReconnect = false) {
         reconnectTimer = setTimeout(() => {
           reconnectTimer = null;
           initWebSocketSync();
-        }, 3000);
+        }, 5000);
       }
     };
   } catch (err) {
-    console.error('Error initializing WebSocket sync:', err);
+    console.warn('Unable to establish WebSocket connection (' + wsUrl + '):', err.message || err);
     setConnectionStatus(false);
+    wsClient = null;
+    loadLocalDexieFallback();
+    if (!reconnectTimer) {
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        initWebSocketSync();
+      }, 5000);
+    }
   }
 }
 
@@ -3735,6 +3821,9 @@ function handleServerBroadcast(msg) {
 export async function fetchAllDataFromServer() {
   try {
     const res = await fetch(`${getApiBase()}/all-data`);
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} ${res.statusText || ''}`.trim());
+    }
     const json = await res.json();
     if (json.success && json.data) {
       Object.keys(json.data).forEach((key) => {
@@ -3775,7 +3864,7 @@ export async function fetchAllDataFromServer() {
       notifyListeners('BOOTSTRAP', dbCache);
     }
   } catch (err) {
-    console.warn('Master Server offline. Loading snapshot from local Dexie storage:', err);
+    console.info('Master Server snapshot unavailable (' + (err.message || 'connection failed') + '). Loading local Dexie storage.');
     // Load local Dexie data
     await loadLocalDexieFallback();
   }

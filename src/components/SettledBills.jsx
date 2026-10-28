@@ -149,18 +149,21 @@ export default function SettledBills({
     return Boolean(bill.isResettled || getBillEditLogs(bill).length > 0);
   };
 
-  const totalEditedCount = (settledBills || []).filter((b) => !b?.isPreOrderAdvance && isBillEdited(b)).length;
+  // Count only today's edited bills
+  const totalEditedCount = (settledBills || []).filter((b) => {
+    if (!b || b.isPreOrderAdvance) return false;
+    const billDateStr = b.createdAt ? getLocalDateStr(b.createdAt) : todayStr;
+    return billDateStr === todayStr && isBillEdited(b);
+  }).length;
 
-  // Filter bills by Time Period ('today' | 'all' | 'edited')
-  // Requirement: Pre-orders whose payment is pending should NEVER show in settle tab
+  // Filter bills by Time Period: strictly Today's Bills ('today' | 'edited')
+  // Requirement: Past historical bills are excluded; only today's settled bills are shown
   const baseTimeBills = (settledBills || []).filter((b) => {
-    if (!b) return false;
-    if (b.isPreOrderAdvance) return false;
+    if (!b || b.isPreOrderAdvance) return false;
+    const billDateStr = b.createdAt ? getLocalDateStr(b.createdAt) : todayStr;
+    if (billDateStr !== todayStr) return false;
     if (timeFilter === 'edited') return isBillEdited(b);
-    if (timeFilter === 'all') return true;
-    if (!b.createdAt) return true;
-    const billDateStr = getLocalDateStr(b.createdAt);
-    return billDateStr === todayStr;
+    return true;
   });
 
   // Filter by Counter
@@ -436,7 +439,7 @@ export default function SettledBills({
         {/* Filter Controls: Today vs All Time vs Edited Bills + Counter Filter + Search */}
         <div className="flex flex-wrap items-center gap-3 pr-12">
           
-          {/* Today vs All Time vs Edited Toggle */}
+          {/* Today's vs Edited Bills Toggle */}
           <div className="flex items-center bg-white border border-slate-300 rounded-xl p-1 shadow-2xs">
             <button
               onClick={() => setTimeFilter('today')}
@@ -451,25 +454,13 @@ export default function SettledBills({
             </button>
 
             <button
-              onClick={() => setTimeFilter('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center space-x-1.5 ${
-                timeFilter === 'all'
-                  ? 'bg-neutral-900 text-white shadow-xs'
-                  : 'text-neutral-700 hover:text-black'
-              }`}
-            >
-              <History className="w-3.5 h-3.5" />
-              <span>All Time History</span>
-            </button>
-
-            <button
               onClick={() => setTimeFilter('edited')}
               className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center space-x-1.5 ${
                 timeFilter === 'edited'
                   ? 'bg-amber-600 text-white shadow-xs'
                   : 'text-amber-800 hover:text-amber-950 hover:bg-amber-50'
               }`}
-              title="Show only settled bills that have been edited or modified"
+              title="Show only today's settled bills that have been edited or modified"
             >
               <Edit3 className="w-3.5 h-3.5" />
               <span>Edited Bills ({totalEditedCount})</span>

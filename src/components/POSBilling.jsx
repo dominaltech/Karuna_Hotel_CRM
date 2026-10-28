@@ -31,7 +31,6 @@ const formatTokenNumber = (token, table) => {
 };
 
 export default function POSBilling({
-  currentZoom = 100,
   dishes,
   categories,
   subCategories,
@@ -591,7 +590,6 @@ export default function POSBilling({
   if (!activeTable) {
     return (
       <TableGrid
-        currentZoom={currentZoom}
         tables={tables}
         sections={sections}
         settledBillsCount={settledBillsCount}

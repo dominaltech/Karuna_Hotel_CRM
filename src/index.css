@@ -70,3 +70,33 @@ body {
     display: none !important;
   }
 }
+
+/* ==========================================================================
+   Remove Up/Down Stepper Arrows from Quantity & Number Inputs across System
+   ========================================================================== */
+/* Chrome, Safari, Edge, Opera, Chromium, Electron */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button,
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+
+/* Firefox */
+input[type="number"] {
+  -moz-appearance: textfield !important;
+  appearance: textfield !important;
+}
+
+/* Fallback & utility class for any input */
+.no-spin::-webkit-outer-spin-button,
+.no-spin::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+.no-spin {
+  -moz-appearance: textfield !important;
+  appearance: textfield !important;
+}
+

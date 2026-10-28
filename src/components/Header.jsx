@@ -16,8 +16,6 @@ import {
   Lock,
   RefreshCw,
   Edit2,
-  ZoomIn,
-  ZoomOut,
   Languages,
   CalendarClock,
   ClipboardList
@@ -44,11 +42,6 @@ export default function Header({
   onForceSync,
   onRequestAdminTab,
   onToggleHeaderHidden,
-  currentZoom = 100,
-  canZoomIn = true,
-  canZoomOut = false,
-  onZoomIn,
-  onZoomOut,
   printLanguage = 'mr',
   onLanguageChange
 }) {
@@ -124,7 +117,7 @@ export default function Header({
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm select-none">
-      <div className="w-full px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 flex items-center justify-between gap-1.5 md:gap-2 xl:gap-3 pr-14 shrink-0">
+      <div className="w-full px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 flex items-center justify-between gap-1.5 md:gap-2 xl:gap-3 shrink-0">
         
         {/* Brand / Logo */}
         <div className="flex items-center space-x-2 sm:space-x-2.5 shrink-0">
@@ -201,43 +194,6 @@ export default function Header({
             </button>
           </div>
 
-          {/* Zoom In / Zoom Out Controls */}
-          {onZoomIn && onZoomOut && (
-            <div className="flex items-center bg-slate-100 border border-slate-300 rounded-xl p-0.5 shadow-2xs space-x-0.5">
-              <button
-                type="button"
-                onClick={onZoomOut}
-                disabled={!canZoomOut}
-                className={`p-1 rounded-lg transition-colors cursor-pointer ${
-                  !canZoomOut
-                    ? 'text-slate-300 cursor-not-allowed'
-                    : 'text-slate-700 hover:bg-white hover:text-slate-900 active:bg-slate-200'
-                }`}
-                title="Zoom Out Tables (Smaller cards)"
-              >
-                <ZoomOut className="w-3 h-3" />
-              </button>
-
-              <span className="text-[10px] font-black text-slate-700 px-0.5 select-none min-w-[34px] text-center">
-                {currentZoom}%
-              </span>
-
-              <button
-                type="button"
-                onClick={onZoomIn}
-                disabled={!canZoomIn}
-                className={`p-1 rounded-lg transition-colors cursor-pointer ${
-                  !canZoomIn
-                    ? 'text-slate-300 cursor-not-allowed'
-                    : 'text-slate-700 hover:bg-white hover:text-slate-900 active:bg-slate-200'
-                }`}
-                title="Zoom In Tables (Larger cards)"
-              >
-                <ZoomIn className="w-3 h-3" />
-              </button>
-            </div>
-          )}
-          
           {/* Offline Queue Sync Button if any bills pending */}
           {offlineQueueCount > 0 && (
             <button
@@ -361,6 +317,18 @@ export default function Header({
                   <p className="text-[10px] text-slate-500 leading-tight pt-1">
                     Enter the IP of your Owner/Server computer so all counter billing updates instantly sync in real-time.
                   </p>
+
+                  {typeof window !== 'undefined' && window.location.protocol === 'https:' && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-[10px] text-amber-900 leading-snug">
+                      <span className="font-extrabold text-amber-950">⚠️ Running on HTTPS ({window.location.hostname}):</span>
+                      <p className="mt-0.5 text-amber-800">
+                        Web browsers block HTTPS websites from directly connecting to local LAN IP addresses (192.168.x.x / localhost) due to Mixed Content & Private Network security rules.
+                      </p>
+                      <p className="mt-1 text-slate-700 font-medium">
+                        👉 <strong>For Hotel LAN Billing:</strong> Use the <strong>Desktop App</strong> (<code>START_COUNTER_LAPTOP.bat</code>) or open <code>http://&lt;server-ip&gt;:5173</code> in your local network browser.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -370,11 +338,11 @@ export default function Header({
           <div className="relative shrink-0">
             <button
               onClick={() => setIsCounterDropdownOpen(!isCounterDropdownOpen)}
-              className="bg-slate-900 hover:bg-slate-800 text-white px-2.5 py-1 sm:py-1.5 rounded-xl text-xs font-black flex items-center space-x-1.5 cursor-pointer shadow-sm transition-all border border-slate-700 shrink-0"
+              className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-xl text-xs font-black flex items-center space-x-1.5 cursor-pointer shadow-sm transition-all border border-slate-700 shrink-0"
               title="Switch Active Counter Terminal"
             >
-              <Monitor className="w-3 h-3 text-indigo-400 shrink-0" />
-              <span className="truncate max-w-[90px] sm:max-w-[110px] xl:max-w-[130px]">{activeCounter.split(' ')[0]} {activeCounter.split(' ')[1] || ''}</span>
+              <Monitor className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+              <span className="truncate max-w-[95px] sm:max-w-[120px] xl:max-w-[140px]">{activeCounter.split(' ')[0]} {activeCounter.split(' ')[1] || ''}</span>
               <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
             </button>
 
@@ -413,6 +381,18 @@ export default function Header({
               </div>
             )}
           </div>
+
+          {/* Header Collapse / Hide Toggle Button (Inline in Header flow, never overlapping) */}
+          {onToggleHeaderHidden && (
+            <button
+              type="button"
+              onClick={onToggleHeaderHidden}
+              className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 flex items-center justify-center transition-all duration-150 cursor-pointer shadow-xs shrink-0 hover:scale-105 active:scale-95 ml-0.5"
+              title="Hide Navigation Header"
+            >
+              <ChevronUp className="w-4 h-4 text-slate-700 stroke-[3]" />
+            </button>
+          )}
 
         </div>
 

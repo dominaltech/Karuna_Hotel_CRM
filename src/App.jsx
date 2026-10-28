@@ -960,30 +960,6 @@ export default function App() {
     syncStateFromCache(snapshot);
   };
 
-  const ZOOM_STEPS = [100, 125, 150, 175, 200];
-  const [zoomIndex, setZoomIndex] = useState(() => {
-    const saved = localStorage.getItem('karuna_table_zoom_index');
-    const parsed = parseInt(saved, 10);
-    return !isNaN(parsed) && parsed >= 0 && parsed < ZOOM_STEPS.length ? parsed : 0;
-  });
-  const currentZoom = ZOOM_STEPS[zoomIndex] || 100;
-
-  const handleZoomIn = () => {
-    setZoomIndex((idx) => {
-      const next = Math.min(ZOOM_STEPS.length - 1, idx + 1);
-      localStorage.setItem('karuna_table_zoom_index', String(next));
-      return next;
-    });
-  };
-
-  const handleZoomOut = () => {
-    setZoomIndex((idx) => {
-      const next = Math.max(0, idx - 1);
-      localStorage.setItem('karuna_table_zoom_index', String(next));
-      return next;
-    });
-  };
-
   const [isHeaderHidden, setIsHeaderHidden] = useState(() => {
     return localStorage.getItem('karuna_header_hidden') === 'true';
   });
@@ -1255,11 +1231,6 @@ export default function App() {
           onForceSync={handleForceSync}
           onRequestAdminTab={handleRequestAdminTab}
           onToggleHeaderHidden={toggleHeaderHidden}
-          currentZoom={currentZoom}
-          canZoomIn={zoomIndex < ZOOM_STEPS.length - 1}
-          canZoomOut={zoomIndex > 0}
-          onZoomIn={handleZoomIn}
-          onZoomOut={handleZoomOut}
           printLanguage={printLanguage}
           onLanguageChange={handleLanguageChange}
         />
@@ -1301,23 +1272,15 @@ export default function App() {
         </div>
       )}
 
-      {/* Fixed Position Hide/Show Header Toggle Button (Always at fixed top-3 right-3) */}
-      {(!activeTable || activeTab !== 'pos') && (
+      {/* Floating Expand Header Button (shown ONLY when header is hidden) */}
+      {isHeaderHidden && (!activeTable || activeTab !== 'pos') && (
         <button
           type="button"
           onClick={toggleHeaderHidden}
-          className={`fixed top-3 right-3 z-50 w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-150 cursor-pointer shadow-xl hover:scale-105 active:scale-95 ${
-            isHeaderHidden
-              ? 'bg-slate-900 hover:bg-slate-800 text-white border border-slate-700 shadow-2xl animate-in slide-in-from-top-2'
-              : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 shadow-sm'
-          }`}
-          title={isHeaderHidden ? 'Show Navigation Header' : 'Hide Navigation Header'}
+          className="fixed top-3 right-3 z-50 w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-150 cursor-pointer shadow-2xl bg-slate-900 hover:bg-slate-800 text-white border border-slate-700 hover:scale-105 active:scale-95 animate-in slide-in-from-top-2"
+          title="Show Navigation Header"
         >
-          {isHeaderHidden ? (
-            <ChevronDown className="w-5 h-5 text-blue-400 stroke-[3]" />
-          ) : (
-            <ChevronUp className="w-5 h-5 text-slate-700 stroke-[3]" />
-          )}
+          <ChevronDown className="w-5 h-5 text-blue-400 stroke-[3]" />
         </button>
       )}
 
@@ -1325,7 +1288,6 @@ export default function App() {
         
         {activeTab === 'pos' && (
           <POSBilling
-            currentZoom={currentZoom}
             dishes={dishes}
             categories={categories}
             subCategories={subCategories}

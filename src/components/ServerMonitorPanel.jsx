@@ -439,6 +439,20 @@ export default function ServerMonitorPanel({
                 </button>
               </div>
 
+              {typeof window !== 'undefined' && window.location.protocol === 'https:' && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-200 leading-snug">
+                  <span className="font-bold text-amber-400 block mb-0.5">⚠️ Running on HTTPS ({window.location.hostname})</span>
+                  Web browsers block HTTPS sites from directly accessing local network IP addresses (192.168.x.x / localhost).
+                  <div className="mt-1 text-slate-300">
+                    To connect to your Master Server locally on the hotel LAN:
+                    <ul className="list-disc list-inside mt-0.5 space-y-0.5 text-[11px] text-slate-400">
+                      <li>Use the Desktop Software: <code className="text-amber-300">START_COUNTER_LAPTOP.bat</code></li>
+                      <li>Or open locally via <code className="text-amber-300">http://&lt;server-ip&gt;:5173</code></li>
+                    </ul>
+                  </div>
+                </div>
+              )}
+
               <button
                 type="submit"
                 className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition shadow-md shadow-indigo-600/20"
